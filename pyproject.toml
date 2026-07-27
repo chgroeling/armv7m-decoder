@@ -1,0 +1,45 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "armv7m-decoder"
+version = "0.1.0"
+description = "Instruction decoder for the ARMv7-M architecture, written in Python."
+authors = [
+    {name = "Chris Groeling", email = "contact@christiangroeling.de"}
+]
+requires-python = ">=3.12"
+license = "GPL-3.0-only"
+readme = "README.md"
+dependencies = []
+
+[project.scripts]
+armv7m-decoder = "armv7m_decoder.cli:main"
+
+[dependency-groups]
+dev = [
+    "decoder-forge",
+    "pytest>=8",
+    "ruff>=0.9",
+]
+
+[tool.uv.sources]
+decoder-forge = { git = "https://github.com/chgroeling/decoder-forge", tag = "v1.1.1" }
+
+[tool.ruff]
+target-version = "py312"
+line-length = 88
+exclude = ["src/armv7m_decoder/_decoder.py"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "W"]
+
+[tool.ruff.format]
+quote-style = "double"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/armv7m_decoder"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

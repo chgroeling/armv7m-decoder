@@ -1,0 +1,7722 @@
+metadata:
+  architecture: ARMv7-M
+  instruction_set: Thumb
+  source_manual: Armv7-M Architecture Reference Manual
+  source_id: ARM DDI 0403E.e
+  note: 'Decode-only extract: walk bit_fields MSB→LSB — skip N bits for `skip` entries, extract field
+    values for `field` entries. The pattern string shows the full bit layout (''0''/''1'' for fixed, ''x''
+    for variable/don''t-care).'
+instructions:
+- id: ADC_immediate
+  mnemonic: ADC
+  encodings:
+  - name: T1
+    length_bits: 32
+    pattern: 11110x01010xxxxx0xxxxxxxxxxxxxxx
+    bit_fields:
+    - skip: 5
+    - field: i
+      width: 1
+    - skip: 5
+    - field: S
+      width: 1
+    - field: Rn
+      width: 4
+    - skip: 1
+    - field: imm3
+      width: 3
+    - field: Rd
+      width: 4
+    - field: imm8
+      width: 8
+    decode: |
+      d = UInt(Rd); n = UInt(Rn); setflags = (S == '1');
+      imm32 = ThumbExpandImm(i:imm3:imm8);
+      if d IN {13,15} || n IN {13,15} then UNPREDICTABLE;
+- id: ADC_register
+  mnemonic: ADC
+  encodings:
+  - name: T1
+    length_bits: 16
+    pattern: 0100000101xxxxxx
+    bit_fields:
+    - skip: 10
+    - field: Rm
+      width: 3
+    - field: Rdn
+      width: 3
+    decode: |
+      d = UInt(Rdn); n = UInt(Rdn); m = UInt(Rm); setflags = !InITBlock();
+      (shift_t, shift_n) = (SRType_LSL, 0);
+  - name: T2
+    length_bits: 32
+    pattern: 11101011010xxxxxxxxxxxxxxxxxxxxx
+    bit_fields:
+    - skip: 11
+    - field: S
+      width: 1
+    - field: Rn
+      width: 4
+    - skip: 1
+    - field: imm3
+      width: 3
+    - field: Rd
+      width: 4
+    - field: imm2
+      width: 2
+    - field: type
+      width: 2
+    - field: Rm
+      width: 4
+    decode: |
+      d = UInt(Rd); n = UInt(Rn); m = UInt(Rm); setflags = (S == '1');
+      (shift_t, shift_n) = DecodeImmShift(type, imm3:imm2);
+      if d IN {13,15} || n IN {13,15} || m IN {13,15} then UNPREDICTABLE;
+- id: ADD_immediate
+  mnemonic: ADD
+  encodings:
+  - name: T1
+    length_bits: 16
+    pattern: 0001110xxxxxxxxx
+    bit_fields:
+    - skip: 7
+    - field: imm3
+      width: 3
+    - field: Rn
+      width: 3
+    - field: Rd
+      width: 3
+    decode: |
+      d = UInt(Rd); n = UInt(Rn); setflags = !InITBlock();
+      imm32 = ZeroExtend(imm3, 32);
+  - name: T2
+    length_bits: 16
+    pattern: 00110xxxxxxxxxxx
+    bit_fields:
+    - skip: 5
+    - field: Rdn
+      width: 3
+    - field: imm8
+      width: 8
+    decode: |
+      d = UInt(Rdn); n = UInt(Rdn); setflags = !InITBlock();
+      imm32 = ZeroExtend(imm8, 32);
+  - name: T3
+    length_bits: 32
+    pattern: 11110x01000xxxxx0xxxxxxxxxxxxxxx
+    bit_fields:
+    - skip: 5
+    - field: i
+      width: 1
+    - skip: 5
+    - field: S
+      width: 1
+    - field: Rn
+      width: 4
+    - skip: 1
+    - field: imm3
+      width: 3
+    - field: Rd
+      width: 4
+    - field: imm8
+      width: 8
+    decode: |
+      if Rd == '1111' && S == '1' then SEE CMN (immediate);
+      if Rn == '1101' then SEE ADD (SP plus immediate);
+      d = UInt(Rd); n = UInt(Rn); setflags = (S == '1');
+      imm32 = ThumbExpandImm(i:imm3:imm8);
+      if d == 13 || (d == 15 && S == '0') || n == 15 then UNPREDICTABLE;
+  - name: T4
+    length_bits: 32
+    pattern: 11110x100000xxxx0xxxxxxxxxxxxxxx
+    bit_fields:
+    - skip: 5
+    - field: i
+      width: 1
+    - skip: 6
+    - field: Rn
+      width: 4
+    - skip: 1
+    - field: imm3
+      width: 3
+    - field: Rd
+      width: 4
+    - field: imm8
+      width: 8
+    decode: |
+      if Rn == '1111' then SEE ADR;
+      if Rn == '1101' then SEE ADD (SP plus immediate);
+      d = UInt(Rd); n = UInt(Rn); setflags = FALSE;
+      imm32 = ZeroExtend(i:imm3:imm8, 32);
+      if d IN {13,15} then UNPREDICTABLE;
+- id: ADD_register
+  mnemonic: ADD
+  encodings:
+  - name: T1
+    length_bits: 16
+    pattern: 0001100xxxxxxxxx
+    bit_fields:
+    - skip: 7
+    - field: Rm
+      width: 3
+    - field: Rn
+      width: 3
+    - field: Rd
+      width: 3
+    decode: |
+      d = UInt(Rd); n = UInt(Rn); m = UInt(Rm); setflags = !InITBlock();
+      (shift_t, shift_n) = (SRType_LSL, 0);
+  - name: T2
+    length_bits: 16
+    pattern: 01000100xxxxxxxx
+    bit_fields:
+    - skip: 8
+    - field: DN
+      width: 1
+    - field: Rm
+      width: 4
+    - field: Rdn
+      width: 3
+    decode: |
+      if (DN:Rdn) == '1101' || Rm == '1101' then SEE ADD (SP plus register);
+      d = UInt(DN:Rdn); n = UInt(DN:Rdn); m = UInt(Rm); setflags = FALSE;
+      (shift_t, shift_n) = (SRType_LSL, 0);
+      if d == 15 && InITBlock() && !LastInITBlock() then UNPREDICTABLE;
+      if d == 15 && m == 15 then UNPREDICTABLE;
+  - name: T3
+    length_bits: 32
+    pattern: 11101011000xxxxxxxxxxxxxxxxxxxxx
+    bit_fields:
+    - skip: 11
+    - field: S
+      width: 1
+    - field: Rn
+      width: 4
+    - skip: 1
+    - field: imm3
+      width: 3
+    - field: Rd
+      width: 4
+    - field: imm2
+      width: 2
+    - field: type
+      width: 2
+    - field: Rm
+      width: 4
+    decode: |
+      if Rd == '1111' && S == '1' then SEE CMN (register);
+      if Rn == '1101' then SEE ADD (SP plus register);
+      d = UInt(Rd); n = UInt(Rn); m = UInt(Rm); setflags = (S == '1');
+      (shift_t, shift_n) = DecodeImmShift(type, imm3:imm2);
+      if d == 13 || (d == 15 && S == '0') || n == 15 || m IN {13,15} then UNPREDICTABLE;
+- id: ADD_SP_plus_immediate
+  mnemonic: ADD
+  encodings:
+  - name: T1
+    length_bits: 16
+    pattern: 10101xxxxxxxxxxx
+    bit_fields:
+    - skip: 5
+    - field: Rd
+      width: 3
+    - field: imm8
+      width: 8
+    decode: |
+      d = UInt(Rd); setflags = FALSE; imm32 = ZeroExtend(imm8:'00', 32);
+  - name: T2
+    length_bits: 16
+    pattern: 101100000xxxxxxx
+    bit_fields:
+    - skip: 9
+    - field: imm7
+      width: 7
+    decode: |
+      d = 13; setflags = FALSE; imm32 = ZeroExtend(imm7:'00', 32);
+  - name: T3
+    length_bits: 32
+    pattern: 11110x01000x11010xxxxxxxxxxxxxxx
+    bit_fields:
+    - skip: 5
+    - field: i
+      width: 1
+    - skip: 5
+    - field: S
+      width: 1
+    - skip: 4
+    - skip: 1
+    - field: imm3
+      width: 3
+    - field: Rd
+      width: 4
+    - field: imm8
+      width: 8
+    decode: |
+      if Rd == '1111' && S == '1' then SEE CMN (immediate);
+      d = UInt(Rd); setflags = (S == '1'); imm32 = ThumbExpandImm(i:imm3:imm8);
+      if d == 15 && S == '0' then UNPREDICTABLE;
+  - name: T4
+    length_bits: 32
+    pattern: 11110x10000011010xxxxxxxxxxxxxxx
+    bit_fields:
+    - skip: 5
+    - field: i
+      width: 1
+    - skip: 6
+    - skip: 4
+    - skip: 1
+    - field: imm3
+      width: 3
+    - field: Rd
+      width: 4
+    - field: imm8
+      width: 8
+    decode: |
+      d = UInt(Rd); setflags = FALSE; imm32 = ZeroExtend(i:imm3:imm8, 32);
+      if d == 15 then UNPREDICTABLE;
+- id: ADD_SP_plus_register
+  mnemonic: ADD
+  encodings:
+  - name: T1
+    length_bits: 16
+    pattern: 01000100x1101xxx
+    bit_fields:
+    - skip: 8
+    - field: DM
+      width: 1
+    - skip: 4
+    - field: Rdm
+      width: 3
+    decode: |
+      d = UInt(DM:Rdm); m = UInt(DM:Rdm); setflags = FALSE;
+      if d == 15 && InITBlock() && !LastInITBlock() then UNPREDICTABLE;
+      (shift_t, shift_n) = (SRType_LSL, 0);
+  - name: T2
+    length_bits: 16
+    pattern: 010001001xxxx101
+    bit_fields:
+    - skip: 9
+    - field: Rm
+      width: 4
+    - skip: 3
+    decode: |
+      if Rm == '1101' then SEE encoding T1;
+      d = 13; m = UInt(Rm); setflags = FALSE;
+      (shift_t, shift_n) = (SRType_LSL, 0);
+  - name: T3
+    length_bits: 32
+    pattern: 11101011000x11010xxxxxxxxxxxxxxx
+    bit_fields:
+    - skip: 11
+    - field: S
+      width: 1
+    - skip: 4
+    - skip: 1
+    - field: imm3
+      width: 3
+    - field: Rd
+      width: 4
+    - field: imm2
+      width: 2
+    - field: type
+      width: 2
+    - field: Rm
+      width: 4
+    decode: |
+      if Rd == '1111' && S == '1' then SEE CMN (register);
+      d = UInt(Rd); m = UInt(Rm); setflags = (S == '1');
+      (shift_t, shift_n) = DecodeImmShift(type, imm3:imm2);
+      if d == 13 && (shift_t != SRType_LSL || shift_n > 3) then UNPREDICTABLE;
+      if (d == 15 && S == '0') || m IN {13,15} then UNPREDICTABLE;
+- id: ADR
+  mnemonic: ADR
+  encodings:
+  - name: T1
+    length_bits: 16
+    pattern: 10100xxxxxxxxxxx
+    bit_fields:
+    - skip: 5
+    - field: Rd
+      width: 3
+    - field: imm8
+      width: 8
+    decode: |
+      d = UInt(Rd); imm32 = ZeroExtend(imm8:'00', 32); add = TRUE;
+  - name: T2
+    length_bits: 32
+    pattern: 11110x10101011110xxxxxxxxxxxxxxx
+    bit_fields:
+    - skip: 5
+    - field: i
+      width: 1
+    - skip: 6
+    - skip: 4
+    - skip: 1
+    - field: imm3
+      width: 3
+    - field: Rd
+      width: 4
+    - field: imm8
+      width: 8
+    decode: |
+      d = UInt(Rd); imm32 = ZeroExtend(i:imm3:imm8, 32); add = FALSE;
+      if d IN {13,15} then UNPREDICTABLE;
+  - name: T3
+    length_bits: 32
+    pattern: 11110x10000011110xxxxxxxxxxxxxxx
+    bit_fields:
+    - skip: 5
+    - field: i
+      width: 1
+    - skip: 6
+    - skip: 4
+    - skip: 1
+    - field: imm3
+      width: 3
+    - field: Rd
+      width: 4
+    - field: imm8
+      width: 8
+    decode: |
+      d = UInt(Rd); imm32 = ZeroExtend(i:imm3:imm8, 32); add = TRUE;
+      if d IN {13,15} then UNPREDICTABLE;
+- id: SUB_immediate
+  mnemonic: SUB
+  encodings:
+  - name: T1
+    length_bits: 16
+    pattern: 0001111xxxxxxxxx
+    bit_fields:
+    - skip: 7
+    - field: imm3
+      width: 3
+    - field: Rn
+      width: 3
+    - field: Rd
+      width: 3
+    decode: |
+      d = UInt(Rd); n = UInt(Rn); setflags = !InITBlock();
+      imm32 = ZeroExtend(imm3, 32);
+  - name: T2
+    length_bits: 16
+    pattern: 00111xxxxxxxxxxx
+    bit_fields:
+    - skip: 5
+    - field: Rdn
+      width: 3
+    - field: imm8
+      width: 8
+    decode: |
+      d = UInt(Rdn); n = UInt(Rdn); setflags = !InITBlock();
+      imm32 = ZeroExtend(imm8, 32);
+  - name: T3
+    length_bits: 32
+    pattern: 11110x01101xxxxx0xxxxxxxxxxxxxxx
+    bit_fields:
+    - skip: 5
+    - field: i
+      width: 1
+    - skip: 5
+    - field: S
+      width: 1
+    - field: Rn
+      width: 4
+    - skip: 1
+    - field: imm3
+      width: 3
+    - field: Rd
+      width: 4
+    - field: imm8
+      width: 8
+    decode: |
+      if Rd == '1111' && S == '1' then SEE CMP (immediate);
+      if Rn == '1101' then SEE SUB (SP minus immediate);
+      d = UInt(Rd); n = UInt(Rn); setflags = (S == '1');
+      imm32 = ThumbExpandImm(i:imm3:imm8);
+      if d == 13 || (d == 15 && S == '0') || n == 15 then UNPREDICTABLE;
+  - name: T4
+    length_bits: 32
+    pattern: 11110x101010xxxx0xxxxxxxxxxxxxxx
+    bit_fields:
+    - skip: 5
+    - field: i
+      width: 1
+    - skip: 6
+    - field: Rn
+      width: 4
+    - skip: 1
+    - field: imm3
+      width: 3
+    - field: Rd
+      width: 4
+    - field: imm8
+      width: 8
+    decode: |
+      if Rn == '1111' then SEE ADR;
+      if Rn == '1101' then SEE SUB (SP minus immediate);
+      d = UInt(Rd); n = UInt(Rn); setflags = FALSE;
+      imm32 = ZeroExtend(i:imm3:imm8, 32);
+      if d IN {13,15} then UNPREDICTABLE;
+- id: SUB_register
+  mnemonic: SUB
+  encodings:
+  - name: T1
+    length_bits: 16
+    pattern: 0001101xxxxxxxxx
+    bit_fields:
+    - skip: 7
+    - field: Rm
+      width: 3
+    - field: Rn
+      width: 3
+    - field: Rd
+      width: 3
+    decode: |
+      d = UInt(Rd); n = UInt(Rn); m = UInt(Rm); setflags = !InITBlock();
+      (shift_t, shift_n) = (SRType_LSL, 0);
+  - name: T2
+    length_bits: 32
+    pattern: 11101011101xxxxxxxxxxxxxxxxxxxxx
+    bit_fields:
+    - skip: 11
+    - field: S
+      width: 1
+    - field: Rn
+      width: 4
+    - skip: 1
+    - field: imm3
+      width: 3
+    - field: Rd
+      width: 4
+    - field: imm2
+      width: 2
+    - field: type
+      width: 2
+    - field: Rm
+      width: 4
+    decode: |
+      if Rd == '1111' && S == '1' then SEE CMP (register);
+      if Rn == '1101' then SEE SUB (SP minus register);
+      d = UInt(Rd); n = UInt(Rn); m = UInt(Rm); setflags = (S == '1');
+      (shift_t, shift_n) = DecodeImmShift(type, imm3:imm2);
+      if d == 13 || (d == 15 && S == '0') || n == 15 || m IN {13,15} then UNPREDICTABLE;
+- id: SUB_SP_minus_immediate
+  mnemonic: SUB
+  encodings:
+  - name: T1
+    length_bits: 16
+    pattern: 101100001xxxxxxx
+    bit_fields:
+    - skip: 9
+    - field: imm7
+      width: 7
+    decode: |
+      d = 13; setflags = FALSE; imm32 = ZeroExtend(imm7:'00', 32);
+  - name: T2
+    length_bits: 32
+    pattern: 11110x01101x11010xxxxxxxxxxxxxxx
+    bit_fields:
+    - skip: 5
+    - field: i
+      width: 1
+    - skip: 5
+    - field: S
+      width: 1
+    - skip: 4
+    - skip: 1
+    - field: imm3
+      width: 3
+    - field: Rd
+      width: 4
+    - field: imm8
+      width: 8
+    decode: |
+      if Rd == '1111' && S == '1' then SEE CMP (immediate);
+      d = UInt(Rd); setflags = (S == '1'); imm32 = ThumbExpandImm(i:imm3:imm8);
+      if d == 15 && S == '0' then UNPREDICTABLE;
+  - name: T3
+    length_bits: 32
+    pattern: 11110x10101011010xxxxxxxxxxxxxxx
+    bit_fields:
+    - skip: 5
+    - field: i
+      width: 1
+    - skip: 6
+    - skip: 4
+    - skip: 1
+    - field: imm3
+      width: 3
+    - field: Rd
+      width: 4
+    - field: imm8
+      width: 8
+    decode: |
+      d = UInt(Rd); setflags = FALSE; imm32 = ZeroExtend(i:imm3:imm8, 32);
+      if d == 15 then UNPREDICTABLE;
+- id: SUB_SP_minus_register
+  mnemonic: SUB
+  encodings:
+  - name: T1
+    length_bits: 32
+    pattern: 11101011101x1101xxxxxxxxxxxxxxxx
+    bit_fields:
+    - skip: 11
+    - field: S
+      width: 1
+    - skip: 4
+    - skip: 1
+    - field: imm3
+      width: 3
+    - field: Rd
+      width: 4
+    - field: imm2
+      width: 2
+    - field: type
+      width: 2
+    - field: Rm
+      width: 4
+    decode: |
+      if Rd == '1111' && S == '1' then SEE CMP (register);
+      d = UInt(Rd); m = UInt(Rm); setflags = (S == '1');
+      (shift_t, shift_n) = DecodeImmShift(type, imm3:imm2);
+      if d == 13 && (shift_t != SRType_LSL || shift_n > 3) then UNPREDICTABLE;
+      if (d == 15 && S == '0') || m IN {13,15} then UNPREDICTABLE;
+- id: MOV_immediate
+  mnemonic: MOV
+  encodings:
+  - name: T1
+    length_bits: 16
+    pattern: 00100xxxxxxxxxxx
+    bit_fields:
+    - skip: 5
+    - field: Rd
+      width: 3
+    - field: imm8
+      width: 8
+    decode: |
+      d = UInt(Rd); setflags = !InITBlock();
+      imm32 = ZeroExtend(imm8, 32); carry = APSR.C;
+  - name: T2
+    length_bits: 32
+    pattern: 11110x00010x11110xxxxxxxxxxxxxxx
+    bit_fields:
+    - skip: 5
+    - field: i
+      width: 1
+    - skip: 5
+    - field: S
+      width: 1
+    - skip: 4
+    - skip: 1
+    - field: imm3
+      width: 3
+    - field: Rd
+      width: 4
+    - field: imm8
+      width: 8
+    decode: |
+      d = UInt(Rd); setflags = (S == '1');
+      (imm32, carry) = ThumbExpandImm_C(i:imm3:imm8, APSR.C);
+      if d IN {13,15} then UNPREDICTABLE;
+  - name: T3
+    length_bits: 32
+    pattern: 11110x100100xxxx0xxxxxxxxxxxxxxx
+    bit_fields:
+    - skip: 5
+    - field: i
+      width: 1
+    - skip: 6
+    - field: imm4
+      width: 4
+    - skip: 1
+    - field: imm3
+      width: 3
+    - field: Rd
+      width: 4
+    - field: imm8
+      width: 8
+    decode: |
+      d = UInt(Rd); setflags = FALSE;
+      imm32 = ZeroExtend(imm4:i:imm3:imm8, 32);
+      if d IN {13,15} then UNPREDICTABLE;
+- id: MOV_register
+  mnemonic: MOV
+  encodings:
+  - name: T1
+    length_bits: 16
+    pattern: 01000110xxxxxxxx
+    bit_fields:
+    - skip: 8
+    - field: D
+      width: 1
+    - field: Rm
+      width: 4
+    - field: Rd
+      width: 3
+    decode: |
+      d = UInt(D:Rd); m = UInt(Rm); setflags = FALSE;
+      if d == 15 && InITBlock() && !LastInITBlock() then UNPREDICTABLE;
+  - name: T2
+    length_bits: 16
+    pattern: 0000000000xxxxxx
+    bit_fields:
+    - skip: 10
+    - field: Rm
+      width: 3
+    - field: Rd
+      width: 3
+    decode: |
+      d = UInt(Rd); m = UInt(Rm); setflags = TRUE;
+      if InITBlock() then UNPREDICTABLE;
+  - name: T3
+    length_bits: 32
+    pattern: 11101010010x1111x000xxxx0000xxxx
+    bit_fields:
+    - skip: 11
+    - field: S
+      width: 1
+    - skip: 4
+    - skip: 1
+    - skip: 3
+    - field: Rd
+      width: 4
+    - skip: 4
+    - field: Rm
+      width: 4
+    decode: |
+      d = UInt(Rd); m = UInt(Rm); setflags = (S == '1');
+      if setflags && (d IN {13,15} || m IN {13,15}) then UNPREDICTABLE;
+      if !setflags && (d == 15 || m == 15 || (d == 13 && m == 13)) then UNPREDICTABLE;
+- id: NOP
+  mnemonic: NOP
+  encodings:
+  - name: T1
+    length_bits: 16
+    pattern: '1011111100000000'
+    bit_fields:
+    - skip: 16
+    decode: |
+      // No additional decoding required
+  - name: T2
+    length_bits: 32
+    pattern: 111100111010xxxx10x0x00000000000
+    bit_fields:
+    - skip: 12
+    - skip: 1
+    - skip: 1
+    - skip: 1
+    - skip: 1
+    - skip: 2
+    - skip: 1
+    - skip: 1
+    - skip: 1
+    - skip: 11
+    decode: |
+      // No additional decoding required
+- id: LDR_immediate
+  mnemonic: LDR
+  encodings:
+  - name: T1
+    length_bits: 16
+    pattern: 01101xxxxxxxxxxx
+    bit_fields:
+    - skip: 5
+    - field: imm5
+      width: 5
+    - field: Rn
+      width: 3
+    - field: Rt
+      width: 3
+    decode: |
+      t = UInt(Rt); n = UInt(Rn); imm32 = ZeroExtend(imm5:'00', 32);
+      index = TRUE; add = TRUE; wback = FALSE;
+  - name: T2
+    length_bits: 16
+    pattern: 10011xxxxxxxxxxx
+    bit_fields:
+    - skip: 5
+    - field: Rt
+      width: 3
+    - field: imm8
+      width: 8
+    decode: |
+      t = UInt(Rt); n = 13; imm32 = ZeroExtend(imm8:'00', 32);
+      index = TRUE; add = TRUE; wback = FALSE;
+  - name: T3
+    length_bits: 32
+    pattern: 111110001101xxxxxxxxxxxxxxxxxxxx
+    bit_fields:
+    - skip: 12
+    - field: Rn
+      width: 4
+    - field: Rt
+      width: 4
+    - field: imm12
+      width: 12
+    decode: |
+      if Rn == '1111' then SEE LDR (literal);
+      t = UInt(Rt); n = UInt(Rn); imm32 = ZeroExtend(imm12, 32);
+      index = TRUE; add = TRUE; wback = FALSE;
+      if t == 15 && InITBlock() && !LastInITBlock() then UNPREDICTABLE;
+  - name: T4
+    length_bits: 32
+    pattern: 111110000101xxxxxxxx1xxxxxxxxxxx
+    bit_fields:
+    - skip: 12
+    - field: Rn
+      width: 4
+    - field: Rt
+      width: 4
+    - skip: 1
+    - field: P
+      width: 1
+    - field: U
+      width: 1
+    - field: W
+      width: 1
+    - field: imm8
+      width: 8
+    decode: |
+      if Rn == '1111' then SEE LDR (literal);
+      if P == '1' && U == '1' && W == '0' then SEE LDRT;
+      if Rn == '1101' && P == '0' && U == '1' && W == '1' && imm8 == '00000100' then SEE POP;
+      if P == '0' && W == '0' then UNDEFINED;
+      t = UInt(Rt); n = UInt(Rn); imm32 = ZeroExtend(imm8, 32);
+      index = (P == '1'); add = (U == '1'); wback = (W == '1');
+      if (wback && n == t) || (t == 15 && InITBlock() && !LastInITBlock()) then UNPREDICTABLE;
+- id: LDR_literal
+  mnemonic: LDR
+  encodings:
+  - name: T1
+    length_bits: 16
+    pattern: 01001xxxxxxxxxxx
+    bit_fields:
+    - skip: 5
+    - field: Rt
+      width: 3
+    - field: imm8
+      width: 8
+    decode: |
+      t = UInt(Rt); imm32 = ZeroExtend(imm8:'00', 32); add = TRUE;
+  - name: T2
+    length_bits: 32
+    pattern: 11111000x1011111xxxxxxxxxxxxxxxx
+    bit_fields:
+    - skip: 8
+    - field: U
+      width: 1
+    - skip: 7
+    - field: Rt
+      width: 4
+    - field: imm12
+      width: 12
+    decode: |
+      t = UInt(Rt); imm32 = ZeroExtend(imm12, 32); add = (U == '1');
+      if t == 15 && InITBlock() && !LastInITBlock() then UNPREDICTABLE;
+- id: LDR_register
+  mnemonic: LDR
+  encodings:
+  - name: T1
+    length_bits: 16
+    pattern: 0101100xxxxxxxxx
+    bit_fields:
+    - skip: 7
+    - field: Rm
+      width: 3
+    - field: Rn
+      width: 3
+    - field: Rt
+      width: 3
+    decode: |
+      t = UInt(Rt); n = UInt(Rn); m = UInt(Rm);
+      index = TRUE; add = TRUE; wback = FALSE;
+      (shift_t, shift_n) = (SRType_LSL, 0);
+  - name: T2
+    length_bits: 32
+    pattern: 111110000101xxxxxxxx000000xxxxxx
+    bit_fields:
+    - skip: 12
+    - field: Rn
+      width: 4
+    - field: Rt
+      width: 4
+    - skip: 6
+    - field: imm2
+      width: 2
+    - field: Rm
+      width: 4
+    decode: |
+      if Rn == '1111' then SEE LDR (literal);
+      t = UInt(Rt); n = UInt(Rn); m = UInt(Rm);
+      (shift_t, shift_n) = (SRType_LSL, UInt(imm2));
+      if m IN {13,15} then UNPREDICTABLE;
+      if t == 15 && InITBlock() && !LastInITBlock() then UNPREDICTABLE;
+- id: LSL_immediate
+  mnemonic: LSL
+  encodings:
+  - name: T1
+    length_bits: 16
+    pattern: 00000xxxxxxxxxxx
+    bit_fields:
+    - skip: 5
+    - field: imm5
+      width: 5
+    - field: Rm
+      width: 3
+    - field: Rd
+      width: 3
+    decode: |
+      if imm5 == '00000' then SEE MOV (register);
+      d = UInt(Rd); m = UInt(Rm); setflags = !InITBlock();
+      (-, shift_n) = DecodeImmShift('00', imm5);
+  - name: T2
+    length_bits: 32
+    pattern: 11101010010x1111xxxxxxxxxx00xxxx
+    bit_fields:
+    - skip: 11
+    - field: S
+      width: 1
+    - skip: 4
+    - skip: 1
+    - field: imm3
+      width: 3
+    - field: Rd
+      width: 4
+    - field: imm2
+      width: 2
+    - skip: 2
+    - field: Rm
+      width: 4
+    decode: |
+      if (imm3:imm2) == '00000' then SEE MOV (register);
+      d = UInt(Rd); m = UInt(Rm); setflags = (S == '1');
+      (-, shift_n) = DecodeImmShift('00', imm3:imm2);
+      if d IN {13,15} || m IN {13,15} then UNPREDICTABLE;
+- id: LSL_register
+  mnemonic: LSL
+  encodings:
+  - name: T1
+    length_bits: 16
+    pattern: 0100000010xxxxxx
+    bit_fields:
+    - skip: 10
+    - field: Rm
+      width: 3
+    - field: Rdn
+      width: 3
+    decode: |
+      d = UInt(Rdn); n = UInt(Rdn); m = UInt(Rm); setflags = !InITBlock();
+  - name: T2
+    length_bits: 32
+    pattern: 11111010000xxxxx1111xxxx0000xxxx
+    bit_fields:
+    - skip: 11
+    - field: S
+      width: 1
+    - field: Rn
+      width: 4
+    - skip: 4
+    - field: Rd
+      width: 4
+    - skip: 4
+    - field: Rm
+      width: 4
+    decode: |
+      d = UInt(Rd); n = UInt(Rn); m = UInt(Rm); setflags = (S == '1');
+      if d IN {13,15} || n IN {13,15} || m IN {13,15} then UNPREDICTABLE;
+- id: LSR_immediate
+  mnemonic: LSR
+  encodings:
+  - name: T1
+    length_bits: 16
+    pattern: 00001xxxxxxxxxxx
+    bit_fields:
+    - skip: 5
+    - field: imm5
+      width: 5
+    - field: Rm
+      width: 3
+    - field: Rd
+      width: 3
+    decode: |
+      d = UInt(Rd); m = UInt(Rm); setflags = !InITBlock();
+      (-, shift_n) = DecodeImmShift('01', imm5);
+  - name: T2
+    length_bits: 32
+    pattern: 11101010010x1111xxxxxxxxxx01xxxx
+    bit_fields:
+    - skip: 11
+    - field: S
+      width: 1
+    - skip: 4
+    - skip: 1
+    - field: imm3
+      width: 3
+    - field: Rd
+      width: 4
+    - field: imm2
+      width: 2
+    - skip: 2
+    - field: Rm
+      width: 4
+    decode: |
+      d = UInt(Rd); m = UInt(Rm); setflags = (S == '1');
+      (-, shift_n) = DecodeImmShift('01', imm3:imm2);
+      if d IN {13,15} || m IN {13,15} then UNPREDICTABLE;
+- id: LSR_register
+  mnemonic: LSR
+  encodings:
+  - name: T1
+    length_bits: 16
+    pattern: 0100000011xxxxxx
+    bit_fields:
+    - skip: 10
+    - field: Rm
+      width: 3
+    - field: Rdn
+      width: 3
+    decode: |
+      d = UInt(Rdn); n = UInt(Rdn); m = UInt(Rm); setflags = !InITBlock();
+  - name: T2
+    length_bits: 32
+    pattern: 11111010001xxxxx1111xxxx0000xxxx
+    bit_fields:
+    - skip: 11
+    - field: S
+      width: 1
+    - field: Rn
+      width: 4
+    - skip: 4
+    - field: Rd
+      width: 4
+    - skip: 4
+    - field: Rm
+      width: 4
+    decode: |
+      d = UInt(Rd); n = UInt(Rn); m = UInt(Rm); setflags = (S == '1');
+      if d IN {13,15} || n IN {13,15} || m IN {13,15} then UNPREDICTABLE;
+- id: AND_immediate
+  mnemonic: AND
+  encodings:
+  - name: T1
+    length_bits: 32
+    pattern: 11110x00000xxxxx0xxxxxxxxxxxxxxx
+    bit_fields:
+    - skip: 5
+    - field: i
+      width: 1
+    - skip: 5
+    - field: S
+      width: 1
+    - field: Rn
+      width: 4
+    - skip: 1
+    - field: imm3
+      width: 3
+    - field: Rd
+      width: 4
+    - field: imm8
+      width: 8
+    decode: |
+      if Rd == '1111' && S == '1' then SEE TST (immediate);
+      d = UInt(Rd); n = UInt(Rn); setflags = (S == '1');
+      (imm32, carry) = ThumbExpandImm_C(i:imm3:imm8, APSR.C);
+      if d == 13 || (d == 15 && S == '0') || n IN {13,15} then UNPREDICTABLE;
+- id: AND_register
+  mnemonic: AND
+  encodings:
+  - name: T1
+    length_bits: 16
+    pattern: 0100000000xxxxxx
+    bit_fields:
+    - skip: 10
+    - field: Rm
+      width: 3
+    - field: Rdn
+      width: 3
+    decode: |
+      d = UInt(Rdn); n = UInt(Rdn); m = UInt(Rm); setflags = !InITBlock();
+      (shift_t, shift_n) = (SRType_LSL, 0);
+  - name: T2
+    length_bits: 32
+    pattern: 11101010000xxxxxxxxxxxxxxxxxxxxx
+    bit_fields:
+    - skip: 11
+    - field: S
+      width: 1
+    - field: Rn
+      width: 4
+    - skip: 1
+    - field: imm3
+      width: 3
+    - field: Rd
+      width: 4
+    - field: imm2
+      width: 2
+    - field: type
+      width: 2
+    - field: Rm
+      width: 4
+    decode: |
+      if Rd == '1111' && S == '1' then SEE TST (register);
+      d = UInt(Rd); n = UInt(Rn); m = UInt(Rm); setflags = (S == '1');
+      (shift_t, shift_n) = DecodeImmShift(type, imm3:imm2);
+      if d == 13 || (d == 15 && S == '0') || n IN {13,15} || m IN {13,15} then UNPREDICTABLE;
+- id: ORR_immediate
+  mnemonic: ORR
+  encodings:
+  - name: T1
+    length_bits: 32
+    pattern: 11110x00010xxxxx0xxxxxxxxxxxxxxx
+    bit_fields:
+    - skip: 5
+    - field: i
+      width: 1
+    - skip: 5
+    - field: S
+      width: 1
+    - field: Rn
+      width: 4
+    - skip: 1
+    - field: imm3
+      width: 3
+    - field: Rd
+      width: 4
+    - field: imm8
+      width: 8
+    decode: |
+      if Rn == '1111' then SEE MOV (immediate);
+      d = UInt(Rd); n = UInt(Rn); setflags = (S == '1');
+      (imm32, carry) = ThumbExpandImm_C(i:imm3:imm8, APSR.C);
+      if d IN {13,15} || n == 13 then UNPREDICTABLE;
+- id: ORR_register
+  mnemonic: ORR
+  encodings:
+  - name: T1
+    length_bits: 16
+    pattern: 0100001100xxxxxx
+    bit_fields:
+    - skip: 10
+    - field: Rm
+      width: 3
+    - field: Rdn
+      width: 3
+    decode: |
+      d = UInt(Rdn); n = UInt(Rdn); m = UInt(Rm); setflags = !InITBlock();
+      (shift_t, shift_n) = (SRType_LSL, 0);
+  - name: T2
+    length_bits: 32
+    pattern: 11101010010xxxxxxxxxxxxxxxxxxxxx
+    bit_fields:
+    - skip: 11
+    - field: S
+      width: 1
+    - field: Rn
+      width: 4
+    - skip: 1
+    - field: imm3
+      width: 3
+    - field: Rd
+      width: 4
+    - field: imm2
+      width: 2
+    - field: type
+      width: 2
+    - field: Rm
+      width: 4
+    decode: |
+      if Rn == '1111' then SEE "Related encodings";
+      d = UInt(Rd); n = UInt(Rn); m = UInt(Rm); setflags = (S == '1');
+      (shift_t, shift_n) = DecodeImmShift(type, imm3:imm2);
+      if d IN {13,15} || n == 13 || m IN {13,15} then UNPREDICTABLE;
+- id: LDRB_immediate
+  mnemonic: LDRB
+  encodings:
+  - name: T1
+    length_bits: 16
+    pattern: 01111xxxxxxxxxxx
+    bit_fields:
+    - skip: 5
+    - field: imm5
+      width: 5
+    - field: Rn
+      width: 3
+    - field: Rt
+      width: 3
+    decode: |
+      t = UInt(Rt); n = UInt(Rn); imm32 = ZeroExtend(imm5, 32);
+      index = TRUE; add = TRUE; wback = FALSE;
+  - name: T2
+    length_bits: 32
+    pattern: 111110001001xxxxxxxxxxxxxxxxxxxx
+    bit_fields:
+    - skip: 12
+    - field: Rn
+      width: 4
+    - field: Rt
+      width: 4
+    - field: imm12
+      width: 12
+    decode: |
+      if Rt == '1111' then SEE PLD;
+      if Rn == '1111' then SEE LDRB (literal);
+      t = UInt(Rt); n = UInt(Rn); imm32 = ZeroExtend(imm12, 32);
+      index = TRUE; add = TRUE; wback = FALSE;
+      if t == 13 then UNPREDICTABLE;
+  - name: T3
+    length_bits: 32
+    pattern: 111110000001xxxxxxxx1xxxxxxxxxxx
+    bit_fields:
+    - skip: 12
+    - field: Rn
+      width: 4
+    - field: Rt
+      width: 4
+    - skip: 1
+    - field: P
+      width: 1
+    - field: U
+      width: 1
+    - field: W
+      width: 1
+    - field: imm8
+      width: 8
+    decode: |
+      if Rt == '1111' && P == '1' && U == '0' && W == '0' then SEE PLD (immediate);
+      if Rn == '1111' then SEE LDRB (literal);
+      if P == '1' && U == '1' && W == '0' then SEE LDRBT;
+      if P == '0' && W == '0' then UNDEFINED;
+      t = UInt(Rt); n = UInt(Rn); imm32 = ZeroExtend(imm8, 32);
+      index = (P == '1'); add = (U == '1'); wback = (W == '1');
+      if t == 13 || (wback && n == t) then UNPREDICTABLE;
+      if t == 15 && (P == '0' || U == '1' || W == '1') then UNPREDICTABLE;
+- id: LDRB_literal
+  mnemonic: LDRB
+  encodings:
+  - name: T1
+    length_bits: 32
+    pattern: 11111000x0011111xxxxxxxxxxxxxxxx
+    bit_fields:
+    - skip: 8
+    - field: U
+      width: 1
+    - skip: 7
+    - field: Rt
+      width: 4
+    - field: imm12
+      width: 12
+    decode: |
+      if Rt == '1111' then SEE PLD;
+      t = UInt(Rt); imm32 = ZeroExtend(imm12, 32); add = (U == '1');
+      if t == 13 then UNPREDICTABLE;
+- id: LDRB_register
+  mnemonic: LDRB
+  encodings:
+  - name: T1
+    length_bits: 16
+    pattern: 0101110xxxxxxxxx
+    bit_fields:
+    - skip: 7
+    - field: Rm
+      width: 3
+    - field: Rn
+      width: 3
+    - field: Rt
+      width: 3
+    decode: |
+      t = UInt(Rt); n = UInt(Rn); m = UInt(Rm);
+      index = TRUE; add = TRUE; wback = FALSE;
+      (shift_t, shift_n) = (SRType_LSL, 0);
+  - name: T2
+    length_bits: 32
+    pattern: 111110000001xxxxxxxx000000xxxxxx
+    bit_fields:
+    - skip: 12
+    - field: Rn
+      width: 4
+    - field: Rt
+      width: 4
+    - skip: 6
+    - field: imm2
+      width: 2
+    - field: Rm
+      width: 4
+    decode: |
+      if Rt == '1111' then SEE PLD;
+      if Rn == '1111' then SEE LDRB (literal);
+      t = UInt(Rt); n = UInt(Rn); m = UInt(Rm);
+      index = TRUE; add = TRUE; wback = FALSE;
+      (shift_t, shift_n) = (SRType_LSL, UInt(imm2));
+      if t == 13 || m IN {13,15} then UNPREDICTABLE;
+- id: B
+  mnemonic: B
+  encodings:
+  - name: T1
+    length_bits: 16
+    pattern: 1101xxxxxxxxxxxx
+    bit_fields:
+    - skip: 4
+    - field: cond
+      width: 4
+    - field: imm8
+      width: 8
+    decode: |
+      if cond == '1110' then SEE UDF;
+      if cond == '1111' then SEE SVC;
+      imm32 = SignExtend(imm8:'0', 32);
+      if InITBlock() then UNPREDICTABLE;
+  - name: T2
+    length_bits: 16
+    pattern: 11100xxxxxxxxxxx
+    bit_fields:
+    - skip: 5
+    - field: imm11
+      width: 11
+    decode: |
+      imm32 = SignExtend(imm11:'0', 32);
+      if InITBlock() && !LastInITBlock() then UNPREDICTABLE;
+  - name: T3
+    length_bits: 32
+    pattern: 11110xxxxxxxxxxx10x0xxxxxxxxxxxx
+    bit_fields:
+    - skip: 5
+    - field: S
+      width: 1
+    - field: cond
+      width: 4
+    - field: imm6
+      width: 6
+    - skip: 2
+    - field: J1
+      width: 1
+    - skip: 1
+    - field: J2
+      width: 1
+    - field: imm11
+      width: 11
+    decode: |
+      if cond<3:1> == '111' then SEE "Related encodings";
+      imm32 = SignExtend(S:J2:J1:imm6:imm11:'0', 32);
+      if InITBlock() then UNPREDICTABLE;
+  - name: T4
+    length_bits: 32
+    pattern: 11110xxxxxxxxxxx10x1xxxxxxxxxxxx
+    bit_fields:
+    - skip: 5
+    - field: S
+      width: 1
+    - field: imm10
+      width: 10
+    - skip: 2
+    - field: J1
+      width: 1
+    - skip: 1
+    - field: J2
+      width: 1
+    - field: imm11
+      width: 11
+    decode: |
+      I1 = NOT(J1 EOR S); I2 = NOT(J2 EOR S);
+      imm32 = SignExtend(S:I1:I2:imm10:imm11:'0', 32);
+      if InITBlock() && !LastInITBlock() then UNPREDICTABLE;
+- id: BKPT
+  mnemonic: BKPT
+  encodings:
+  - name: T1
+    length_bits: 16
+    pattern: 10111110xxxxxxxx
+    bit_fields:
+    - skip: 8
+    - field: imm8
+      width: 8
+    decode: |
+      imm32 = ZeroExtend(imm8, 32);
+      // imm32 is for assembly/disassembly only and is ignored by hardware.
+- id: BL
+  mnemonic: BL
+  encodings:
+  - name: T1
+    length_bits: 32
+    pattern: 11110xxxxxxxxxxx11x1xxxxxxxxxxxx
+    bit_fields:
+    - skip: 5
+    - field: S
+      width: 1
+    - field: imm10
+      width: 10
+    - skip: 2
+    - field: J1
+      width: 1
+    - skip: 1
+    - field: J2
+      width: 1
+    - field: imm11
+      width: 11
+    decode: |
+      I1 = NOT(J1 EOR S); I2 = NOT(J2 EOR S);
+      imm32 = SignExtend(S:I1:I2:imm10:imm11:'0', 32);
+      if InITBlock() && !LastInITBlock() then UNPREDICTABLE;
+- id: LDRH_immediate
+  mnemonic: LDRH
+  encodings:
+  - name: T1
+    length_bits: 16
+    pattern: 10001xxxxxxxxxxx
+    bit_fields:
+    - skip: 5
+    - field: imm5
+      width: 5
+    - field: Rn
+      width: 3
+    - field: Rt
+      width: 3
+    decode: |
+      t = UInt(Rt); n = UInt(Rn); imm32 = ZeroExtend(imm5:'0', 32);
+      index = TRUE; add = TRUE; wback = FALSE;
+  - name: T2
+    length_bits: 32
+    pattern: 111110001011xxxxxxxxxxxxxxxxxxxx
+    bit_fields:
+    - skip: 12
+    - field: Rn
+      width: 4
+    - field: Rt
+      width: 4
+    - field: imm12
+      width: 12
+    decode: |
+      if Rt == '1111' then SEE PLD (immediate);
+      if Rn == '1111' then SEE LDRH (literal);
+      t = UInt(Rt); n = UInt(Rn); imm32 = ZeroExtend(imm12, 32);
+      index = TRUE; add = TRUE; wback = FALSE;
+      if t == 13 then UNPREDICTABLE;
+  - name: T3
+    length_bits: 32
+    pattern: 111110000011xxxxxxxx1xxxxxxxxxxx
+    bit_fields:
+    - skip: 12
+    - field: Rn
+      width: 4
+    - field: Rt
+      width: 4
+    - skip: 1
+    - field: P
+      width: 1
+    - field: U
+      width: 1
+    - field: W
+      width: 1
+    - field: imm8
+      width: 8
+    decode: |
+      if Rn == '1111' then SEE LDRH (literal);
+      if Rt == '1111' && P == '1' && U == '0' && W == '0' then SEE PLD;
+      if P == '1' && U == '1' && W == '0' then SEE LDRHT;
+      if P == '0' && W == '0' then UNDEFINED;
+      t = UInt(Rt); n = UInt(Rn); imm32 = ZeroExtend(imm8, 32);
+      index = (P == '1'); add = (U == '1'); wback = (W == '1');
+      if t == 13 || (t == 15 && W == '1') || (wback && n == t) then UNPREDICTABLE;
+- id: LDRH_literal
+  mnemonic: LDRH
+  encodings:
+  - name: T1
+    length_bits: 32
+    pattern: 11111000x0111111xxxxxxxxxxxxxxxx
+    bit_fields:
+    - skip: 8
+    - field: U
+      width: 1
+    - skip: 7
+    - field: Rt
+      width: 4
+    - field: imm12
+      width: 12
+    decode: |
+      if Rt == '1111' then SEE PLD (literal);
+      t = UInt(Rt); imm32 = ZeroExtend(imm12, 32); add = (U == '1');
+      if t == 13 then UNPREDICTABLE;
+- id: LDRH_register
+  mnemonic: LDRH
+  encodings:
+  - name: T1
+    length_bits: 16
+    pattern: 0101101xxxxxxxxx
+    bit_fields:
+    - skip: 7
+    - field: Rm
+      width: 3
+    - field: Rn
+      width: 3
+    - field: Rt
+      width: 3
+    decode: |
+      t = UInt(Rt); n = UInt(Rn); m = UInt(Rm);
+      index = TRUE; add = TRUE; wback = FALSE;
+      (shift_t, shift_n) = (SRType_LSL, 0);
+  - name: T2
+    length_bits: 32
+    pattern: 111110000011xxxxxxxx000000xxxxxx
+    bit_fields:
+    - skip: 12
+    - field: Rn
+      width: 4
+    - field: Rt
+      width: 4
+    - skip: 6
+    - field: imm2
+      width: 2
+    - field: Rm
+      width: 4
+    decode: |
+      if Rn == '1111' then SEE LDRH (literal);
+      if Rt == '1111' then SEE "Related instructions";
+      t = UInt(Rt); n = UInt(Rn); m = UInt(Rm);
+      index = TRUE; add = TRUE; wback = FALSE;
+      (shift_t, shift_n) = (SRType_LSL, UInt(imm2));
+      if t == 13 || m IN {13,15} then UNPREDICTABLE;
+- id: POP
+  mnemonic: POP
+  encodings:
+  - name: T1
+    length_bits: 16
+    pattern: 1011110xxxxxxxxx
+    bit_fields:
+    - skip: 7
+    - field: P
+      width: 1
+    - field: register_list
+      width: 8
+    decode: |
+      registers = P:'0000000':register_list; UnalignedAllowed = FALSE;
+      if BitCount(registers) < 1 then UNPREDICTABLE;
+      if registers<15> == '1' && InITBlock() && !LastInITBlock() then UNPREDICTABLE;
+  - name: T2
+    length_bits: 32
+    pattern: 1110100010111101xxxxxxxxxxxxxxxx
+    bit_fields:
+    - skip: 16
+    - field: P
+      width: 1
+    - field: M
+      width: 1
+    - skip: 1
+    - field: register_list
+      width: 13
+    decode: |
+      registers = P:M:'0':register_list; UnalignedAllowed = FALSE;
+      if BitCount(registers) < 2 || (P == '1' && M == '1') then UNPREDICTABLE;
+      if registers<15> == '1' && InITBlock() && !LastInITBlock() then UNPREDICTABLE;
+  - name: T3
+    length_bits: 32
+    pattern: 1111100001011101xxxx101100000100
+    bit_fields:
+    - skip: 16
+    - field: Rt
+      width: 4
+    - skip: 12
+    decode: |
+      t = UInt(Rt); registers = Zeros(16); registers<t> = '1'; UnalignedAllowed = TRUE;
+      if t == 13 || (t == 15 && InITBlock() && !LastInITBlock()) then UNPREDICTABLE;
+- id: PUSH
+  mnemonic: PUSH
+  encodings:
+  - name: T1
+    length_bits: 16
+    pattern: 1011010xxxxxxxxx
+    bit_fields:
+    - skip: 7
+    - field: M
+      width: 1
+    - field: register_list
+      width: 8
+    decode: |
+      registers = '0':M:'000000':register_list; UnalignedAllowed = FALSE;
+      if BitCount(registers) < 1 then UNPREDICTABLE;
+  - name: T2
+    length_bits: 32
+    pattern: 1110100100101101xxxxxxxxxxxxxxxx
+    bit_fields:
+    - skip: 16
+    - skip: 1
+    - field: M
+      width: 1
+    - skip: 1
+    - field: register_list
+      width: 13
+    decode: |
+      registers = '0':M:'0':register_list; UnalignedAllowed = FALSE;
+      if BitCount(registers) < 2 then UNPREDICTABLE;
+  - name: T3
+    length_bits: 32
+    pattern: 1111100001001101xxxx110100000100
+    bit_fields:
+    - skip: 16
+    - field: Rt
+      width: 4
+    - skip: 12
+    decode: |
+      t = UInt(Rt); registers = Zeros(16); registers<t> = '1'; UnalignedAllowed = TRUE;
+      if t IN {13,15} then UNPREDICTABLE;
+- id: STR_immediate
+  mnemonic: STR
+  encodings:
+  - name: T1
+    length_bits: 16
+    pattern: 01100xxxxxxxxxxx
+    bit_fields:
+    - skip: 5
+    - field: imm5
+      width: 5
+    - field: Rn
+      width: 3
+    - field: Rt
+      width: 3
+    decode: |
+      t = UInt(Rt); n = UInt(Rn); imm32 = ZeroExtend(imm5:'00', 32);
+      index = TRUE; add = TRUE; wback = FALSE;
+  - name: T2
+    length_bits: 16
+    pattern: 10010xxxxxxxxxxx
+    bit_fields:
+    - skip: 5
+    - field: Rt
+      width: 3
+    - field: imm8
+      width: 8
+    decode: |
+      t = UInt(Rt); n = 13; imm32 = ZeroExtend(imm8:'00', 32);
+      index = TRUE; add = TRUE; wback = FALSE;
+  - name: T3
+    length_bits: 32
+    pattern: 111110001100xxxxxxxxxxxxxxxxxxxx
+    bit_fields:
+    - skip: 12
+    - field: Rn
+      width: 4
+    - field: Rt
+      width: 4
+    - field: imm12
+      width: 12
+    decode: |
+      if Rn == '1111' then UNDEFINED;
+      t = UInt(Rt); n = UInt(Rn); imm32 = ZeroExtend(imm12, 32);
+      index = TRUE; add = TRUE; wback = FALSE;
+      if t == 15 then UNPREDICTABLE;
+  - name: T4
+    length_bits: 32
+    pattern: 111110000100xxxxxxxx1xxxxxxxxxxx
+    bit_fields:
+    - skip: 12
+    - field: Rn
+      width: 4
+    - field: Rt
+      width: 4
+    - skip: 1
+    - field: P
+      width: 1
+    - field: U
+      width: 1
+    - field: W
+      width: 1
+    - field: imm8
+      width: 8
+    decode: |
+      if P == '1' && U == '1' && W == '0' then SEE STRT;
+      if Rn == '1101' && P == '1' && U == '0' && W == '1' && imm8 == '00000100' then SEE PUSH;
+      if Rn == '1111' || (P == '0' && W == '0') then UNDEFINED;
+      t = UInt(Rt); n = UInt(Rn); imm32 = ZeroExtend(imm8, 32);
+      index = (P == '1'); add = (U == '1'); wback = (W == '1');
+      if t == 15 || (wback && n == t) then UNPREDICTABLE;
+- id: STR_register
+  mnemonic: STR
+  encodings:
+  - name: T1
+    length_bits: 16
+    pattern: 0101000xxxxxxxxx
+    bit_fields:
+    - skip: 7
+    - field: Rm
+      width: 3
+    - field: Rn
+      width: 3
+    - field: Rt
+      width: 3
+    decode: |
+      t = UInt(Rt); n = UInt(Rn); m = UInt(Rm);
+      index = TRUE; add = TRUE; wback = FALSE;
+      (shift_t, shift_n) = (SRType_LSL, 0);
+  - name: T2
+    length_bits: 32
+    pattern: 111110000100xxxxxxxx000000xxxxxx
+    bit_fields:
+    - skip: 12
+    - field: Rn
+      width: 4
+    - field: Rt
+      width: 4
+    - skip: 6
+    - field: imm2
+      width: 2
+    - field: Rm
+      width: 4
+    decode: |
+      if Rn == '1111' then UNDEFINED;
+      t = UInt(Rt); n = UInt(Rn); m = UInt(Rm);
+      index = TRUE; add = TRUE; wback = FALSE;
+      (shift_t, shift_n) = (SRType_LSL, UInt(imm2));
+      if t == 15 || m IN {13,15} then UNPREDICTABLE;
+- id: STRD_immediate
+  mnemonic: STRD
+  encodings:
+  - name: T1
+    length_bits: 32
+    pattern: 1110100xx1x0xxxxxxxxxxxxxxxxxxxx
+    bit_fields:
+    - skip: 7
+    - field: P
+      width: 1
+    - field: U
+      width: 1
+    - skip: 1
+    - field: W
+      width: 1
+    - skip: 1
+    - field: Rn
+      width: 4
+    - field: Rt
+      width: 4
+    - field: Rt2
+      width: 4
+    - field: imm8
+      width: 8
+    decode: |
+      if P == '0' && W == '0' then SEE "Related encodings";
+      t = UInt(Rt); t2 = UInt(Rt2); n = UInt(Rn); imm32 = ZeroExtend(imm8:'00', 32);
+      index = (P == '1'); add = (U == '1'); wback = (W == '1');
+      if wback && (n == t || n == t2) then UNPREDICTABLE;
+      if n == 15 || t IN {13,15} || t2 IN {13,15} then UNPREDICTABLE;
+- id: STREX
+  mnemonic: STREX
+  encodings:
+  - name: T1
+    length_bits: 32
+    pattern: 111010000100xxxxxxxxxxxxxxxxxxxx
+    bit_fields:
+    - skip: 12
+    - field: Rn
+      width: 4
+    - field: Rt
+      width: 4
+    - field: Rd
+      width: 4
+    - field: imm8
+      width: 8
+    decode: |
+      d = UInt(Rd); t = UInt(Rt); n = UInt(Rn); imm32 = ZeroExtend(imm8:'00', 32);
+      if d IN {13,15} || t IN {13,15} || n == 15 then UNPREDICTABLE;
+      if d == n || d == t then UNPREDICTABLE;
+- id: ASR_immediate
+  mnemonic: ASR
+  encodings:
+  - name: T1
+    length_bits: 16
+    pattern: 00010xxxxxxxxxxx
+    bit_fields:
+    - skip: 5
+    - field: imm5
+      width: 5
+    - field: Rm
+      width: 3
+    - field: Rd
+      width: 3
+    decode: |
+      d = UInt(Rd); m = UInt(Rm); setflags = !InITBlock();
+      (-, shift_n) = DecodeImmShift('10', imm5);
+  - name: T2
+    length_bits: 32
+    pattern: 11101010010x1111xxxxxxxxxx10xxxx
+    bit_fields:
+    - skip: 11
+    - field: S
+      width: 1
+    - skip: 4
+    - skip: 1
+    - field: imm3
+      width: 3
+    - field: Rd
+      width: 4
+    - field: imm2
+      width: 2
+    - skip: 2
+    - field: Rm
+      width: 4
+    decode: |
+      d = UInt(Rd); m = UInt(Rm); setflags = (S == '1');
+      (-, shift_n) = DecodeImmShift('10', imm3:imm2);
+      if d IN {13,15} || m IN {13,15} then UNPREDICTABLE;
+- id: ASR_register
+  mnemonic: ASR
+  encodings:
+  - name: T1
+    length_bits: 16
+    pattern: 0100000100xxxxxx
+    bit_fields:
+    - skip: 10
+    - field: Rm
+      width: 3
+    - field: Rdn
+      width: 3
+    decode: |
+      d = UInt(Rdn); n = UInt(Rdn); m = UInt(Rm); setflags = !InITBlock();
+  - name: T2
+    length_bits: 32
+    pattern: 11111010010xxxxx1111xxxx0000xxxx
+    bit_fields:
+    - skip: 11
+    - field: S
+      width: 1
+    - field: Rn
+      width: 4
+    - skip: 4
+    - field: Rd
+      width: 4
+    - skip: 4
+    - field: Rm
+      width: 4
+    decode: |
+      d = UInt(Rd); n = UInt(Rn); m = UInt(Rm); setflags = (S == '1');
+      if d IN {13,15} || n IN {13,15} || m IN {13,15} then UNPREDICTABLE;
+- id: EOR_immediate
+  mnemonic: EOR
+  encodings:
+  - name: T1
+    length_bits: 32
+    pattern: 11110x00100xxxxx0xxxxxxxxxxxxxxx
+    bit_fields:
+    - skip: 5
+    - field: i
+      width: 1
+    - skip: 5
+    - field: S
+      width: 1
+    - field: Rn
+      width: 4
+    - skip: 1
+    - field: imm3
+      width: 3
+    - field: Rd
+      width: 4
+    - field: imm8
+      width: 8
+    decode: |
+      if Rd == '1111' && S == '1' then SEE TEQ (immediate);
+      d = UInt(Rd); n = UInt(Rn); setflags = (S == '1');
+      (imm32, carry) = ThumbExpandImm_C(i:imm3:imm8, APSR.C);
+      if d == 13 || (d == 15 && S == '0') || n IN {13,15} then UNPREDICTABLE;
+- id: EOR_register
+  mnemonic: EOR
+  encodings:
+  - name: T1
+    length_bits: 16
+    pattern: 0100000001xxxxxx
+    bit_fields:
+    - skip: 10
+    - field: Rm
+      width: 3
+    - field: Rdn
+      width: 3
+    decode: |
+      d = UInt(Rdn); n = UInt(Rdn); m = UInt(Rm); setflags = !InITBlock();
+      (shift_t, shift_n) = (SRType_LSL, 0);
+  - name: T2
+    length_bits: 32
+    pattern: 11101010100xxxxxxxxxxxxxxxxxxxxx
+    bit_fields:
+    - skip: 11
+    - field: S
+      width: 1
+    - field: Rn
+      width: 4
+    - skip: 1
+    - field: imm3
+      width: 3
+    - field: Rd
+      width: 4
+    - field: imm2
+      width: 2
+    - field: type
+      width: 2
+    - field: Rm
+      width: 4
+    decode: |
+      if Rd == '1111' && S == '1' then SEE TEQ (register);
+      d = UInt(Rd); n = UInt(Rn); m = UInt(Rm); setflags = (S == '1');
+      (shift_t, shift_n) = DecodeImmShift(type, imm3:imm2);
+      if d == 13 || (d == 15 && S == '0') || n IN {13,15} || m IN {13,15} then UNPREDICTABLE;
+- id: MVN_immediate
+  mnemonic: MVN
+  encodings:
+  - name: T1
+    length_bits: 32
+    pattern: 11110x00011x11110xxxxxxxxxxxxxxx
+    bit_fields:
+    - skip: 5
+    - field: i
+      width: 1
+    - skip: 5
+    - field: S
+      width: 1
+    - skip: 4
+    - skip: 1
+    - field: imm3
+      width: 3
+    - field: Rd
+      width: 4
+    - field: imm8
+      width: 8
+    decode: |
+      d = UInt(Rd); setflags = (S == '1');
+      (imm32, carry) = ThumbExpandImm_C(i:imm3:imm8, APSR.C);
+      if d IN {13,15} then UNPREDICTABLE;
+- id: MVN_register
+  mnemonic: MVN
+  encodings:
+  - name: T1
+    length_bits: 16
+    pattern: 0100001111xxxxxx
+    bit_fields:
+    - skip: 10
+    - field: Rm
+      width: 3
+    - field: Rd
+      width: 3
+    decode: |
+      d = UInt(Rd); m = UInt(Rm); setflags = !InITBlock();
+      (shift_t, shift_n) = (SRType_LSL, 0);
+  - name: T2
+    length_bits: 32
+    pattern: 11101010011x1111xxxxxxxxxxxxxxxx
+    bit_fields:
+    - skip: 11
+    - field: S
+      width: 1
+    - skip: 4
+    - skip: 1
+    - field: imm3
+      width: 3
+    - field: Rd
+      width: 4
+    - field: imm2
+      width: 2
+    - field: type
+      width: 2
+    - field: Rm
+      width: 4
+    decode: |
+      d = UInt(Rd); m = UInt(Rm); setflags = (S == '1');
+      (shift_t, shift_n) = DecodeImmShift(type, imm3:imm2);
+      if d IN {13,15} || m IN {13,15} then UNPREDICTABLE;
+- id: TST_immediate
+  mnemonic: TST
+  encodings:
+  - name: T1
+    length_bits: 32
+    pattern: 11110x000001xxxx0xxx1111xxxxxxxx
+    bit_fields:
+    - skip: 5
+    - field: i
+      width: 1
+    - skip: 5
+    - skip: 1
+    - field: Rn
+      width: 4
+    - skip: 1
+    - field: imm3
+      width: 3
+    - skip: 4
+    - field: imm8
+      width: 8
+    decode: |
+      n = UInt(Rn);
+      (imm32, carry) = ThumbExpandImm_C(i:imm3:imm8, APSR.C);
+      if n IN {13,15} then UNPREDICTABLE;
+- id: TST_register
+  mnemonic: TST
+  encodings:
+  - name: T1
+    length_bits: 16
+    pattern: 0100001000xxxxxx
+    bit_fields:
+    - skip: 10
+    - field: Rm
+      width: 3
+    - field: Rn
+      width: 3
+    decode: |
+      n = UInt(Rn); m = UInt(Rm);
+      (shift_t, shift_n) = (SRType_LSL, 0);
+  - name: T2
+    length_bits: 32
+    pattern: 111010100001xxxxxxxx1111xxxxxxxx
+    bit_fields:
+    - skip: 11
+    - skip: 1
+    - field: Rn
+      width: 4
+    - skip: 1
+    - field: imm3
+      width: 3
+    - skip: 4
+    - field: imm2
+      width: 2
+    - field: type
+      width: 2
+    - field: Rm
+      width: 4
+    decode: |
+      n = UInt(Rn); m = UInt(Rm);
+      (shift_t, shift_n) = DecodeImmShift(type, imm3:imm2);
+      if n IN {13,15} || m IN {13,15} then UNPREDICTABLE;
+- id: LDRSB_immediate
+  mnemonic: LDRSB
+  encodings:
+  - name: T1
+    length_bits: 32
+    pattern: 111110011001xxxxxxxxxxxxxxxxxxxx
+    bit_fields:
+    - skip: 12
+    - field: Rn
+      width: 4
+    - field: Rt
+      width: 4
+    - field: imm12
+      width: 12
+    decode: |
+      if Rt == '1111' then SEE PLI;
+      if Rn == '1111' then SEE LDRSB (literal);
+      t = UInt(Rt); n = UInt(Rn); imm32 = ZeroExtend(imm12, 32);
+      index = TRUE; add = TRUE; wback = FALSE;
+      if t == 13 then UNPREDICTABLE;
+  - name: T2
+    length_bits: 32
+    pattern: 111110010001xxxxxxxx1xxxxxxxxxxx
+    bit_fields:
+    - skip: 12
+    - field: Rn
+      width: 4
+    - field: Rt
+      width: 4
+    - skip: 1
+    - field: P
+      width: 1
+    - field: U
+      width: 1
+    - field: W
+      width: 1
+    - field: imm8
+      width: 8
+    decode: |
+      if Rt == '1111' && P == '1' && U == '0' && W == '0' then SEE PLI;
+      if Rn == '1111' then SEE LDRSB (literal);
+      if P == '1' && U == '1' && W == '0' then SEE LDRSBT;
+      if P == '0' && W == '0' then UNDEFINED;
+      t = UInt(Rt); n = UInt(Rn); imm32 = ZeroExtend(imm8, 32);
+      index = (P == '1'); add = (U == '1'); wback = (W == '1');
+      if t == 13 || (t == 15 && W == '1') || (wback && n == t) then UNPREDICTABLE;
+- id: LDRSB_literal
+  mnemonic: LDRSB
+  encodings:
+  - name: T1
+    length_bits: 32
+    pattern: 11111001x0011111xxxxxxxxxxxxxxxx
+    bit_fields:
+    - skip: 8
+    - field: U
+      width: 1
+    - skip: 7
+    - field: Rt
+      width: 4
+    - field: imm12
+      width: 12
+    decode: |
+      if Rt == '1111' then SEE PLI;
+      t = UInt(Rt); imm32 = ZeroExtend(imm12, 32); add = (U == '1');
+      if t == 13 then UNPREDICTABLE;
+- id: LDRSB_register
+  mnemonic: LDRSB
+  encodings:
+  - name: T1
+    length_bits: 16
+    pattern: 0101011xxxxxxxxx
+    bit_fields:
+    - skip: 7
+    - field: Rm
+      width: 3
+    - field: Rn
+      width: 3
+    - field: Rt
+      width: 3
+    decode: |
+      t = UInt(Rt); n = UInt(Rn); m = UInt(Rm);
+      index = TRUE; add = TRUE; wback = FALSE;
+      (shift_t, shift_n) = (SRType_LSL, 0);
+  - name: T2
+    length_bits: 32
+    pattern: 111110010001xxxxxxxx000000xxxxxx
+    bit_fields:
+    - skip: 12
+    - field: Rn
+      width: 4
+    - field: Rt
+      width: 4
+    - skip: 6
+    - field: imm2
+      width: 2
+    - field: Rm
+      width: 4
+    decode: |
+      if Rt == '1111' then SEE PLI;
+      if Rn == '1111' then SEE LDRSB (literal);
+      t = UInt(Rt); n = UInt(Rn); m = UInt(Rm);
+      index = TRUE; add = TRUE; wback = FALSE;
+      (shift_t, shift_n) = (SRType_LSL, UInt(imm2));
+      if t == 13 || m IN {13,15} then UNPREDICTABLE;
+- id: LDRSH_immediate
+  mnemonic: LDRSH
+  encodings:
+  - name: T1
+    length_bits: 32
+    pattern: 111110011011xxxxxxxxxxxxxxxxxxxx
+    bit_fields:
+    - skip: 12
+    - field: Rn
+      width: 4
+    - field: Rt
+      width: 4
+    - field: imm12
+      width: 12
+    decode: |
+      if Rn == '1111' then SEE LDRSH (literal);
+      if Rt == '1111' then SEE "Related instructions";
+      t = UInt(Rt); n = UInt(Rn); imm32 = ZeroExtend(imm12, 32);
+      index = TRUE; add = TRUE; wback = FALSE;
+      if t == 13 then UNPREDICTABLE;
+  - name: T2
+    length_bits: 32
+    pattern: 111110010011xxxxxxxx1xxxxxxxxxxx
+    bit_fields:
+    - skip: 12
+    - field: Rn
+      width: 4
+    - field: Rt
+      width: 4
+    - skip: 1
+    - field: P
+      width: 1
+    - field: U
+      width: 1
+    - field: W
+      width: 1
+    - field: imm8
+      width: 8
+    decode: |
+      if Rn == '1111' then SEE LDRSH (literal);
+      if Rt == '1111' && P == '1' && U == '0' && W == '0' then SEE "Related instructions";
+      if P == '1' && U == '1' && W == '0' then SEE LDRSHT;
+      if P == '0' && W == '0' then UNDEFINED;
+      t = UInt(Rt); n = UInt(Rn); imm32 = ZeroExtend(imm8, 32);
+      index = (P == '1'); add = (U == '1'); wback = (W == '1');
+      if t == 13 || (t == 15 && W == '1') || (wback && n == t) then UNPREDICTABLE;
+- id: LDRSH_literal
+  mnemonic: LDRSH
+  encodings:
+  - name: T1
+    length_bits: 32
+    pattern: 11111001x0111111xxxxxxxxxxxxxxxx
+    bit_fields:
+    - skip: 8
+    - field: U
+      width: 1
+    - skip: 7
+    - field: Rt
+      width: 4
+    - field: imm12
+      width: 12
+    decode: |
+      if Rt == '1111' then SEE "Related instructions";
+      t = UInt(Rt); imm32 = ZeroExtend(imm12, 32); add = (U == '1');
+      if t == 13 then UNPREDICTABLE;
+- id: LDRSH_register
+  mnemonic: LDRSH
+  encodings:
+  - name: T1
+    length_bits: 16
+    pattern: 0101111xxxxxxxxx
+    bit_fields:
+    - skip: 7
+    - field: Rm
+      width: 3
+    - field: Rn
+      width: 3
+    - field: Rt
+      width: 3
+    decode: |
+      t = UInt(Rt); n = UInt(Rn); m = UInt(Rm);
+      index = TRUE; add = TRUE; wback = FALSE;
+      (shift_t, shift_n) = (SRType_LSL, 0);
+  - name: T2
+    length_bits: 32
+    pattern: 111110010011xxxxxxxx000000xxxxxx
+    bit_fields:
+    - skip: 12
+    - field: Rn
+      width: 4
+    - field: Rt
+      width: 4
+    - skip: 6
+    - field: imm2
+      width: 2
+    - field: Rm
+      width: 4
+    decode: |
+      if Rn == '1111' then SEE LDRSH (literal);
+      if Rt == '1111' then SEE "Related instructions";
+      t = UInt(Rt); n = UInt(Rn); m = UInt(Rm);
+      index = TRUE; add = TRUE; wback = FALSE;
+      (shift_t, shift_n) = (SRType_LSL, UInt(imm2));
+      if t == 13 || m IN {13,15} then UNPREDICTABLE;
+- id: LDM
+  mnemonic: LDM
+  encodings:
+  - name: T1
+    length_bits: 16
+    pattern: 11001xxxxxxxxxxx
+    bit_fields:
+    - skip: 5
+    - field: Rn
+      width: 3
+    - field: register_list
+      width: 8
+    decode: |
+      n = UInt(Rn); registers = '00000000':register_list; wback = (registers<n> == '0');
+      if BitCount(registers) < 1 then UNPREDICTABLE;
+  - name: T2
+    length_bits: 32
+    pattern: 1110100010x1xxxxxxxxxxxxxxxxxxxx
+    bit_fields:
+    - skip: 10
+    - field: W
+      width: 1
+    - skip: 1
+    - field: Rn
+      width: 4
+    - field: P
+      width: 1
+    - field: M
+      width: 1
+    - skip: 1
+    - field: register_list
+      width: 13
+    decode: |
+      if W == '1' && Rn == '1101' then SEE POP (Thumb);
+      n = UInt(Rn); registers = P:M:'0':register_list; wback = (W == '1');
+      if n == 15 || BitCount(registers) < 2 || (P == '1' && M == '1') then UNPREDICTABLE;
+      if registers<15> == '1' && InITBlock() && !LastInITBlock() then UNPREDICTABLE;
+      if wback && registers<n> == '1' then UNPREDICTABLE;
+- id: STM
+  mnemonic: STM
+  encodings:
+  - name: T1
+    length_bits: 16
+    pattern: 11000xxxxxxxxxxx
+    bit_fields:
+    - skip: 5
+    - field: Rn
+      width: 3
+    - field: register_list
+      width: 8
+    decode: |
+      n = UInt(Rn); registers = '00000000':register_list; wback = TRUE;
+      if BitCount(registers) < 1 then UNPREDICTABLE;
+  - name: T2
+    length_bits: 32
+    pattern: 1110100010x0xxxxxxxxxxxxxxxxxxxx
+    bit_fields:
+    - skip: 10
+    - field: W
+      width: 1
+    - skip: 1
+    - field: Rn
+      width: 4
+    - skip: 1
+    - field: M
+      width: 1
+    - skip: 1
+    - field: register_list
+      width: 13
+    decode: |
+      n = UInt(Rn); registers = '0':M:'0':register_list; wback = (W == '1');
+      if n == 15 || BitCount(registers) < 2 then UNPREDICTABLE;
+      if wback && registers<n> == '1' then UNPREDICTABLE;
+- id: BLX_register
+  mnemonic: BLX
+  encodings:
+  - name: T1
+    length_bits: 16
+    pattern: 010001111xxxxxxx
+    bit_fields:
+    - skip: 9
+    - field: Rm
+      width: 4
+    - skip: 1
+    - skip: 1
+    - skip: 1
+    decode: |
+      m = UInt(Rm);
+      if m == 15 then UNPREDICTABLE;
+      if InITBlock() && !LastInITBlock() then UNPREDICTABLE;
+- id: BX
+  mnemonic: BX
+  encodings:
+  - name: T1
+    length_bits: 16
+    pattern: 010001110xxxxxxx
+    bit_fields:
+    - skip: 9
+    - field: Rm
+      width: 4
+    - skip: 1
+    - skip: 1
+    - skip: 1
+    decode: |
+      m = UInt(Rm);
+      if InITBlock() && !LastInITBlock() then UNPREDICTABLE;
+- id: IT
+  mnemonic: IT
+  encodings:
+  - name: T1
+    length_bits: 16
+    pattern: 10111111xxxxxxxx
+    bit_fields:
+    - skip: 8
+    - field: firstcond
+      width: 4
+    - field: mask
+      width: 4
+    decode: |
+      if mask == '0000' then SEE "Related encodings";
+      if firstcond == '1111' || (firstcond == '1110' && BitCount(mask) != 1) then UNPREDICTABLE;
+      if InITBlock() then UNPREDICTABLE;
+- id: SVC
+  mnemonic: SVC
+  encodings:
+  - name: T1
+    length_bits: 16
+    pattern: 11011111xxxxxxxx
+    bit_fields:
+    - skip: 8
+    - field: imm8
+      width: 8
+    decode: |
+      imm32 = ZeroExtend(imm8, 32);
+      // imm32 is for assembly/disassembly. SVC handlers in some systems
+      // interpret imm8 in software, for example to determine the required service.
+- id: BFI
+  mnemonic: BFI
+  encodings:
+  - name: T1
+    length_bits: 32
+    pattern: 11110x110110xxxx0xxxxxxxxxxxxxxx
+    bit_fields:
+    - skip: 5
+    - skip: 1
+    - skip: 6
+    - field: Rn
+      width: 4
+    - skip: 1
+    - field: imm3
+      width: 3
+    - field: Rd
+      width: 4
+    - field: imm2
+      width: 2
+    - skip: 1
+    - field: msb
+      width: 5
+    decode: |
+      if Rn == '1111' then SEE BFC;
+      d = UInt(Rd); n = UInt(Rn); msbit = UInt(msb); lsbit = UInt(imm3:imm2);
+      if d IN {13,15} || n == 13 then UNPREDICTABLE;
+- id: CBNZ_CBZ
+  mnemonic: CBNZ
+  encodings:
+  - name: T1
+    length_bits: 16
+    pattern: 1011x0x1xxxxxxxx
+    bit_fields:
+    - skip: 4
+    - field: op
+      width: 1
+    - skip: 1
+    - field: i
+      width: 1
+    - skip: 1
+    - field: imm5
+      width: 5
+    - field: Rn
+      width: 3
+    decode: |
+      n = UInt(Rn); imm32 = ZeroExtend(i:imm5:'0', 32); nonzero = (op == '1');
+      if InITBlock() then UNPREDICTABLE;
+- id: CLZ
+  mnemonic: CLZ
+  encodings:
+  - name: T1
+    length_bits: 32
+    pattern: 111110101011xxxx1111xxxx1000xxxx
+    bit_fields:
+    - skip: 12
+    - field: Rm
+      width: 4
+    - skip: 4
+    - field: Rd
+      width: 4
+    - skip: 4
+    - field: Rm
+      width: 4
+    decode: |
+      if !Consistent(Rm) then UNPREDICTABLE;
+      d = UInt(Rd); m = UInt(Rm);
+      if d IN {13,15} || m IN {13,15} then UNPREDICTABLE;
+- id: CMN_immediate
+  mnemonic: CMN
+  encodings:
+  - name: T1
+    length_bits: 32
+    pattern: 11110x010001xxxx0xxx1111xxxxxxxx
+    bit_fields:
+    - skip: 5
+    - field: i
+      width: 1
+    - skip: 5
+    - skip: 1
+    - field: Rn
+      width: 4
+    - skip: 1
+    - field: imm3
+      width: 3
+    - skip: 4
+    - field: imm8
+      width: 8
+    decode: |
+      n = UInt(Rn); imm32 = ThumbExpandImm(i:imm3:imm8);
+      if n == 15 then UNPREDICTABLE;
+- id: CMN_register
+  mnemonic: CMN
+  encodings:
+  - name: T1
+    length_bits: 16
+    pattern: 0100001011xxxxxx
+    bit_fields:
+    - skip: 10
+    - field: Rm
+      width: 3
+    - field: Rn
+      width: 3
+    decode: |
+      n = UInt(Rn); m = UInt(Rm);
+      (shift_t, shift_n) = (SRType_LSL, 0);
+  - name: T2
+    length_bits: 32
+    pattern: 111010110001xxxxxxxx1111xxxxxxxx
+    bit_fields:
+    - skip: 11
+    - skip: 1
+    - field: Rn
+      width: 4
+    - skip: 1
+    - field: imm3
+      width: 3
+    - skip: 4
+    - field: imm2
+      width: 2
+    - field: type
+      width: 2
+    - field: Rm
+      width: 4
+    decode: |
+      n = UInt(Rn); m = UInt(Rm);
+      (shift_t, shift_n) = DecodeImmShift(type, imm3:imm2);
+      if n == 15 || m IN {13,15} then UNPREDICTABLE;
+- id: CMP_immediate
+  mnemonic: CMP
+  encodings:
+  - name: T1
+    length_bits: 16
+    pattern: 00101xxxxxxxxxxx
+    bit_fields:
+    - skip: 5
+    - field: Rn
+      width: 3
+    - field: imm8
+      width: 8
+    decode: |
+      n = UInt(Rn); imm32 = ZeroExtend(imm8, 32);
+  - name: T2
+    length_bits: 32
+    pattern: 11110x011011xxxx0xxx1111xxxxxxxx
+    bit_fields:
+    - skip: 5
+    - field: i
+      width: 1
+    - skip: 5
+    - skip: 1
+    - field: Rn
+      width: 4
+    - skip: 1
+    - field: imm3
+      width: 3
+    - skip: 4
+    - field: imm8
+      width: 8
+    decode: |
+      n = UInt(Rn); imm32 = ThumbExpandImm(i:imm3:imm8);
+      if n == 15 then UNPREDICTABLE;
+- id: CMP_register
+  mnemonic: CMP
+  encodings:
+  - name: T1
+    length_bits: 16
+    pattern: 0100001010xxxxxx
+    bit_fields:
+    - skip: 10
+    - field: Rm
+      width: 3
+    - field: Rn
+      width: 3
+    decode: |
+      n = UInt(Rn); m = UInt(Rm);
+      (shift_t, shift_n) = (SRType_LSL, 0);
+  - name: T2
+    length_bits: 16
+    pattern: 01000101xxxxxxxx
+    bit_fields:
+    - skip: 8
+    - field: N
+      width: 1
+    - field: Rm
+      width: 4
+    - field: Rn
+      width: 3
+    decode: |
+      n = UInt(N:Rn); m = UInt(Rm); (shift_t, shift_n) = (SRType_LSL, 0);
+      if n < 8 && m < 8 then UNPREDICTABLE;
+      if n == 15 || m == 15 then UNPREDICTABLE;
+  - name: T3
+    length_bits: 32
+    pattern: 111010111011xxxxxxxx1111xxxxxxxx
+    bit_fields:
+    - skip: 11
+    - skip: 1
+    - field: Rn
+      width: 4
+    - skip: 1
+    - field: imm3
+      width: 3
+    - skip: 4
+    - field: imm2
+      width: 2
+    - field: type
+      width: 2
+    - field: Rm
+      width: 4
+    decode: |
+      n = UInt(Rn); m = UInt(Rm);
+      (shift_t, shift_n) = DecodeImmShift(type, imm3:imm2);
+      if n == 15 || m IN {13,15} then UNPREDICTABLE;
+- id: DMB
+  mnemonic: DMB
+  encodings:
+  - name: T1
+    length_bits: 32
+    pattern: 111100111011xxxx10x0xxxx0101xxxx
+    bit_fields:
+    - skip: 12
+    - skip: 1
+    - skip: 1
+    - skip: 1
+    - skip: 1
+    - skip: 2
+    - skip: 1
+    - skip: 1
+    - skip: 1
+    - skip: 1
+    - skip: 1
+    - skip: 1
+    - skip: 4
+    - field: option
+      width: 4
+    decode: |
+      // No additional decoding required
+- id: BIC_immediate
+  mnemonic: BIC
+  encodings:
+  - name: T1
+    length_bits: 32
+    pattern: 11110x00001xxxxx0xxxxxxxxxxxxxxx
+    bit_fields:
+    - skip: 5
+    - field: i
+      width: 1
+    - skip: 5
+    - field: S
+      width: 1
+    - field: Rn
+      width: 4
+    - skip: 1
+    - field: imm3
+      width: 3
+    - field: Rd
+      width: 4
+    - field: imm8
+      width: 8
+    decode: |
+      d = UInt(Rd); n = UInt(Rn); setflags = (S == '1');
+      (imm32, carry) = ThumbExpandImm_C(i:imm3:imm8, APSR.C);
+      if d IN {13,15} || n IN {13,15} then UNPREDICTABLE;
+- id: BIC_register
+  mnemonic: BIC
+  encodings:
+  - name: T1
+    length_bits: 16
+    pattern: 0100001110xxxxxx
+    bit_fields:
+    - skip: 10
+    - field: Rm
+      width: 3
+    - field: Rdn
+      width: 3
+    decode: |
+      d = UInt(Rdn); n = UInt(Rdn); m = UInt(Rm); setflags = !InITBlock();
+      (shift_t, shift_n) = (SRType_LSL, 0);
+  - name: T2
+    length_bits: 32
+    pattern: 11101010001xxxxxxxxxxxxxxxxxxxxx
+    bit_fields:
+    - skip: 11
+    - field: S
+      width: 1
+    - field: Rn
+      width: 4
+    - skip: 1
+    - field: imm3
+      width: 3
+    - field: Rd
+      width: 4
+    - field: imm2
+      width: 2
+    - field: type
+      width: 2
+    - field: Rm
+      width: 4
+    decode: |
+      d = UInt(Rd); n = UInt(Rn); m = UInt(Rm); setflags = (S == '1');
+      (shift_t, shift_n) = DecodeImmShift(type, imm3:imm2);
+      if d IN {13,15} || n IN {13,15} || m IN {13,15} then UNPREDICTABLE;
+- id: TEQ_immediate
+  mnemonic: TEQ
+  encodings:
+  - name: T1
+    length_bits: 32
+    pattern: 11110x001001xxxx0xxx1111xxxxxxxx
+    bit_fields:
+    - skip: 5
+    - field: i
+      width: 1
+    - skip: 6
+    - field: Rn
+      width: 4
+    - skip: 1
+    - field: imm3
+      width: 3
+    - skip: 4
+    - field: imm8
+      width: 8
+    decode: |
+      n = UInt(Rn);
+      (imm32, carry) = ThumbExpandImm_C(i:imm3:imm8, APSR.C);
+      if n IN {13,15} then UNPREDICTABLE;
+- id: TEQ_register
+  mnemonic: TEQ
+  encodings:
+  - name: T1
+    length_bits: 32
+    pattern: 111010101001xxxxxxxx1111xxxxxxxx
+    bit_fields:
+    - skip: 12
+    - field: Rn
+      width: 4
+    - skip: 1
+    - field: imm3
+      width: 3
+    - skip: 4
+    - field: imm2
+      width: 2
+    - field: type
+      width: 2
+    - field: Rm
+      width: 4
+    decode: |
+      n = UInt(Rn); m = UInt(Rm);
+      (shift_t, shift_n) = DecodeImmShift(type, imm3:imm2);
+      if n IN {13,15} || m IN {13,15} then UNPREDICTABLE;
+- id: RSB_immediate
+  mnemonic: RSB
+  encodings:
+  - name: T1
+    length_bits: 16
+    pattern: 0100001001xxxxxx
+    bit_fields:
+    - skip: 10
+    - field: Rn
+      width: 3
+    - field: Rd
+      width: 3
+    decode: |
+      d = UInt(Rd); n = UInt(Rn); setflags = !InITBlock();
+      imm32 = Zeros(32); // immediate = #0
+  - name: T2
+    length_bits: 32
+    pattern: 11110x01110xxxxx0xxxxxxxxxxxxxxx
+    bit_fields:
+    - skip: 5
+    - field: i
+      width: 1
+    - skip: 5
+    - field: S
+      width: 1
+    - field: Rn
+      width: 4
+    - skip: 1
+    - field: imm3
+      width: 3
+    - field: Rd
+      width: 4
+    - field: imm8
+      width: 8
+    decode: |
+      d = UInt(Rd); n = UInt(Rn); setflags = (S == '1');
+      imm32 = ThumbExpandImm(i:imm3:imm8);
+      if d IN {13,15} || n IN {13,15} then UNPREDICTABLE;
+- id: RSB_register
+  mnemonic: RSB
+  encodings:
+  - name: T1
+    length_bits: 32
+    pattern: 11101011110xxxxxxxxxxxxxxxxxxxxx
+    bit_fields:
+    - skip: 11
+    - field: S
+      width: 1
+    - field: Rn
+      width: 4
+    - skip: 1
+    - field: imm3
+      width: 3
+    - field: Rd
+      width: 4
+    - field: imm2
+      width: 2
+    - field: type
+      width: 2
+    - field: Rm
+      width: 4
+    decode: |
+      d = UInt(Rd); n = UInt(Rn); m = UInt(Rm); setflags = (S == '1');
+      (shift_t, shift_n) = DecodeImmShift(type, imm3:imm2);
+      if d IN {13,15} || n IN {13,15} || m IN {13,15} then UNPREDICTABLE;
+- id: SBC_immediate
+  mnemonic: SBC
+  encodings:
+  - name: T1
+    length_bits: 32
+    pattern: 11110x01011xxxxx0xxxxxxxxxxxxxxx
+    bit_fields:
+    - skip: 5
+    - field: i
+      width: 1
+    - skip: 5
+    - field: S
+      width: 1
+    - field: Rn
+      width: 4
+    - skip: 1
+    - field: imm3
+      width: 3
+    - field: Rd
+      width: 4
+    - field: imm8
+      width: 8
+    decode: |
+      d = UInt(Rd); n = UInt(Rn); setflags = (S == '1');
+      imm32 = ThumbExpandImm(i:imm3:imm8);
+      if d IN {13,15} || n IN {13,15} then UNPREDICTABLE;
+- id: SBC_register
+  mnemonic: SBC
+  encodings:
+  - name: T1
+    length_bits: 16
+    pattern: 0100000110xxxxxx
+    bit_fields:
+    - skip: 10
+    - field: Rm
+      width: 3
+    - field: Rdn
+      width: 3
+    decode: |
+      d = UInt(Rdn); n = UInt(Rdn); m = UInt(Rm); setflags = !InITBlock();
+      (shift_t, shift_n) = (SRType_LSL, 0);
+  - name: T2
+    length_bits: 32
+    pattern: 11101011011xxxxxxxxxxxxxxxxxxxxx
+    bit_fields:
+    - skip: 11
+    - field: S
+      width: 1
+    - field: Rn
+      width: 4
+    - skip: 1
+    - field: imm3
+      width: 3
+    - field: Rd
+      width: 4
+    - field: imm2
+      width: 2
+    - field: type
+      width: 2
+    - field: Rm
+      width: 4
+    decode: |
+      d = UInt(Rd); n = UInt(Rn); m = UInt(Rm); setflags = (S == '1');
+      (shift_t, shift_n) = DecodeImmShift(type, imm3:imm2);
+      if d IN {13,15} || n IN {13,15} || m IN {13,15} then UNPREDICTABLE;
+- id: MUL
+  mnemonic: MUL
+  encodings:
+  - name: T1
+    length_bits: 16
+    pattern: 0100001101xxxxxx
+    bit_fields:
+    - skip: 10
+    - field: Rn
+      width: 3
+    - field: Rdm
+      width: 3
+    decode: |
+      d = UInt(Rdm); n = UInt(Rn); m = UInt(Rdm); setflags = !InITBlock();
+  - name: T2
+    length_bits: 32
+    pattern: 111110110000xxxx1111xxxx0000xxxx
+    bit_fields:
+    - skip: 12
+    - field: Rn
+      width: 4
+    - skip: 4
+    - field: Rd
+      width: 4
+    - skip: 4
+    - field: Rm
+      width: 4
+    decode: |
+      d = UInt(Rd); n = UInt(Rn); m = UInt(Rm); setflags = FALSE;
+      if d IN {13,15} || n IN {13,15} || m IN {13,15} then UNPREDICTABLE;
+- id: MLA
+  mnemonic: MLA
+  encodings:
+  - name: T1
+    length_bits: 32
+    pattern: 111110110000xxxxxxxxxxxx0000xxxx
+    bit_fields:
+    - skip: 12
+    - field: Rn
+      width: 4
+    - field: Ra
+      width: 4
+    - field: Rd
+      width: 4
+    - skip: 4
+    - field: Rm
+      width: 4
+    decode: |
+      if Ra == '1111' then SEE MUL;
+      d = UInt(Rd); n = UInt(Rn); m = UInt(Rm); a = UInt(Ra); setflags = FALSE;
+      if d IN {13,15} || n IN {13,15} || m IN {13,15} || a == 13 then UNPREDICTABLE;
+- id: MLS
+  mnemonic: MLS
+  encodings:
+  - name: T1
+    length_bits: 32
+    pattern: 111110110000xxxxxxxxxxxx0001xxxx
+    bit_fields:
+    - skip: 12
+    - field: Rn
+      width: 4
+    - field: Ra
+      width: 4
+    - field: Rd
+      width: 4
+    - skip: 4
+    - field: Rm
+      width: 4
+    decode: |
+      d = UInt(Rd); n = UInt(Rn); m = UInt(Rm); a = UInt(Ra);
+      if d IN {13,15} || n IN {13,15} || m IN {13,15} || a IN {13,15} then UNPREDICTABLE;
+- id: SMULL
+  mnemonic: SMULL
+  encodings:
+  - name: T1
+    length_bits: 32
+    pattern: 111110111000xxxxxxxxxxxx0000xxxx
+    bit_fields:
+    - skip: 12
+    - field: Rn
+      width: 4
+    - field: RdLo
+      width: 4
+    - field: RdHi
+      width: 4
+    - skip: 4
+    - field: Rm
+      width: 4
+    decode: |
+      dLo = UInt(RdLo); dHi = UInt(RdHi); n = UInt(Rn); m = UInt(Rm); setflags = FALSE;
+      if dLo IN {13,15} || dHi IN {13,15} || n IN {13,15} || m IN {13,15} then UNPREDICTABLE;
+      if dHi == dLo then UNPREDICTABLE;
+- id: UMULL
+  mnemonic: UMULL
+  encodings:
+  - name: T1
+    length_bits: 32
+    pattern: 111110111010xxxxxxxxxxxx0000xxxx
+    bit_fields:
+    - skip: 12
+    - field: Rn
+      width: 4
+    - field: RdLo
+      width: 4
+    - field: RdHi
+      width: 4
+    - skip: 4
+    - field: Rm
+      width: 4
+    decode: |
+      dLo = UInt(RdLo); dHi = UInt(RdHi); n = UInt(Rn); m = UInt(Rm); setflags = FALSE;
+      if dLo IN {13,15} || dHi IN {13,15} || n IN {13,15} || m IN {13,15} then UNPREDICTABLE;
+      if dHi == dLo then UNPREDICTABLE;
+- id: UMLAL
+  mnemonic: UMLAL
+  encodings:
+  - name: T1
+    length_bits: 32
+    pattern: 111110111110xxxxxxxxxxxx0000xxxx
+    bit_fields:
+    - skip: 12
+    - field: Rn
+      width: 4
+    - field: RdLo
+      width: 4
+    - field: RdHi
+      width: 4
+    - skip: 4
+    - field: Rm
+      width: 4
+    decode: |
+      dLo = UInt(RdLo); dHi = UInt(RdHi); n = UInt(Rn); m = UInt(Rm); setflags = FALSE;
+      if dLo IN {13,15} || dHi IN {13,15} || n IN {13,15} || m IN {13,15} then UNPREDICTABLE;
+      if dHi == dLo then UNPREDICTABLE;
+- id: SDIV
+  mnemonic: SDIV
+  encodings:
+  - name: T1
+    length_bits: 32
+    pattern: 111110111001xxxxxxxxxxxx1111xxxx
+    bit_fields:
+    - skip: 12
+    - field: Rn
+      width: 4
+    - skip: 1
+    - skip: 1
+    - skip: 1
+    - skip: 1
+    - field: Rd
+      width: 4
+    - skip: 4
+    - field: Rm
+      width: 4
+    decode: |
+      d = UInt(Rd); n = UInt(Rn); m = UInt(Rm);
+      if d IN {13,15} || n IN {13,15} || m IN {13,15} then UNPREDICTABLE;
+- id: UDIV
+  mnemonic: UDIV
+  encodings:
+  - name: T1
+    length_bits: 32
+    pattern: 111110111011xxxxxxxxxxxx1111xxxx
+    bit_fields:
+    - skip: 12
+    - field: Rn
+      width: 4
+    - skip: 1
+    - skip: 1
+    - skip: 1
+    - skip: 1
+    - field: Rd
+      width: 4
+    - skip: 4
+    - field: Rm
+      width: 4
+    decode: |
+      d = UInt(Rd); n = UInt(Rn); m = UInt(Rm);
+      if d IN {13,15} || n IN {13,15} || m IN {13,15} then UNPREDICTABLE;
+- id: SXTAB
+  mnemonic: SXTAB
+  encodings:
+  - name: T1
+    length_bits: 32
+    pattern: 111110100100xxxx1111xxxx1xxxxxxx
+    bit_fields:
+    - skip: 12
+    - field: Rn
+      width: 4
+    - skip: 4
+    - field: Rd
+      width: 4
+    - skip: 1
+    - skip: 1
+    - field: rotate
+      width: 2
+    - field: Rm
+      width: 4
+    decode: |
+      if Rn == '1111' then SEE SXTB;
+      d = UInt(Rd); n = UInt(Rn); m = UInt(Rm); rotation = UInt(rotate:'000');
+      if d IN {13,15} || n == 13 || m IN {13,15} then UNPREDICTABLE;
+- id: SXTAB16
+  mnemonic: SXTAB16
+  encodings:
+  - name: T1
+    length_bits: 32
+    pattern: 111110100010xxxx1111xxxx1xxxxxxx
+    bit_fields:
+    - skip: 12
+    - field: Rn
+      width: 4
+    - skip: 4
+    - field: Rd
+      width: 4
+    - skip: 1
+    - skip: 1
+    - field: rotate
+      width: 2
+    - field: Rm
+      width: 4
+    decode: |
+      if Rn == '1111' then SEE SXTB16;
+      d = UInt(Rd); n = UInt(Rn); m = UInt(Rm); rotation = UInt(rotate:'000');
+      if d IN {13,15} || n == 13 || m IN {13,15} then UNPREDICTABLE;
+- id: SXTAH
+  mnemonic: SXTAH
+  encodings:
+  - name: T1
+    length_bits: 32
+    pattern: 111110100000xxxx1111xxxx1xxxxxxx
+    bit_fields:
+    - skip: 12
+    - field: Rn
+      width: 4
+    - skip: 4
+    - field: Rd
+      width: 4
+    - skip: 1
+    - skip: 1
+    - field: rotate
+      width: 2
+    - field: Rm
+      width: 4
+    decode: |
+      if Rn == '1111' then SEE SXTH;
+      d = UInt(Rd); n = UInt(Rn); m = UInt(Rm); rotation = UInt(rotate:'000');
+      if d IN {13,15} || n == 13 || m IN {13,15} then UNPREDICTABLE;
+- id: SXTB
+  mnemonic: SXTB
+  encodings:
+  - name: T1
+    length_bits: 16
+    pattern: 1011001001xxxxxx
+    bit_fields:
+    - skip: 10
+    - field: Rm
+      width: 3
+    - field: Rd
+      width: 3
+    decode: |
+      d = UInt(Rd); m = UInt(Rm); rotation = 0;
+  - name: T2
+    length_bits: 32
+    pattern: 11111010010011111111xxxx1xxxxxxx
+    bit_fields:
+    - skip: 16
+    - skip: 4
+    - field: Rd
+      width: 4
+    - skip: 1
+    - skip: 1
+    - field: rotate
+      width: 2
+    - field: Rm
+      width: 4
+    decode: |
+      d = UInt(Rd); m = UInt(Rm); rotation = UInt(rotate:'000');
+      if d IN {13,15} || m IN {13,15} then UNPREDICTABLE;
+- id: SXTB16
+  mnemonic: SXTB16
+  encodings:
+  - name: T1
+    length_bits: 32
+    pattern: 11111010001011111111xxxx1xxxxxxx
+    bit_fields:
+    - skip: 16
+    - skip: 4
+    - field: Rd
+      width: 4
+    - skip: 1
+    - skip: 1
+    - field: rotate
+      width: 2
+    - field: Rm
+      width: 4
+    decode: |
+      d = UInt(Rd); m = UInt(Rm); rotation = UInt(rotate:'000');
+      if d IN {13,15} || m IN {13,15} then UNPREDICTABLE;
+- id: SXTH
+  mnemonic: SXTH
+  encodings:
+  - name: T1
+    length_bits: 16
+    pattern: 1011001000xxxxxx
+    bit_fields:
+    - skip: 10
+    - field: Rm
+      width: 3
+    - field: Rd
+      width: 3
+    decode: |
+      d = UInt(Rd); m = UInt(Rm); rotation = 0;
+  - name: T2
+    length_bits: 32
+    pattern: 11111010000011111111xxxx1xxxxxxx
+    bit_fields:
+    - skip: 16
+    - skip: 4
+    - field: Rd
+      width: 4
+    - skip: 1
+    - skip: 1
+    - field: rotate
+      width: 2
+    - field: Rm
+      width: 4
+    decode: |
+      d = UInt(Rd); m = UInt(Rm); rotation = UInt(rotate:'000');
+      if d IN {13,15} || m IN {13,15} then UNPREDICTABLE;
+- id: UXTB
+  mnemonic: UXTB
+  encodings:
+  - name: T1
+    length_bits: 16
+    pattern: 1011001011xxxxxx
+    bit_fields:
+    - skip: 10
+    - field: Rm
+      width: 3
+    - field: Rd
+      width: 3
+    decode: |
+      d = UInt(Rd); m = UInt(Rm); rotation = 0;
+  - name: T2
+    length_bits: 32
+    pattern: 11111010010111111111xxxx1xxxxxxx
+    bit_fields:
+    - skip: 16
+    - skip: 4
+    - field: Rd
+      width: 4
+    - skip: 1
+    - skip: 1
+    - field: rotate
+      width: 2
+    - field: Rm
+      width: 4
+    decode: |
+      d = UInt(Rd); m = UInt(Rm); rotation = UInt(rotate:'000');
+      if d IN {13,15} || m IN {13,15} then UNPREDICTABLE;
+- id: UXTH
+  mnemonic: UXTH
+  encodings:
+  - name: T1
+    length_bits: 16
+    pattern: 1011001010xxxxxx
+    bit_fields:
+    - skip: 10
+    - field: Rm
+      width: 3
+    - field: Rd
+      width: 3
+    decode: |
+      d = UInt(Rd); m = UInt(Rm); rotation = 0;
+  - name: T2
+    length_bits: 32
+    pattern: 11111010000111111111xxxx1xxxxxxx
+    bit_fields:
+    - skip: 16
+    - skip: 4
+    - field: Rd
+      width: 4
+    - skip: 1
+    - skip: 1
+    - field: rotate
+      width: 2
+    - field: Rm
+      width: 4
+    decode: |
+      d = UInt(Rd); m = UInt(Rm); rotation = UInt(rotate:'000');
+      if d IN {13,15} || m IN {13,15} then UNPREDICTABLE;
+- id: UBFX
+  mnemonic: UBFX
+  encodings:
+  - name: T1
+    length_bits: 32
+    pattern: 11110x111100xxxx0xxxxxxxxxxxxxxx
+    bit_fields:
+    - skip: 5
+    - skip: 1
+    - skip: 6
+    - field: Rn
+      width: 4
+    - skip: 1
+    - field: imm3
+      width: 3
+    - field: Rd
+      width: 4
+    - field: imm2
+      width: 2
+    - skip: 1
+    - field: widthm1
+      width: 5
+    decode: |
+      d = UInt(Rd); n = UInt(Rn);
+      lsbit = UInt(imm3:imm2); widthminus1 = UInt(widthm1);
+      if d IN {13,15} || n IN {13,15} then UNPREDICTABLE;
+- id: RRX
+  mnemonic: RRX
+  encodings:
+  - name: T1
+    length_bits: 32
+    pattern: 11101010010x1111x000xxxx0011xxxx
+    bit_fields:
+    - skip: 11
+    - field: S
+      width: 1
+    - skip: 4
+    - skip: 1
+    - skip: 3
+    - field: Rd
+      width: 4
+    - skip: 4
+    - field: Rm
+      width: 4
+    decode: |
+      d = UInt(Rd); m = UInt(Rm); setflags = (S == '1');
+      if d IN {13,15} || m IN {13,15} then UNPREDICTABLE;
+- id: STRB_immediate
+  mnemonic: STRB
+  encodings:
+  - name: T1
+    length_bits: 16
+    pattern: 01110xxxxxxxxxxx
+    bit_fields:
+    - skip: 5
+    - field: imm5
+      width: 5
+    - field: Rn
+      width: 3
+    - field: Rt
+      width: 3
+    decode: |
+      t = UInt(Rt); n = UInt(Rn); imm32 = ZeroExtend(imm5, 32);
+      index = TRUE; add = TRUE; wback = FALSE;
+  - name: T2
+    length_bits: 32
+    pattern: 111110001000xxxxxxxxxxxxxxxxxxxx
+    bit_fields:
+    - skip: 12
+    - field: Rn
+      width: 4
+    - field: Rt
+      width: 4
+    - field: imm12
+      width: 12
+    decode: |
+      if Rn == '1111' then UNDEFINED;
+      t = UInt(Rt); n = UInt(Rn); imm32 = ZeroExtend(imm12, 32);
+      index = TRUE; add = TRUE; wback = FALSE;
+      if t IN {13,15} then UNPREDICTABLE;
+  - name: T3
+    length_bits: 32
+    pattern: 111110000000xxxxxxxx1xxxxxxxxxxx
+    bit_fields:
+    - skip: 12
+    - field: Rn
+      width: 4
+    - field: Rt
+      width: 4
+    - skip: 1
+    - field: P
+      width: 1
+    - field: U
+      width: 1
+    - field: W
+      width: 1
+    - field: imm8
+      width: 8
+    decode: |
+      if P == '1' && U == '1' && W == '0' then SEE STRBT;
+      if Rn == '1111' || (P == '0' && W == '0') then UNDEFINED;
+      t = UInt(Rt); n = UInt(Rn); imm32 = ZeroExtend(imm8, 32);
+      index = (P == '1'); add = (U == '1'); wback = (W == '1');
+      if t IN {13,15} || (wback && n == t) then UNPREDICTABLE;
+- id: STRB_register
+  mnemonic: STRB
+  encodings:
+  - name: T1
+    length_bits: 16
+    pattern: 0101010xxxxxxxxx
+    bit_fields:
+    - skip: 7
+    - field: Rm
+      width: 3
+    - field: Rn
+      width: 3
+    - field: Rt
+      width: 3
+    decode: |
+      t = UInt(Rt); n = UInt(Rn); m = UInt(Rm);
+      index = TRUE; add = TRUE; wback = FALSE;
+      (shift_t, shift_n) = (SRType_LSL, 0);
+  - name: T2
+    length_bits: 32
+    pattern: 111110000000xxxxxxxx000000xxxxxx
+    bit_fields:
+    - skip: 12
+    - field: Rn
+      width: 4
+    - field: Rt
+      width: 4
+    - skip: 6
+    - field: imm2
+      width: 2
+    - field: Rm
+      width: 4
+    decode: |
+      if Rn == '1111' then UNDEFINED;
+      t = UInt(Rt); n = UInt(Rn); m = UInt(Rm);
+      index = TRUE; add = TRUE; wback = FALSE;
+      (shift_t, shift_n) = (SRType_LSL, UInt(imm2));
+      if t IN {13,15} || m IN {13,15} then UNPREDICTABLE;
+- id: STRH_immediate
+  mnemonic: STRH
+  encodings:
+  - name: T1
+    length_bits: 16
+    pattern: 10000xxxxxxxxxxx
+    bit_fields:
+    - skip: 5
+    - field: imm5
+      width: 5
+    - field: Rn
+      width: 3
+    - field: Rt
+      width: 3
+    decode: |
+      t = UInt(Rt); n = UInt(Rn); imm32 = ZeroExtend(imm5:'0', 32);
+      index = TRUE; add = TRUE; wback = FALSE;
+  - name: T2
+    length_bits: 32
+    pattern: 111110001010xxxxxxxxxxxxxxxxxxxx
+    bit_fields:
+    - skip: 12
+    - field: Rn
+      width: 4
+    - field: Rt
+      width: 4
+    - field: imm12
+      width: 12
+    decode: |
+      if Rn == '1111' then UNDEFINED;
+      t = UInt(Rt); n = UInt(Rn); imm32 = ZeroExtend(imm12, 32);
+      index = TRUE; add = TRUE; wback = FALSE;
+      if t IN {13,15} then UNPREDICTABLE;
+  - name: T3
+    length_bits: 32
+    pattern: 111110000010xxxxxxxx1xxxxxxxxxxx
+    bit_fields:
+    - skip: 12
+    - field: Rn
+      width: 4
+    - field: Rt
+      width: 4
+    - skip: 1
+    - field: P
+      width: 1
+    - field: U
+      width: 1
+    - field: W
+      width: 1
+    - field: imm8
+      width: 8
+    decode: |
+      if P == '1' && U == '1' && W == '0' then SEE STRHT;
+      if Rn == '1111' || (P == '0' && W == '0') then UNDEFINED;
+      t = UInt(Rt); n = UInt(Rn); imm32 = ZeroExtend(imm8, 32);
+      index = (P == '1'); add = (U == '1'); wback = (W == '1');
+      if t IN {13,15} || (wback && n == t) then UNPREDICTABLE;
+- id: STRH_register
+  mnemonic: STRH
+  encodings:
+  - name: T1
+    length_bits: 16
+    pattern: 0101001xxxxxxxxx
+    bit_fields:
+    - skip: 7
+    - field: Rm
+      width: 3
+    - field: Rn
+      width: 3
+    - field: Rt
+      width: 3
+    decode: |
+      t = UInt(Rt); n = UInt(Rn); m = UInt(Rm);
+      index = TRUE; add = TRUE; wback = FALSE;
+      (shift_t, shift_n) = (SRType_LSL, 0);
+  - name: T2
+    length_bits: 32
+    pattern: 111110000010xxxxxxxx000000xxxxxx
+    bit_fields:
+    - skip: 12
+    - field: Rn
+      width: 4
+    - field: Rt
+      width: 4
+    - skip: 6
+    - field: imm2
+      width: 2
+    - field: Rm
+      width: 4
+    decode: |
+      if Rn == '1111' then UNDEFINED;
+      t = UInt(Rt); n = UInt(Rn); m = UInt(Rm);
+      index = TRUE; add = TRUE; wback = FALSE;
+      (shift_t, shift_n) = (SRType_LSL, UInt(imm2));
+      if t IN {13,15} || m IN {13,15} then UNPREDICTABLE;
+- id: LDREX
+  mnemonic: LDREX
+  encodings:
+  - name: T1
+    length_bits: 32
+    pattern: 111010000101xxxxxxxxxxxxxxxxxxxx
+    bit_fields:
+    - skip: 12
+    - field: Rn
+      width: 4
+    - field: Rt
+      width: 4
+    - skip: 1
+    - skip: 1
+    - skip: 1
+    - skip: 1
+    - field: imm8
+      width: 8
+    decode: |
+      t = UInt(Rt); n = UInt(Rn); imm32 = ZeroExtend(imm8:'00', 32);
+      if t IN {13,15} || n == 15 then UNPREDICTABLE;
+- id: STMDB
+  mnemonic: STMDB
+  encodings:
+  - name: T1
+    length_bits: 32
+    pattern: 1110100100x0xxxxxxxxxxxxxxxxxxxx
+    bit_fields:
+    - skip: 10
+    - field: W
+      width: 1
+    - skip: 1
+    - field: Rn
+      width: 4
+    - skip: 1
+    - field: M
+      width: 1
+    - skip: 1
+    - field: register_list
+      width: 13
+    decode: |
+      if W == '1' && Rn == '1101' then SEE PUSH;
+      n = UInt(Rn); registers = '0':M:'0':register_list; wback = (W == '1');
+      if n == 15 || BitCount(registers) < 2 then UNPREDICTABLE;
+      if wback && registers<n> == '1' then UNPREDICTABLE;
+- id: MRS
+  mnemonic: MRS
+  encodings:
+  - name: T1
+    length_bits: 32
+    pattern: 11110011111xxxxx10x0xxxxxxxxxxxx
+    bit_fields:
+    - skip: 11
+    - skip: 1
+    - skip: 1
+    - skip: 1
+    - skip: 1
+    - skip: 1
+    - skip: 2
+    - skip: 1
+    - skip: 1
+    - field: Rd
+      width: 4
+    - field: SYSm
+      width: 8
+    decode: |
+      d = UInt(Rd);
+      if d IN {13,15} || !(UInt(SYSm) IN {0..3,5..9,16..20}) then UNPREDICTABLE;
+- id: MSR
+  mnemonic: MSR
+  encodings:
+  - name: T1
+    length_bits: 32
+    pattern: 11110011100xxxxx10x0xxxxxxxxxxxx
+    bit_fields:
+    - skip: 11
+    - skip: 1
+    - field: Rn
+      width: 4
+    - skip: 2
+    - skip: 1
+    - skip: 1
+    - field: mask
+      width: 2
+    - skip: 1
+    - skip: 1
+    - field: SYSm
+      width: 8
+    decode: |
+      n = UInt(Rn);
+      if mask == '00' || (mask != '10' && !(UInt(SYSm) IN {0..3})) then UNPREDICTABLE;
+      if n IN {13,15} || !(UInt(SYSm) IN {0..3,5..9,16..20}) then UNPREDICTABLE;
+- id: TBB_TBH
+  mnemonic: TBB
+  encodings:
+  - name: T1
+    length_bits: 32
+    pattern: 111010001101xxxxxxxxxxxx000xxxxx
+    bit_fields:
+    - skip: 12
+    - field: Rn
+      width: 4
+    - skip: 1
+    - skip: 1
+    - skip: 1
+    - skip: 1
+    - skip: 1
+    - skip: 1
+    - skip: 1
+    - skip: 1
+    - skip: 3
+    - field: H
+      width: 1
+    - field: Rm
+      width: 4
+    decode: |
+      n = UInt(Rn); m = UInt(Rm); is_tbh = (H == '1');
+      if n == 13 || m IN {13,15} then UNPREDICTABLE;
+      if InITBlock() && !LastInITBlock() then UNPREDICTABLE;
+- id: BFC
+  mnemonic: BFC
+  encodings:
+  - name: T1
+    length_bits: 32
+    pattern: 11110x11011011110xxxxxxxxxxxxxxx
+    bit_fields:
+    - skip: 5
+    - skip: 1
+    - skip: 6
+    - skip: 4
+    - skip: 1
+    - field: imm3
+      width: 3
+    - field: Rd
+      width: 4
+    - field: imm2
+      width: 2
+    - skip: 1
+    - field: msb
+      width: 5
+    decode: |
+      d = UInt(Rd); msbit = UInt(msb); lsbit = UInt(imm3:imm2);
+      if d IN {13,15} then UNPREDICTABLE;
+- id: CDP_CDP2
+  mnemonic: CDP
+  encodings:
+  - name: T1
+    length_bits: 32
+    pattern: 11101110xxxxxxxxxxxxxxxxxxx0xxxx
+    bit_fields:
+    - skip: 8
+    - field: opc1
+      width: 4
+    - field: CRn
+      width: 4
+    - field: CRd
+      width: 4
+    - field: coproc
+      width: 4
+    - field: opc2
+      width: 3
+    - skip: 1
+    - field: CRm
+      width: 4
+    decode: |
+      cp = UInt(coproc);
+  - name: T2
+    length_bits: 32
+    pattern: 11111110xxxxxxxxxxxxxxxxxxx0xxxx
+    bit_fields:
+    - skip: 8
+    - field: opc1
+      width: 4
+    - field: CRn
+      width: 4
+    - field: CRd
+      width: 4
+    - field: coproc
+      width: 4
+    - field: opc2
+      width: 3
+    - skip: 1
+    - field: CRm
+      width: 4
+    decode: |
+      cp = UInt(coproc);
+- id: ISB
+  mnemonic: ISB
+  encodings:
+  - name: T1
+    length_bits: 32
+    pattern: 111100111011xxxx10x0xxxx0110xxxx
+    bit_fields:
+    - skip: 12
+    - skip: 1
+    - skip: 1
+    - skip: 1
+    - skip: 1
+    - skip: 2
+    - skip: 1
+    - skip: 1
+    - skip: 1
+    - skip: 1
+    - skip: 1
+    - skip: 1
+    - skip: 4
+    - field: option
+      width: 4
+    decode: |
+      if InITBlock() then UNPREDICTABLE;
+- id: LDMDB
+  mnemonic: LDMDB
+  encodings:
+  - name: T1
+    length_bits: 32
+    pattern: 1110100100x1xxxxxxxxxxxxxxxxxxxx
+    bit_fields:
+    - skip: 10
+    - field: W
+      width: 1
+    - skip: 1
+    - field: Rn
+      width: 4
+    - field: P
+      width: 1
+    - field: M
+      width: 1
+    - skip: 1
+    - field: register_list
+      width: 13
+    decode: |
+      n = UInt(Rn); registers = P:M:'0':register_list; wback = (W == '1');
+      if n == 15 || BitCount(registers) < 2 || (P == '1' && M == '1') then UNPREDICTABLE;
+      if registers<15> == '1' && InITBlock() && !LastInITBlock() then UNPREDICTABLE;
+      if wback && registers<n> == '1' then UNPREDICTABLE;
+- id: LDRD_immediate
+  mnemonic: LDRD
+  encodings:
+  - name: T1
+    length_bits: 32
+    pattern: 1110100xx1x1xxxxxxxxxxxxxxxxxxxx
+    bit_fields:
+    - skip: 7
+    - field: P
+      width: 1
+    - field: U
+      width: 1
+    - skip: 1
+    - field: W
+      width: 1
+    - skip: 1
+    - field: Rn
+      width: 4
+    - field: Rt
+      width: 4
+    - field: Rt2
+      width: 4
+    - field: imm8
+      width: 8
+    decode: |
+      if P == '0' && W == '0' then SEE "Related encodings";
+      if Rn == '1111' then SEE LDRD (literal);
+      t = UInt(Rt); t2 = UInt(Rt2); n = UInt(Rn); imm32 = ZeroExtend(imm8:'00', 32);
+      index = (P == '1'); add = (U == '1'); wback = (W == '1');
+      if wback && (n == t || n == t2) then UNPREDICTABLE;
+      if t IN {13,15} || t2 IN {13,15} || t == t2 then UNPREDICTABLE;
+- id: LDRD_literal
+  mnemonic: LDRD
+  encodings:
+  - name: T1
+    length_bits: 32
+    pattern: 1110100xx1x11111xxxxxxxxxxxxxxxx
+    bit_fields:
+    - skip: 7
+    - field: P
+      width: 1
+    - field: U
+      width: 1
+    - skip: 1
+    - field: W
+      width: 1
+    - skip: 1
+    - skip: 4
+    - field: Rt
+      width: 4
+    - field: Rt2
+      width: 4
+    - field: imm8
+      width: 8
+    decode: |
+      if P == '0' && W == '0' then SEE "Related encodings";
+      t = UInt(Rt); t2 = UInt(Rt2); imm32 = ZeroExtend(imm8:'00', 32); add = (U == '1');
+      if t IN {13,15} || t2 IN {13,15} || t == t2 then UNPREDICTABLE;
+      if W == '1' then UNPREDICTABLE;
+- id: STC_STC2
+  mnemonic: STC
+  encodings:
+  - name: T1
+    length_bits: 32
+    pattern: 1110110xxxx0xxxxxxxxxxxxxxxxxxxx
+    bit_fields:
+    - skip: 7
+    - field: P
+      width: 1
+    - field: U
+      width: 1
+    - field: D
+      width: 1
+    - field: W
+      width: 1
+    - skip: 1
+    - field: Rn
+      width: 4
+    - field: CRd
+      width: 4
+    - field: coproc
+      width: 4
+    - field: imm8
+      width: 8
+    decode: |
+      if P == '0' && U == '0' && D == '0' && W == '0' then UNDEFINED;
+      if P == '0' && U == '0' && D == '1' && W == '0' then SEE MCRR, MCRR2;
+      n = UInt(Rn); cp = UInt(coproc);
+      imm32 = ZeroExtend(imm8:'00', 32);
+      index = (P == '1'); add = (U == '1'); wback = (W == '1');
+      if n == 15 then UNPREDICTABLE;
+  - name: T2
+    length_bits: 32
+    pattern: 1111110xxxx0xxxxxxxxxxxxxxxxxxxx
+    bit_fields:
+    - skip: 7
+    - field: P
+      width: 1
+    - field: U
+      width: 1
+    - field: D
+      width: 1
+    - field: W
+      width: 1
+    - skip: 1
+    - field: Rn
+      width: 4
+    - field: CRd
+      width: 4
+    - field: coproc
+      width: 4
+    - field: imm8
+      width: 8
+    decode: |
+      if P == '0' && U == '0' && D == '0' && W == '0' then UNDEFINED;
+      if P == '0' && U == '0' && D == '1' && W == '0' then SEE MCRR, MCRR2;
+      n = UInt(Rn); cp = UInt(coproc);
+      imm32 = ZeroExtend(imm8:'00', 32);
+      index = (P == '1'); add = (U == '1'); wback = (W == '1');
+      if n == 15 then UNPREDICTABLE;
+- id: LDC_LDC2_immediate
+  mnemonic: LDC
+  encodings:
+  - name: T1
+    length_bits: 32
+    pattern: 1110110xxxx1xxxxxxxxxxxxxxxxxxxx
+    bit_fields:
+    - skip: 7
+    - field: P
+      width: 1
+    - field: U
+      width: 1
+    - field: D
+      width: 1
+    - field: W
+      width: 1
+    - skip: 1
+    - field: Rn
+      width: 4
+    - field: CRd
+      width: 4
+    - field: coproc
+      width: 4
+    - field: imm8
+      width: 8
+    decode: |
+      if Rn == '1111' then SEE LDC (literal);
+      if P == '0' && U == '0' && D == '0' && W == '0' then UNDEFINED;
+      if P == '0' && U == '0' && D == '1' && W == '0' then SEE MRRC, MRRC2;
+      n = UInt(Rn); cp = UInt(coproc);
+      imm32 = ZeroExtend(imm8:'00', 32);
+      index = (P == '1'); add = (U == '1'); wback = (W == '1');
+  - name: T2
+    length_bits: 32
+    pattern: 1111110xxxx1xxxxxxxxxxxxxxxxxxxx
+    bit_fields:
+    - skip: 7
+    - field: P
+      width: 1
+    - field: U
+      width: 1
+    - field: D
+      width: 1
+    - field: W
+      width: 1
+    - skip: 1
+    - field: Rn
+      width: 4
+    - field: CRd
+      width: 4
+    - field: coproc
+      width: 4
+    - field: imm8
+      width: 8
+    decode: |
+      if Rn == '1111' then SEE LDC (literal);
+      if P == '0' && U == '0' && D == '0' && W == '0' then UNDEFINED;
+      if P == '0' && U == '0' && D == '1' && W == '0' then SEE MRRC, MRRC2;
+      n = UInt(Rn); cp = UInt(coproc);
+      imm32 = ZeroExtend(imm8:'00', 32);
+      index = (P == '1'); add = (U == '1'); wback = (W == '1');
+- id: LDC_LDC2_literal
+  mnemonic: LDC
+  encodings:
+  - name: T1
+    length_bits: 32
+    pattern: 1110110xxxx11111xxxxxxxxxxxxxxxx
+    bit_fields:
+    - skip: 7
+    - field: P
+      width: 1
+    - field: U
+      width: 1
+    - field: D
+      width: 1
+    - field: W
+      width: 1
+    - skip: 1
+    - skip: 4
+    - field: CRd
+      width: 4
+    - field: coproc
+      width: 4
+    - field: imm8
+      width: 8
+    decode: |
+      if P == '0' && U == '0' && D == '0' && W == '0' then UNDEFINED;
+      if P == '0' && U == '0' && D == '1' && W == '0' then SEE MRRC, MRRC2;
+      index = (P == '1'); // Always TRUE in the Thumb instruction set
+      add = (U == '1'); cp = UInt(coproc); imm32 = ZeroExtend(imm8:'00', 32);
+      if W == '1' || P == '0' then UNPREDICTABLE;
+  - name: T2
+    length_bits: 32
+    pattern: 1111110xxxx11111xxxxxxxxxxxxxxxx
+    bit_fields:
+    - skip: 7
+    - field: P
+      width: 1
+    - field: U
+      width: 1
+    - field: D
+      width: 1
+    - field: W
+      width: 1
+    - skip: 1
+    - skip: 4
+    - field: CRd
+      width: 4
+    - field: coproc
+      width: 4
+    - field: imm8
+      width: 8
+    decode: |
+      if P == '0' && U == '0' && D == '0' && W == '0' then UNDEFINED;
+      if P == '0' && U == '0' && D == '1' && W == '0' then SEE MRRC, MRRC2;
+      index = (P == '1'); // Always TRUE in the Thumb instruction set
+      add = (U == '1'); cp = UInt(coproc); imm32 = ZeroExtend(imm8:'00', 32);
+      if W == '1' || P == '0' then UNPREDICTABLE;
+- id: CLREX
+  mnemonic: CLREX
+  encodings:
+  - name: T1
+    length_bits: 32
+    pattern: 111100111011xxxx10x0xxxx0010xxxx
+    bit_fields:
+    - skip: 12
+    - skip: 1
+    - skip: 1
+    - skip: 1
+    - skip: 1
+    - skip: 2
+    - skip: 1
+    - skip: 1
+    - skip: 1
+    - skip: 1
+    - skip: 1
+    - skip: 1
+    - skip: 4
+    - skip: 1
+    - skip: 1
+    - skip: 1
+    - skip: 1
+    decode: |
+      // No additional decoding required
+- id: CPS
+  mnemonic: CPS
+  encodings:
+  - name: T1
+    length_bits: 16
+    pattern: 10110110011xxxxx
+    bit_fields:
+    - skip: 11
+    - field: im
+      width: 1
+    - skip: 1
+    - skip: 1
+    - field: I
+      width: 1
+    - field: F
+      width: 1
+    decode: |
+      if (I == '0' && F == '0') then UNPREDICTABLE;
+      enable = (im == '0'); disable = (im == '1');
+      affectPRI = (I == '1'); affectFAULT = (F == '1');
+      if InITBlock() then UNPREDICTABLE;
+- id: CSDB
+  mnemonic: CSDB
+  encodings:
+  - name: T1
+    length_bits: 32
+    pattern: 111100111010xxxx10x0x00000010100
+    bit_fields:
+    - skip: 12
+    - skip: 1
+    - skip: 1
+    - skip: 1
+    - skip: 1
+    - skip: 2
+    - skip: 1
+    - skip: 1
+    - skip: 1
+    - skip: 3
+    - skip: 8
+    decode: |
+      if InITBlock() then UNPREDICTABLE;
+- id: DBG
+  mnemonic: DBG
+  encodings:
+  - name: T1
+    length_bits: 32
+    pattern: 111100111010xxxx10x0x0001111xxxx
+    bit_fields:
+    - skip: 12
+    - skip: 1
+    - skip: 1
+    - skip: 1
+    - skip: 1
+    - skip: 2
+    - skip: 1
+    - skip: 1
+    - skip: 1
+    - skip: 3
+    - skip: 4
+    - field: option
+      width: 4
+    decode: |
+      // Any decoding of 'option' is specified by the debug system
+- id: DSB
+  mnemonic: DSB
+  encodings:
+  - name: T1
+    length_bits: 32
+    pattern: 111100111011xxxx10x0xxxx0100xxxx
+    bit_fields:
+    - skip: 12
+    - skip: 1
+    - skip: 1
+    - skip: 1
+    - skip: 1
+    - skip: 2
+    - skip: 1
+    - skip: 1
+    - skip: 1
+    - skip: 1
+    - skip: 1
+    - skip: 1
+    - skip: 4
+    - field: option
+      width: 4
+    decode: |
+      // No additional decoding required
+- id: LDRT
+  mnemonic: LDRT
+  encodings:
+  - name: T1
+    length_bits: 32
+    pattern: 111110000101xxxxxxxx1110xxxxxxxx
+    bit_fields:
+    - skip: 12
+    - field: Rn
+      width: 4
+    - field: Rt
+      width: 4
+    - skip: 4
+    - field: imm8
+      width: 8
+    decode: |
+      if Rn == '1111' then SEE LDR (literal);
+      t = UInt(Rt); n = UInt(Rn); postindex = FALSE; add = TRUE;
+      register_form = FALSE; imm32 = ZeroExtend(imm8, 32);
+      if t IN {13,15} then UNPREDICTABLE;
+- id: MCR_MCR2
+  mnemonic: MCR
+  encodings:
+  - name: T1
+    length_bits: 32
+    pattern: 11101110xxx0xxxxxxxxxxxxxxx1xxxx
+    bit_fields:
+    - skip: 8
+    - field: opc1
+      width: 3
+    - skip: 1
+    - field: CRn
+      width: 4
+    - field: Rt
+      width: 4
+    - field: coproc
+      width: 4
+    - field: opc2
+      width: 3
+    - skip: 1
+    - field: CRm
+      width: 4
+    decode: |
+      t = UInt(Rt); cp = UInt(coproc);
+      if t == 15 || t == 13 then UNPREDICTABLE;
+  - name: T2
+    length_bits: 32
+    pattern: 11111110xxx0xxxxxxxxxxxxxxx1xxxx
+    bit_fields:
+    - skip: 8
+    - field: opc1
+      width: 3
+    - skip: 1
+    - field: CRn
+      width: 4
+    - field: Rt
+      width: 4
+    - field: coproc
+      width: 4
+    - field: opc2
+      width: 3
+    - skip: 1
+    - field: CRm
+      width: 4
+    decode: |
+      t = UInt(Rt); cp = UInt(coproc);
+      if t == 15 || t == 13 then UNPREDICTABLE;
+- id: MCRR_MCRR2
+  mnemonic: MCRR
+  encodings:
+  - name: T1
+    length_bits: 32
+    pattern: 111011000100xxxxxxxxxxxxxxxxxxxx
+    bit_fields:
+    - skip: 12
+    - field: Rt2
+      width: 4
+    - field: Rt
+      width: 4
+    - field: coproc
+      width: 4
+    - field: opc1
+      width: 4
+    - field: CRm
+      width: 4
+    decode: |
+      t = UInt(Rt); t2 = UInt(Rt2); cp = UInt(coproc);
+      if t == 15 || t2 == 15 then UNPREDICTABLE;
+      if t == 13 || t2 == 13 then UNPREDICTABLE;
+  - name: T2
+    length_bits: 32
+    pattern: 111111000100xxxxxxxxxxxxxxxxxxxx
+    bit_fields:
+    - skip: 12
+    - field: Rt2
+      width: 4
+    - field: Rt
+      width: 4
+    - field: coproc
+      width: 4
+    - field: opc1
+      width: 4
+    - field: CRm
+      width: 4
+    decode: |
+      t = UInt(Rt); t2 = UInt(Rt2); cp = UInt(coproc);
+      if t == 15 || t2 == 15 then UNPREDICTABLE;
+      if t == 13 || t2 == 13 then UNPREDICTABLE;
+- id: MOVT
+  mnemonic: MOVT
+  encodings:
+  - name: T1
+    length_bits: 32
+    pattern: 11110x101100xxxx0xxxxxxxxxxxxxxx
+    bit_fields:
+    - skip: 5
+    - field: i
+      width: 1
+    - skip: 6
+    - field: imm4
+      width: 4
+    - skip: 1
+    - field: imm3
+      width: 3
+    - field: Rd
+      width: 4
+    - field: imm8
+      width: 8
+    decode: |
+      d = UInt(Rd); imm16 = imm4:i:imm3:imm8;
+      if d IN {13,15} then UNPREDICTABLE;
+- id: MRC_MRC2
+  mnemonic: MRC
+  encodings:
+  - name: T1
+    length_bits: 32
+    pattern: 11101110xxx1xxxxxxxxxxxxxxx1xxxx
+    bit_fields:
+    - skip: 8
+    - field: opc1
+      width: 3
+    - skip: 1
+    - field: CRn
+      width: 4
+    - field: Rt
+      width: 4
+    - field: coproc
+      width: 4
+    - field: opc2
+      width: 3
+    - skip: 1
+    - field: CRm
+      width: 4
+    decode: |
+      t = UInt(Rt); cp = UInt(coproc);
+      if t == 13 then UNPREDICTABLE;
+  - name: T2
+    length_bits: 32
+    pattern: 11111110xxx1xxxxxxxxxxxxxxx1xxxx
+    bit_fields:
+    - skip: 8
+    - field: opc1
+      width: 3
+    - skip: 1
+    - field: CRn
+      width: 4
+    - field: Rt
+      width: 4
+    - field: coproc
+      width: 4
+    - field: opc2
+      width: 3
+    - skip: 1
+    - field: CRm
+      width: 4
+    decode: |
+      t = UInt(Rt); cp = UInt(coproc);
+      if t == 13 then UNPREDICTABLE;
+- id: ORN_immediate
+  mnemonic: ORN
+  encodings:
+  - name: T1
+    length_bits: 32
+    pattern: 11110x00011xxxxx0xxxxxxxxxxxxxxx
+    bit_fields:
+    - skip: 5
+    - field: i
+      width: 1
+    - skip: 5
+    - field: S
+      width: 1
+    - field: Rn
+      width: 4
+    - skip: 1
+    - field: imm3
+      width: 3
+    - field: Rd
+      width: 4
+    - field: imm8
+      width: 8
+    decode: |
+      if Rn == '1111' then SEE MVN (immediate);
+      d = UInt(Rd); n = UInt(Rn); setflags = (S == '1');
+      (imm32, carry) = ThumbExpandImm_C(i:imm3:imm8, APSR.C);
+      if d IN {13,15} || n == 13 then UNPREDICTABLE;
+- id: ORN_register
+  mnemonic: ORN
+  encodings:
+  - name: T1
+    length_bits: 32
+    pattern: 11101010011xxxxxxxxxxxxxxxxxxxxx
+    bit_fields:
+    - skip: 11
+    - field: S
+      width: 1
+    - field: Rn
+      width: 4
+    - skip: 1
+    - field: imm3
+      width: 3
+    - field: Rd
+      width: 4
+    - field: imm2
+      width: 2
+    - field: type
+      width: 2
+    - field: Rm
+      width: 4
+    decode: |
+      if Rn == '1111' then SEE MVN (register);
+      d = UInt(Rd); n = UInt(Rn); m = UInt(Rm); setflags = (S == '1');
+      (shift_t, shift_n) = DecodeImmShift(type, imm3:imm2);
+      if d IN {13,15} || n == 13 || m IN {13,15} then UNPREDICTABLE;
+- id: PLD_immediate
+  mnemonic: PLD
+  encodings:
+  - name: T1
+    length_bits: 32
+    pattern: 111110001001xxxx1111xxxxxxxxxxxx
+    bit_fields:
+    - skip: 12
+    - field: Rn
+      width: 4
+    - skip: 4
+    - field: imm12
+      width: 12
+    decode: |
+      if Rn == '1111' then SEE PLD (literal);
+      n = UInt(Rn); imm32 = ZeroExtend(imm12, 32); add = TRUE;
+  - name: T2
+    length_bits: 32
+    pattern: 111110000001xxxx11111100xxxxxxxx
+    bit_fields:
+    - skip: 12
+    - field: Rn
+      width: 4
+    - skip: 8
+    - field: imm8
+      width: 8
+    decode: |
+      if Rn == '1111' then SEE PLD (literal);
+      n = UInt(Rn); imm32 = ZeroExtend(imm8, 32); add = FALSE;
+- id: PLD_literal
+  mnemonic: PLD
+  encodings:
+  - name: T1
+    length_bits: 32
+    pattern: 11111000x00111111111xxxxxxxxxxxx
+    bit_fields:
+    - skip: 8
+    - field: U
+      width: 1
+    - skip: 3
+    - skip: 8
+    - field: imm12
+      width: 12
+    decode: |
+      imm32 = ZeroExtend(imm12, 32); add = (U == '1');
+- id: PLD_register
+  mnemonic: PLD
+  encodings:
+  - name: T1
+    length_bits: 32
+    pattern: 111110000001xxxx1111000000xxxxxx
+    bit_fields:
+    - skip: 12
+    - field: Rn
+      width: 4
+    - skip: 10
+    - field: imm2
+      width: 2
+    - field: Rm
+      width: 4
+    decode: |
+      if Rn == '1111' then SEE PLD (literal);
+      n = UInt(Rn); m = UInt(Rm); add = TRUE;
+      (shift_t, shift_n) = (SRType_LSL, UInt(imm2));
+      if m IN {13,15} then UNPREDICTABLE;
+- id: PLI_immediate_literal
+  mnemonic: PLI
+  encodings:
+  - name: T1
+    length_bits: 32
+    pattern: 111110011001xxxx1111xxxxxxxxxxxx
+    bit_fields:
+    - skip: 12
+    - field: Rn
+      width: 4
+    - skip: 4
+    - field: imm12
+      width: 12
+    decode: |
+      if Rn == '1111' then SEE encoding T3;
+      n = UInt(Rn); imm32 = ZeroExtend(imm12, 32); add = TRUE;
+  - name: T2
+    length_bits: 32
+    pattern: 111110010001xxxx11111100xxxxxxxx
+    bit_fields:
+    - skip: 12
+    - field: Rn
+      width: 4
+    - skip: 8
+    - field: imm8
+      width: 8
+    decode: |
+      if Rn == '1111' then SEE encoding T3;
+      n = UInt(Rn); imm32 = ZeroExtend(imm8, 32); add = FALSE;
+  - name: T3
+    length_bits: 32
+    pattern: 11111001x00111111111xxxxxxxxxxxx
+    bit_fields:
+    - skip: 8
+    - field: U
+      width: 1
+    - skip: 3
+    - skip: 8
+    - field: imm12
+      width: 12
+    decode: |
+      n = 15; imm32 = ZeroExtend(imm12, 32); add = (U == '1');
+- id: PLI_register
+  mnemonic: PLI
+  encodings:
+  - name: T1
+    length_bits: 32
+    pattern: 111110010001xxxx1111000000xxxxxx
+    bit_fields:
+    - skip: 12
+    - field: Rn
+      width: 4
+    - skip: 10
+    - field: imm2
+      width: 2
+    - field: Rm
+      width: 4
+    decode: |
+      if Rn == '1111' then SEE PLI (immediate, literal);
+      n = UInt(Rn); m = UInt(Rm); add = TRUE;
+      (shift_t, shift_n) = (SRType_LSL, UInt(imm2));
+      if m IN {13,15} then UNPREDICTABLE;
+- id: REV
+  mnemonic: REV
+  encodings:
+  - name: T1
+    length_bits: 16
+    pattern: 1011101000xxxxxx
+    bit_fields:
+    - skip: 10
+    - field: Rm
+      width: 3
+    - field: Rd
+      width: 3
+    decode: |
+      d = UInt(Rd); m = UInt(Rm);
+  - name: T2
+    length_bits: 32
+    pattern: 111110101001xxxx1111xxxx1000xxxx
+    bit_fields:
+    - skip: 12
+    - field: Rm
+      width: 4
+    - skip: 4
+    - field: Rd
+      width: 4
+    - skip: 4
+    - field: Rm
+      width: 4
+    decode: |
+      if !Consistent(Rm) then UNPREDICTABLE;
+      d = UInt(Rd); m = UInt(Rm);
+      if d IN {13,15} || m IN {13,15} then UNPREDICTABLE;
+- id: REV16
+  mnemonic: REV16
+  encodings:
+  - name: T1
+    length_bits: 16
+    pattern: 1011101001xxxxxx
+    bit_fields:
+    - skip: 10
+    - field: Rm
+      width: 3
+    - field: Rd
+      width: 3
+    decode: |
+      d = UInt(Rd); m = UInt(Rm);
+  - name: T2
+    length_bits: 32
+    pattern: 111110101001xxxx1111xxxx1001xxxx
+    bit_fields:
+    - skip: 12
+    - field: Rm
+      width: 4
+    - skip: 4
+    - field: Rd
+      width: 4
+    - skip: 4
+    - field: Rm
+      width: 4
+    decode: |
+      if !Consistent(Rm) then UNPREDICTABLE;
+      d = UInt(Rd); m = UInt(Rm);
+      if d IN {13,15} || m IN {13,15} then UNPREDICTABLE;
+- id: REVSH
+  mnemonic: REVSH
+  encodings:
+  - name: T1
+    length_bits: 16
+    pattern: 1011101011xxxxxx
+    bit_fields:
+    - skip: 10
+    - field: Rm
+      width: 3
+    - field: Rd
+      width: 3
+    decode: |
+      d = UInt(Rd); m = UInt(Rm);
+  - name: T2
+    length_bits: 32
+    pattern: 111110101001xxxx1111xxxx1011xxxx
+    bit_fields:
+    - skip: 12
+    - field: Rm
+      width: 4
+    - skip: 4
+    - field: Rd
+      width: 4
+    - skip: 4
+    - field: Rm
+      width: 4
+    decode: |
+      if !Consistent(Rm) then UNPREDICTABLE;
+      d = UInt(Rd); m = UInt(Rm);
+      if d IN {13,15} || m IN {13,15} then UNPREDICTABLE;
+- id: ROR_immediate
+  mnemonic: ROR
+  encodings:
+  - name: T1
+    length_bits: 32
+    pattern: 11101010010x1111xxxxxxxxxx11xxxx
+    bit_fields:
+    - skip: 11
+    - field: S
+      width: 1
+    - skip: 4
+    - skip: 1
+    - field: imm3
+      width: 3
+    - field: Rd
+      width: 4
+    - field: imm2
+      width: 2
+    - skip: 2
+    - field: Rm
+      width: 4
+    decode: |
+      if (imm3:imm2) == '00000' then SEE RRX;
+      d = UInt(Rd); m = UInt(Rm); setflags = (S == '1');
+      (-, shift_n) = DecodeImmShift('11', imm3:imm2);
+      if d IN {13,15} || m IN {13,15} then UNPREDICTABLE;
+- id: ROR_register
+  mnemonic: ROR
+  encodings:
+  - name: T1
+    length_bits: 16
+    pattern: 0100000111xxxxxx
+    bit_fields:
+    - skip: 10
+    - field: Rm
+      width: 3
+    - field: Rdn
+      width: 3
+    decode: |
+      d = UInt(Rdn); n = UInt(Rdn); m = UInt(Rm); setflags = !InITBlock();
+  - name: T2
+    length_bits: 32
+    pattern: 11111010011xxxxx1111xxxx0000xxxx
+    bit_fields:
+    - skip: 11
+    - field: S
+      width: 1
+    - field: Rn
+      width: 4
+    - skip: 4
+    - field: Rd
+      width: 4
+    - skip: 4
+    - field: Rm
+      width: 4
+    decode: |
+      d = UInt(Rd); n = UInt(Rn); m = UInt(Rm); setflags = (S == '1');
+      if d IN {13,15} || n IN {13,15} || m IN {13,15} then UNPREDICTABLE;
+- id: WFE
+  mnemonic: WFE
+  encodings:
+  - name: T1
+    length_bits: 16
+    pattern: '1011111100100000'
+    bit_fields:
+    - skip: 16
+    decode: |
+      // No additional decoding required
+  - name: T2
+    length_bits: 32
+    pattern: 111100111010xxxx10x0x00000000010
+    bit_fields:
+    - skip: 12
+    - skip: 1
+    - skip: 1
+    - skip: 1
+    - skip: 1
+    - skip: 2
+    - skip: 1
+    - skip: 1
+    - skip: 1
+    - skip: 3
+    - skip: 8
+    decode: |
+      // No additional decoding required
+- id: WFI
+  mnemonic: WFI
+  encodings:
+  - name: T1
+    length_bits: 16
+    pattern: '1011111100110000'
+    bit_fields:
+    - skip: 16
+    decode: |
+      // No additional decoding required
+  - name: T2
+    length_bits: 32
+    pattern: 111100111010xxxx10x0x00000000011
+    bit_fields:
+    - skip: 12
+    - skip: 1
+    - skip: 1
+    - skip: 1
+    - skip: 1
+    - skip: 2
+    - skip: 1
+    - skip: 1
+    - skip: 1
+    - skip: 3
+    - skip: 8
+    decode: |
+      // No additional decoding required
+- id: UXTAB
+  mnemonic: UXTAB
+  encodings:
+  - name: T1
+    length_bits: 32
+    pattern: 111110100101xxxx1111xxxx1xxxxxxx
+    bit_fields:
+    - skip: 12
+    - field: Rn
+      width: 4
+    - skip: 4
+    - field: Rd
+      width: 4
+    - skip: 1
+    - skip: 1
+    - field: rotate
+      width: 2
+    - field: Rm
+      width: 4
+    decode: |
+      if Rn == '1111' then SEE UXTB;
+      d = UInt(Rd); n = UInt(Rn); m = UInt(Rm); rotation = UInt(rotate:'000');
+      if d IN {13,15} || n == 13 || m IN {13,15} then UNPREDICTABLE;
+- id: UXTAB16
+  mnemonic: UXTAB16
+  encodings:
+  - name: T1
+    length_bits: 32
+    pattern: 111110100011xxxx1111xxxx1xxxxxxx
+    bit_fields:
+    - skip: 12
+    - field: Rn
+      width: 4
+    - skip: 4
+    - field: Rd
+      width: 4
+    - skip: 1
+    - skip: 1
+    - field: rotate
+      width: 2
+    - field: Rm
+      width: 4
+    decode: |
+      if Rn == '1111' then SEE UXTB16;
+      d = UInt(Rd); n = UInt(Rn); m = UInt(Rm); rotation = UInt(rotate:'000');
+      if d IN {13,15} || n == 13 || m IN {13,15} then UNPREDICTABLE;
+- id: UADD16
+  mnemonic: UADD16
+  encodings:
+  - name: T1
+    length_bits: 32
+    pattern: 111110101001xxxx1111xxxx0100xxxx
+    bit_fields:
+    - skip: 12
+    - field: Rn
+      width: 4
+    - skip: 4
+    - field: Rd
+      width: 4
+    - skip: 4
+    - field: Rm
+      width: 4
+    decode: |
+      d = UInt(Rd); n = UInt(Rn); m = UInt(Rm);
+      if d IN {13,15} || n IN {13,15} || m IN {13,15} then UNPREDICTABLE;
+- id: UADD8
+  mnemonic: UADD8
+  encodings:
+  - name: T1
+    length_bits: 32
+    pattern: 111110101000xxxx1111xxxx0100xxxx
+    bit_fields:
+    - skip: 12
+    - field: Rn
+      width: 4
+    - skip: 4
+    - field: Rd
+      width: 4
+    - skip: 4
+    - field: Rm
+      width: 4
+    decode: |
+      d = UInt(Rd); n = UInt(Rn); m = UInt(Rm);
+      if d IN {13,15} || n IN {13,15} || m IN {13,15} then UNPREDICTABLE;
+- id: PKHBT_PKHTB
+  mnemonic: PKHBT
+  encodings:
+  - name: T1
+    length_bits: 32
+    pattern: 11101010110xxxxxxxxxxxxxxxxxxxxx
+    bit_fields:
+    - skip: 11
+    - field: S
+      width: 1
+    - field: Rn
+      width: 4
+    - skip: 1
+    - field: imm3
+      width: 3
+    - field: Rd
+      width: 4
+    - field: imm2
+      width: 2
+    - field: tb
+      width: 1
+    - field: T
+      width: 1
+    - field: Rm
+      width: 4
+    decode: |
+      if S == '1' || T == '1' then UNDEFINED;
+      d = UInt(Rd); n = UInt(Rn); m = UInt(Rm); tbform = (tb == '1');
+      (shift_t, shift_n) = DecodeImmShift(tb:'0', imm3:imm2);
+      if d IN {13,15} || n IN {13,15} || m IN {13,15} then UNPREDICTABLE;
+- id: PSSBB
+  mnemonic: PSSBB
+  encodings:
+  - name: T1
+    length_bits: 32
+    pattern: 111100111011xxxx10x0xxxx01000100
+    bit_fields:
+    - skip: 12
+    - skip: 1
+    - skip: 1
+    - skip: 1
+    - skip: 1
+    - skip: 2
+    - skip: 1
+    - skip: 1
+    - skip: 1
+    - skip: 1
+    - skip: 1
+    - skip: 1
+    - skip: 8
+    decode: |
+      if InITBlock() then UNPREDICTABLE;
+- id: QADD
+  mnemonic: QADD
+  encodings:
+  - name: T1
+    length_bits: 32
+    pattern: 111110101000xxxx1111xxxx1000xxxx
+    bit_fields:
+    - skip: 12
+    - field: Rn
+      width: 4
+    - skip: 4
+    - field: Rd
+      width: 4
+    - skip: 4
+    - field: Rm
+      width: 4
+    decode: |
+      d = UInt(Rd); n = UInt(Rn); m = UInt(Rm);
+      if d IN {13,15} || n IN {13,15} || m IN {13,15} then UNPREDICTABLE;
+- id: QADD16
+  mnemonic: QADD16
+  encodings:
+  - name: T1
+    length_bits: 32
+    pattern: 111110101001xxxx1111xxxx0001xxxx
+    bit_fields:
+    - skip: 12
+    - field: Rn
+      width: 4
+    - skip: 4
+    - field: Rd
+      width: 4
+    - skip: 4
+    - field: Rm
+      width: 4
+    decode: |
+      d = UInt(Rd); n = UInt(Rn); m = UInt(Rm);
+      if d IN {13,15} || n IN {13,15} || m IN {13,15} then UNPREDICTABLE;
+- id: QADD8
+  mnemonic: QADD8
+  encodings:
+  - name: T1
+    length_bits: 32
+    pattern: 111110101000xxxx1111xxxx0001xxxx
+    bit_fields:
+    - skip: 12
+    - field: Rn
+      width: 4
+    - skip: 4
+    - field: Rd
+      width: 4
+    - skip: 4
+    - field: Rm
+      width: 4
+    decode: |
+      d = UInt(Rd); n = UInt(Rn); m = UInt(Rm);
+      if d IN {13,15} || n IN {13,15} || m IN {13,15} then UNPREDICTABLE;
+- id: QASX
+  mnemonic: QASX
+  encodings:
+  - name: T1
+    length_bits: 32
+    pattern: 111110101010xxxx1111xxxx0001xxxx
+    bit_fields:
+    - skip: 12
+    - field: Rn
+      width: 4
+    - skip: 4
+    - field: Rd
+      width: 4
+    - skip: 4
+    - field: Rm
+      width: 4
+    decode: |
+      d = UInt(Rd); n = UInt(Rn); m = UInt(Rm);
+      if d IN {13,15} || n IN {13,15} || m IN {13,15} then UNPREDICTABLE;
+- id: QDADD
+  mnemonic: QDADD
+  encodings:
+  - name: T1
+    length_bits: 32
+    pattern: 111110101000xxxx1111xxxx1001xxxx
+    bit_fields:
+    - skip: 12
+    - field: Rn
+      width: 4
+    - skip: 4
+    - field: Rd
+      width: 4
+    - skip: 4
+    - field: Rm
+      width: 4
+    decode: |
+      d = UInt(Rd); n = UInt(Rn); m = UInt(Rm);
+      if d IN {13,15} || n IN {13,15} || m IN {13,15} then UNPREDICTABLE;
+- id: QDSUB
+  mnemonic: QDSUB
+  encodings:
+  - name: T1
+    length_bits: 32
+    pattern: 111110101000xxxx1111xxxx1011xxxx
+    bit_fields:
+    - skip: 12
+    - field: Rn
+      width: 4
+    - skip: 4
+    - field: Rd
+      width: 4
+    - skip: 4
+    - field: Rm
+      width: 4
+    decode: |
+      d = UInt(Rd); n = UInt(Rn); m = UInt(Rm);
+      if d IN {13,15} || n IN {13,15} || m IN {13,15} then UNPREDICTABLE;
+- id: QSAX
+  mnemonic: QSAX
+  encodings:
+  - name: T1
+    length_bits: 32
+    pattern: 111110101110xxxx1111xxxx0001xxxx
+    bit_fields:
+    - skip: 12
+    - field: Rn
+      width: 4
+    - skip: 4
+    - field: Rd
+      width: 4
+    - skip: 4
+    - field: Rm
+      width: 4
+    decode: |
+      d = UInt(Rd); n = UInt(Rn); m = UInt(Rm);
+      if d IN {13,15} || n IN {13,15} || m IN {13,15} then UNPREDICTABLE;
+- id: QSUB
+  mnemonic: QSUB
+  encodings:
+  - name: T1
+    length_bits: 32
+    pattern: 111110101000xxxx1111xxxx1010xxxx
+    bit_fields:
+    - skip: 12
+    - field: Rn
+      width: 4
+    - skip: 4
+    - field: Rd
+      width: 4
+    - skip: 4
+    - field: Rm
+      width: 4
+    decode: |
+      d = UInt(Rd); n = UInt(Rn); m = UInt(Rm);
+      if d IN {13,15} || n IN {13,15} || m IN {13,15} then UNPREDICTABLE;
+- id: QSUB16
+  mnemonic: QSUB16
+  encodings:
+  - name: T1
+    length_bits: 32
+    pattern: 111110101101xxxx1111xxxx0001xxxx
+    bit_fields:
+    - skip: 12
+    - field: Rn
+      width: 4
+    - skip: 4
+    - field: Rd
+      width: 4
+    - skip: 4
+    - field: Rm
+      width: 4
+    decode: |
+      d = UInt(Rd); n = UInt(Rn); m = UInt(Rm);
+      if d IN {13,15} || n IN {13,15} || m IN {13,15} then UNPREDICTABLE;
+- id: QSUB8
+  mnemonic: QSUB8
+  encodings:
+  - name: T1
+    length_bits: 32
+    pattern: 111110101100xxxx1111xxxx0001xxxx
+    bit_fields:
+    - skip: 12
+    - field: Rn
+      width: 4
+    - skip: 4
+    - field: Rd
+      width: 4
+    - skip: 4
+    - field: Rm
+      width: 4
+    decode: |
+      d = UInt(Rd); n = UInt(Rn); m = UInt(Rm);
+      if d IN {13,15} || n IN {13,15} || m IN {13,15} then UNPREDICTABLE;
+- id: RBIT
+  mnemonic: RBIT
+  encodings:
+  - name: T1
+    length_bits: 32
+    pattern: 111110101001xxxx1111xxxx1010xxxx
+    bit_fields:
+    - skip: 12
+    - field: Rm
+      width: 4
+    - skip: 4
+    - field: Rd
+      width: 4
+    - skip: 4
+    - field: Rm
+      width: 4
+    decode: |
+      if !Consistent(Rm) then UNPREDICTABLE;
+      d = UInt(Rd); m = UInt(Rm);
+      if d IN {13,15} || m IN {13,15} then UNPREDICTABLE;
+- id: SADD16
+  mnemonic: SADD16
+  encodings:
+  - name: T1
+    length_bits: 32
+    pattern: 111110101001xxxx1111xxxx0000xxxx
+    bit_fields:
+    - skip: 12
+    - field: Rn
+      width: 4
+    - skip: 4
+    - field: Rd
+      width: 4
+    - skip: 4
+    - field: Rm
+      width: 4
+    decode: |
+      d = UInt(Rd); n = UInt(Rn); m = UInt(Rm);
+      if d IN {13,15} || n IN {13,15} || m IN {13,15} then UNPREDICTABLE;
+- id: SADD8
+  mnemonic: SADD8
+  encodings:
+  - name: T1
+    length_bits: 32
+    pattern: 111110101000xxxx1111xxxx0000xxxx
+    bit_fields:
+    - skip: 12
+    - field: Rn
+      width: 4
+    - skip: 4
+    - field: Rd
+      width: 4
+    - skip: 4
+    - field: Rm
+      width: 4
+    decode: |
+      d = UInt(Rd); n = UInt(Rn); m = UInt(Rm);
+      if d IN {13,15} || n IN {13,15} || m IN {13,15} then UNPREDICTABLE;
+- id: SMLABB_SMLABT_SMLATB_SMLATT
+  mnemonic: SMLABB
+  encodings:
+  - name: T1
+    length_bits: 32
+    pattern: 111110110001xxxxxxxxxxxx00xxxxxx
+    bit_fields:
+    - skip: 12
+    - field: Rn
+      width: 4
+    - field: Ra
+      width: 4
+    - field: Rd
+      width: 4
+    - skip: 2
+    - field: N
+      width: 1
+    - field: M
+      width: 1
+    - field: Rm
+      width: 4
+    decode: |
+      if Ra == '1111' then SEE SMULBB, SMULBT, SMULTB, SMULTT;
+      d = UInt(Rd); n = UInt(Rn); m = UInt(Rm); a = UInt(Ra);
+      n_high = (N == '1'); m_high = (M == '1');
+      if d IN {13,15} || n IN {13,15} || m IN {13,15} || a == 13 then UNPREDICTABLE;
+- id: SMLAD_SMLADX
+  mnemonic: SMLAD
+  encodings:
+  - name: T1
+    length_bits: 32
+    pattern: 111110110010xxxxxxxxxxxx000xxxxx
+    bit_fields:
+    - skip: 12
+    - field: Rn
+      width: 4
+    - field: Ra
+      width: 4
+    - field: Rd
+      width: 4
+    - skip: 3
+    - field: M
+      width: 1
+    - field: Rm
+      width: 4
+    decode: |
+      if Ra == '1111' then SEE SMUAD;
+      d = UInt(Rd); n = UInt(Rn); m = UInt(Rm); a = UInt(Ra);
+      m_swap = (M == '1');
+      if d IN {13,15} || n IN {13,15} || m IN {13,15} || a == 13 then UNPREDICTABLE;
+- id: SMLAL
+  mnemonic: SMLAL
+  encodings:
+  - name: T1
+    length_bits: 32
+    pattern: 111110111100xxxxxxxxxxxx0000xxxx
+    bit_fields:
+    - skip: 12
+    - field: Rn
+      width: 4
+    - field: RdLo
+      width: 4
+    - field: RdHi
+      width: 4
+    - skip: 4
+    - field: Rm
+      width: 4
+    decode: |
+      dLo = UInt(RdLo); dHi = UInt(RdHi); n = UInt(Rn); m = UInt(Rm); setflags = FALSE;
+      if dLo IN {13,15} || dHi IN {13,15} || n IN {13,15} || m IN {13,15} then UNPREDICTABLE;
+      if dHi == dLo then UNPREDICTABLE;
+- id: SMLALBB_SMLALBT_SMLALTB_SMLALTT
+  mnemonic: SMLALBB
+  encodings:
+  - name: T1
+    length_bits: 32
+    pattern: 111110111100xxxxxxxxxxxx10xxxxxx
+    bit_fields:
+    - skip: 12
+    - field: Rn
+      width: 4
+    - field: RdLo
+      width: 4
+    - field: RdHi
+      width: 4
+    - skip: 2
+    - field: N
+      width: 1
+    - field: M
+      width: 1
+    - field: Rm
+      width: 4
+    decode: |
+      dLo = UInt(RdLo); dHi = UInt(RdHi); n = UInt(Rn); m = UInt(Rm);
+      n_high = (N == '1'); m_high = (M == '1');
+      if dLo IN {13,15} || dHi IN {13,15} || n IN {13,15} || m IN {13,15} then UNPREDICTABLE;
+      if dHi == dLo then UNPREDICTABLE;
+- id: SMLALD_SMLALDX
+  mnemonic: SMLALD
+  encodings:
+  - name: T1
+    length_bits: 32
+    pattern: 111110111100xxxxxxxxxxxx110xxxxx
+    bit_fields:
+    - skip: 12
+    - field: Rn
+      width: 4
+    - field: RdLo
+      width: 4
+    - field: RdHi
+      width: 4
+    - skip: 3
+    - field: M
+      width: 1
+    - field: Rm
+      width: 4
+    decode: |
+      dLo = UInt(RdLo); dHi = UInt(RdHi); n = UInt(Rn); m = UInt(Rm); m_swap = (M == '1');
+      if dLo IN {13,15} || dHi IN {13,15} || n IN {13,15} || m IN {13,15} then UNPREDICTABLE;
+      if dHi == dLo then UNPREDICTABLE;
+- id: SMLAWB_SMLAWT
+  mnemonic: SMLAWB
+  encodings:
+  - name: T1
+    length_bits: 32
+    pattern: 111110110011xxxxxxxxxxxx000xxxxx
+    bit_fields:
+    - skip: 12
+    - field: Rn
+      width: 4
+    - field: Ra
+      width: 4
+    - field: Rd
+      width: 4
+    - skip: 3
+    - field: M
+      width: 1
+    - field: Rm
+      width: 4
+    decode: |
+      if Ra == '1111' then SEE SMULWB, SMULWT;
+      d = UInt(Rd); n = UInt(Rn); m = UInt(Rm); a = UInt(Ra); m_high = (M == '1');
+      if d IN {13,15} || n IN {13,15} || m IN {13,15} || a == 13 then UNPREDICTABLE;
+- id: SMLSD_SMLSDX
+  mnemonic: SMLSD
+  encodings:
+  - name: T1
+    length_bits: 32
+    pattern: 111110110100xxxxxxxxxxxx000xxxxx
+    bit_fields:
+    - skip: 12
+    - field: Rn
+      width: 4
+    - field: Ra
+      width: 4
+    - field: Rd
+      width: 4
+    - skip: 3
+    - field: M
+      width: 1
+    - field: Rm
+      width: 4
+    decode: |
+      if Ra == '1111' then SEE SMUSD;
+      d = UInt(Rd); n = UInt(Rn); m = UInt(Rm); a = UInt(Ra); m_swap = (M == '1');
+      if d IN {13,15} || n IN {13,15} || m IN {13,15} || a == 13 then UNPREDICTABLE;
+- id: SMLSLD_SMLSLDX
+  mnemonic: SMLSLD
+  encodings:
+  - name: T1
+    length_bits: 32
+    pattern: 111110111101xxxxxxxxxxxx110xxxxx
+    bit_fields:
+    - skip: 12
+    - field: Rn
+      width: 4
+    - field: RdLo
+      width: 4
+    - field: RdHi
+      width: 4
+    - skip: 3
+    - field: M
+      width: 1
+    - field: Rm
+      width: 4
+    decode: |
+      dLo = UInt(RdLo); dHi = UInt(RdHi); n = UInt(Rn); m = UInt(Rm); m_swap = (M == '1');
+      if dLo IN {13,15} || dHi IN {13,15} || n IN {13,15} || m IN {13,15} then UNPREDICTABLE;
+      if dHi == dLo then UNPREDICTABLE;
+- id: SMMLA_SMMLAR
+  mnemonic: SMMLA
+  encodings:
+  - name: T1
+    length_bits: 32
+    pattern: 111110110101xxxxxxxxxxxx000xxxxx
+    bit_fields:
+    - skip: 12
+    - field: Rn
+      width: 4
+    - field: Ra
+      width: 4
+    - field: Rd
+      width: 4
+    - skip: 3
+    - field: R
+      width: 1
+    - field: Rm
+      width: 4
+    decode: |
+      if Ra == '1111' then SEE SMMUL;
+      d = UInt(Rd); n = UInt(Rn); m = UInt(Rm); a = UInt(Ra); round = (R == '1');
+      if d IN {13,15} || n IN {13,15} || m IN {13,15} || a == 13 then UNPREDICTABLE;
+- id: SMMLS_SMMLSR
+  mnemonic: SMMLS
+  encodings:
+  - name: T1
+    length_bits: 32
+    pattern: 111110110110xxxxxxxxxxxx000xxxxx
+    bit_fields:
+    - skip: 12
+    - field: Rn
+      width: 4
+    - field: Ra
+      width: 4
+    - field: Rd
+      width: 4
+    - skip: 3
+    - field: R
+      width: 1
+    - field: Rm
+      width: 4
+    decode: |
+      d = UInt(Rd); n = UInt(Rn); m = UInt(Rm); a = UInt(Ra); round = (R == '1');
+      if d IN {13,15} || n IN {13,15} || m IN {13,15} || a IN {13,15} then UNPREDICTABLE;
+- id: SMMUL_SMMULR
+  mnemonic: SMMUL
+  encodings:
+  - name: T1
+    length_bits: 32
+    pattern: 111110110101xxxx1111xxxx000xxxxx
+    bit_fields:
+    - skip: 12
+    - field: Rn
+      width: 4
+    - skip: 4
+    - field: Rd
+      width: 4
+    - skip: 3
+    - field: R
+      width: 1
+    - field: Rm
+      width: 4
+    decode: |
+      d = UInt(Rd); n = UInt(Rn); m = UInt(Rm); round = (R == '1');
+      if d IN {13,15} || n IN {13,15} || m IN {13,15} then UNPREDICTABLE;
+- id: SMUAD_SMUADX
+  mnemonic: SMUAD
+  encodings:
+  - name: T1
+    length_bits: 32
+    pattern: 111110110010xxxx1111xxxx000xxxxx
+    bit_fields:
+    - skip: 12
+    - field: Rn
+      width: 4
+    - skip: 4
+    - field: Rd
+      width: 4
+    - skip: 3
+    - field: M
+      width: 1
+    - field: Rm
+      width: 4
+    decode: |
+      d = UInt(Rd); n = UInt(Rn); m = UInt(Rm); m_swap = (M == '1');
+      if d IN {13,15} || n IN {13,15} || m IN {13,15} then UNPREDICTABLE;
+- id: SMULBB_SMULBT_SMULTB_SMULTT
+  mnemonic: SMULBB
+  encodings:
+  - name: T1
+    length_bits: 32
+    pattern: 111110110001xxxx1111xxxx00xxxxxx
+    bit_fields:
+    - skip: 12
+    - field: Rn
+      width: 4
+    - skip: 4
+    - field: Rd
+      width: 4
+    - skip: 2
+    - field: N
+      width: 1
+    - field: M
+      width: 1
+    - field: Rm
+      width: 4
+    decode: |
+      d = UInt(Rd); n = UInt(Rn); m = UInt(Rm);
+      n_high = (N == '1'); m_high = (M == '1');
+      if d IN {13,15} || n IN {13,15} || m IN {13,15} then UNPREDICTABLE;
+- id: SMULWB_SMULWT
+  mnemonic: SMULWB
+  encodings:
+  - name: T1
+    length_bits: 32
+    pattern: 111110110011xxxx1111xxxx000xxxxx
+    bit_fields:
+    - skip: 12
+    - field: Rn
+      width: 4
+    - skip: 4
+    - field: Rd
+      width: 4
+    - skip: 3
+    - field: M
+      width: 1
+    - field: Rm
+      width: 4
+    decode: |
+      d = UInt(Rd); n = UInt(Rn); m = UInt(Rm); m_high = (M == '1');
+      if d IN {13,15} || n IN {13,15} || m IN {13,15} then UNPREDICTABLE;
+- id: SMUSD_SMUSDX
+  mnemonic: SMUSD
+  encodings:
+  - name: T1
+    length_bits: 32
+    pattern: 111110110100xxxx1111xxxx000xxxxx
+    bit_fields:
+    - skip: 12
+    - field: Rn
+      width: 4
+    - skip: 4
+    - field: Rd
+      width: 4
+    - skip: 3
+    - field: M
+      width: 1
+    - field: Rm
+      width: 4
+    decode: |
+      d = UInt(Rd); n = UInt(Rn); m = UInt(Rm); m_swap = (M == '1');
+      if d IN {13,15} || n IN {13,15} || m IN {13,15} then UNPREDICTABLE;
+- id: SSAT
+  mnemonic: SSAT
+  encodings:
+  - name: T1
+    length_bits: 32
+    pattern: 11110x1100x0xxxx0xxxxxxxxxxxxxxx
+    bit_fields:
+    - skip: 5
+    - skip: 1
+    - skip: 4
+    - field: sh
+      width: 1
+    - skip: 1
+    - field: Rn
+      width: 4
+    - skip: 1
+    - field: imm3
+      width: 3
+    - field: Rd
+      width: 4
+    - field: imm2
+      width: 2
+    - skip: 1
+    - field: sat_imm
+      width: 5
+    decode: |
+      if sh == '1' && (imm3:imm2) == '00000' then
+          if HaveDSPExt() then
+               SEE SSAT16;
+          else
+               UNDEFINED;
+      d = UInt(Rd); n = UInt(Rn); saturate_to = UInt(sat_imm)+1;
+      (shift_t, shift_n) = DecodeImmShift(sh:'0', imm3:imm2);
+      if d IN {13,15} || n IN {13,15} then UNPREDICTABLE;
+- id: SSAT16
+  mnemonic: SSAT16
+  encodings:
+  - name: T1
+    length_bits: 32
+    pattern: 11110x110010xxxx0000xxxx00xxxxxx
+    bit_fields:
+    - skip: 5
+    - skip: 1
+    - skip: 6
+    - field: Rn
+      width: 4
+    - skip: 4
+    - field: Rd
+      width: 4
+    - skip: 2
+    - skip: 1
+    - skip: 1
+    - field: sat_imm
+      width: 4
+    decode: |
+      d = UInt(Rd); n = UInt(Rn); saturate_to = UInt(sat_imm)+1;
+      if d IN {13,15} || n IN {13,15} then UNPREDICTABLE;
+- id: SSAX
+  mnemonic: SSAX
+  encodings:
+  - name: T1
+    length_bits: 32
+    pattern: 111110101110xxxx1111xxxx0000xxxx
+    bit_fields:
+    - skip: 12
+    - field: Rn
+      width: 4
+    - skip: 4
+    - field: Rd
+      width: 4
+    - skip: 4
+    - field: Rm
+      width: 4
+    decode: |
+      d = UInt(Rd); n = UInt(Rn); m = UInt(Rm);
+      if d IN {13,15} || n IN {13,15} || m IN {13,15} then UNPREDICTABLE;
+- id: SSBB
+  mnemonic: SSBB
+  encodings:
+  - name: T1
+    length_bits: 32
+    pattern: 111100111011xxxx10x0xxxx01000000
+    bit_fields:
+    - skip: 12
+    - skip: 1
+    - skip: 1
+    - skip: 1
+    - skip: 1
+    - skip: 2
+    - skip: 1
+    - skip: 1
+    - skip: 1
+    - skip: 1
+    - skip: 1
+    - skip: 1
+    - skip: 8
+    decode: |
+      if InITBlock() then UNPREDICTABLE;
+- id: SSUB16
+  mnemonic: SSUB16
+  encodings:
+  - name: T1
+    length_bits: 32
+    pattern: 111110101101xxxx1111xxxx0000xxxx
+    bit_fields:
+    - skip: 12
+    - field: Rn
+      width: 4
+    - skip: 4
+    - field: Rd
+      width: 4
+    - skip: 4
+    - field: Rm
+      width: 4
+    decode: |
+      d = UInt(Rd); n = UInt(Rn); m = UInt(Rm);
+      if d IN {13,15} || n IN {13,15} || m IN {13,15} then UNPREDICTABLE;
+- id: SSUB8
+  mnemonic: SSUB8
+  encodings:
+  - name: T1
+    length_bits: 32
+    pattern: 111110101100xxxx1111xxxx0000xxxx
+    bit_fields:
+    - skip: 12
+    - field: Rn
+      width: 4
+    - skip: 4
+    - field: Rd
+      width: 4
+    - skip: 4
+    - field: Rm
+      width: 4
+    decode: |
+      d = UInt(Rd); n = UInt(Rn); m = UInt(Rm);
+      if d IN {13,15} || n IN {13,15} || m IN {13,15} then UNPREDICTABLE;
+- id: UDF
+  mnemonic: UDF
+  encodings:
+  - name: T1
+    length_bits: 16
+    pattern: 11011110xxxxxxxx
+    bit_fields:
+    - skip: 8
+    - field: imm8
+      width: 8
+    decode: |
+      imm32 = ZeroExtend(imm8, 32);
+      // imm32 is for assembly and disassembly only, and is ignored by hardware.
+  - name: T2
+    length_bits: 32
+    pattern: 111101111111xxxx1010xxxxxxxxxxxx
+    bit_fields:
+    - skip: 12
+    - field: imm4
+      width: 4
+    - skip: 4
+    - field: imm12
+      width: 12
+    decode: |
+      imm32 = ZeroExtend(imm4:imm12, 32);
+      // imm32 is for assembly and disassembly only, and is ignored by hardware.
+- id: UHADD16
+  mnemonic: UHADD16
+  encodings:
+  - name: T1
+    length_bits: 32
+    pattern: 111110101001xxxx1111xxxx0110xxxx
+    bit_fields:
+    - skip: 12
+    - field: Rn
+      width: 4
+    - skip: 4
+    - field: Rd
+      width: 4
+    - skip: 4
+    - field: Rm
+      width: 4
+    decode: |
+      d = UInt(Rd); n = UInt(Rn); m = UInt(Rm);
+      if d IN {13,15} || n IN {13,15} || m IN {13,15} then UNPREDICTABLE;
+- id: UHADD8
+  mnemonic: UHADD8
+  encodings:
+  - name: T1
+    length_bits: 32
+    pattern: 111110101000xxxx1111xxxx0110xxxx
+    bit_fields:
+    - skip: 12
+    - field: Rn
+      width: 4
+    - skip: 4
+    - field: Rd
+      width: 4
+    - skip: 4
+    - field: Rm
+      width: 4
+    decode: |
+      d = UInt(Rd); n = UInt(Rn); m = UInt(Rm);
+      if d IN {13,15} || n IN {13,15} || m IN {13,15} then UNPREDICTABLE;
+- id: UHASX
+  mnemonic: UHASX
+  encodings:
+  - name: T1
+    length_bits: 32
+    pattern: 111110101010xxxx1111xxxx0110xxxx
+    bit_fields:
+    - skip: 12
+    - field: Rn
+      width: 4
+    - skip: 4
+    - field: Rd
+      width: 4
+    - skip: 4
+    - field: Rm
+      width: 4
+    decode: |
+      d = UInt(Rd); n = UInt(Rn); m = UInt(Rm);
+      if d IN {13,15} || n IN {13,15} || m IN {13,15} then UNPREDICTABLE;
+- id: UHSAX
+  mnemonic: UHSAX
+  encodings:
+  - name: T1
+    length_bits: 32
+    pattern: 111110101110xxxx1111xxxx0110xxxx
+    bit_fields:
+    - skip: 12
+    - field: Rn
+      width: 4
+    - skip: 4
+    - field: Rd
+      width: 4
+    - skip: 4
+    - field: Rm
+      width: 4
+    decode: |
+      d = UInt(Rd); n = UInt(Rn); m = UInt(Rm);
+      if d IN {13,15} || n IN {13,15} || m IN {13,15} then UNPREDICTABLE;
+- id: UHSUB16
+  mnemonic: UHSUB16
+  encodings:
+  - name: T1
+    length_bits: 32
+    pattern: 111110101101xxxx1111xxxx0110xxxx
+    bit_fields:
+    - skip: 12
+    - field: Rn
+      width: 4
+    - skip: 4
+    - field: Rd
+      width: 4
+    - skip: 4
+    - field: Rm
+      width: 4
+    decode: |
+      d = UInt(Rd); n = UInt(Rn); m = UInt(Rm);
+      if d IN {13,15} || n IN {13,15} || m IN {13,15} then UNPREDICTABLE;
+- id: UHSUB8
+  mnemonic: UHSUB8
+  encodings:
+  - name: T1
+    length_bits: 32
+    pattern: 111110101100xxxx1111xxxx0110xxxx
+    bit_fields:
+    - skip: 12
+    - field: Rn
+      width: 4
+    - skip: 4
+    - field: Rd
+      width: 4
+    - skip: 4
+    - field: Rm
+      width: 4
+    decode: |
+      d = UInt(Rd); n = UInt(Rn); m = UInt(Rm);
+      if d IN {13,15} || n IN {13,15} || m IN {13,15} then UNPREDICTABLE;
+- id: UMAAL
+  mnemonic: UMAAL
+  encodings:
+  - name: T1
+    length_bits: 32
+    pattern: 111110111110xxxxxxxxxxxx0110xxxx
+    bit_fields:
+    - skip: 12
+    - field: Rn
+      width: 4
+    - field: RdLo
+      width: 4
+    - field: RdHi
+      width: 4
+    - skip: 4
+    - field: Rm
+      width: 4
+    decode: |
+      dLo = UInt(RdLo); dHi = UInt(RdHi); n = UInt(Rn); m = UInt(Rm);
+      if dLo IN {13,15} || dHi IN {13,15} || n IN {13,15} || m IN {13,15} then UNPREDICTABLE;
+      if dHi == dLo then UNPREDICTABLE;
+- id: UQSAX
+  mnemonic: UQSAX
+  encodings:
+  - name: T1
+    length_bits: 32
+    pattern: 111110101110xxxx1111xxxx0101xxxx
+    bit_fields:
+    - skip: 12
+    - field: Rn
+      width: 4
+    - skip: 4
+    - field: Rd
+      width: 4
+    - skip: 4
+    - field: Rm
+      width: 4
+    decode: |
+      d = UInt(Rd); n = UInt(Rn); m = UInt(Rm);
+      if d IN {13,15} || n IN {13,15} || m IN {13,15} then UNPREDICTABLE;
+- id: UQSUB16
+  mnemonic: UQSUB16
+  encodings:
+  - name: T1
+    length_bits: 32
+    pattern: 111110101101xxxx1111xxxx0101xxxx
+    bit_fields:
+    - skip: 12
+    - field: Rn
+      width: 4
+    - skip: 4
+    - field: Rd
+      width: 4
+    - skip: 4
+    - field: Rm
+      width: 4
+    decode: |
+      d = UInt(Rd); n = UInt(Rn); m = UInt(Rm);
+      if d IN {13,15} || n IN {13,15} || m IN {13,15} then UNPREDICTABLE;
+- id: UQSUB8
+  mnemonic: UQSUB8
+  encodings:
+  - name: T1
+    length_bits: 32
+    pattern: 111110101100xxxx1111xxxx0101xxxx
+    bit_fields:
+    - skip: 12
+    - field: Rn
+      width: 4
+    - skip: 4
+    - field: Rd
+      width: 4
+    - skip: 4
+    - field: Rm
+      width: 4
+    decode: |
+      d = UInt(Rd); n = UInt(Rn); m = UInt(Rm);
+      if d IN {13,15} || n IN {13,15} || m IN {13,15} then UNPREDICTABLE;
+- id: USAT
+  mnemonic: USAT
+  encodings:
+  - name: T1
+    length_bits: 32
+    pattern: 11110x1110x0xxxx0xxxxxxxxxxxxxxx
+    bit_fields:
+    - skip: 5
+    - skip: 1
+    - skip: 4
+    - field: sh
+      width: 1
+    - skip: 1
+    - field: Rn
+      width: 4
+    - skip: 1
+    - field: imm3
+      width: 3
+    - field: Rd
+      width: 4
+    - field: imm2
+      width: 2
+    - skip: 1
+    - field: sat_imm
+      width: 5
+    decode: |
+      if sh == '1' && (imm3:imm2) == '00000' then
+          if HaveDSPExt() then
+               SEE USAT16;
+          else
+               UNDEFINED;
+      d = UInt(Rd); n = UInt(Rn); saturate_to = UInt(sat_imm);
+      (shift_t, shift_n) = DecodeImmShift(sh:'0', imm3:imm2);
+      if d IN {13,15} || n IN {13,15} then UNPREDICTABLE;
+- id: USAT16
+  mnemonic: USAT16
+  encodings:
+  - name: T1
+    length_bits: 32
+    pattern: 11110x111010xxxx0000xxxx00xxxxxx
+    bit_fields:
+    - skip: 5
+    - skip: 1
+    - skip: 6
+    - field: Rn
+      width: 4
+    - skip: 4
+    - field: Rd
+      width: 4
+    - skip: 2
+    - skip: 1
+    - skip: 1
+    - field: sat_imm
+      width: 4
+    decode: |
+      d = UInt(Rd); n = UInt(Rn); saturate_to = UInt(sat_imm);
+      if d IN {13,15} || n IN {13,15} then UNPREDICTABLE;
+- id: YIELD
+  mnemonic: YIELD
+  encodings:
+  - name: T1
+    length_bits: 16
+    pattern: '1011111100010000'
+    bit_fields:
+    - skip: 16
+    decode: |
+      // No additional decoding required
+  - name: T2
+    length_bits: 32
+    pattern: 111100111010xxxx10x0x00000000001
+    bit_fields:
+    - skip: 12
+    - skip: 1
+    - skip: 1
+    - skip: 1
+    - skip: 1
+    - skip: 2
+    - skip: 1
+    - skip: 1
+    - skip: 1
+    - skip: 3
+    - skip: 8
+    decode: |
+      // No additional decoding required
+- id: LDRBT
+  mnemonic: LDRBT
+  encodings:
+  - name: T1
+    length_bits: 32
+    pattern: 111110000001xxxxxxxx1110xxxxxxxx
+    bit_fields:
+    - skip: 12
+    - field: Rn
+      width: 4
+    - field: Rt
+      width: 4
+    - skip: 4
+    - field: imm8
+      width: 8
+    decode: |
+      if Rn == '1111' then SEE LDRB (literal);
+      t = UInt(Rt); n = UInt(Rn); postindex = FALSE; add = TRUE;
+      register_form = FALSE; imm32 = ZeroExtend(imm8, 32);
+      if t IN {13,15} then UNPREDICTABLE;
+- id: LDREXB
+  mnemonic: LDREXB
+  encodings:
+  - name: T1
+    length_bits: 32
+    pattern: 111010001101xxxxxxxxxxxx0100xxxx
+    bit_fields:
+    - skip: 12
+    - field: Rn
+      width: 4
+    - field: Rt
+      width: 4
+    - skip: 1
+    - skip: 1
+    - skip: 1
+    - skip: 1
+    - skip: 4
+    - skip: 1
+    - skip: 1
+    - skip: 1
+    - skip: 1
+    decode: |
+      t = UInt(Rt); n = UInt(Rn);
+      if t IN {13,15} || n == 15 then UNPREDICTABLE;
+- id: LDREXH
+  mnemonic: LDREXH
+  encodings:
+  - name: T1
+    length_bits: 32
+    pattern: 111010001101xxxxxxxxxxxx0101xxxx
+    bit_fields:
+    - skip: 12
+    - field: Rn
+      width: 4
+    - field: Rt
+      width: 4
+    - skip: 1
+    - skip: 1
+    - skip: 1
+    - skip: 1
+    - skip: 4
+    - skip: 1
+    - skip: 1
+    - skip: 1
+    - skip: 1
+    decode: |
+      t = UInt(Rt); n = UInt(Rn);
+      if t IN {13,15} || n == 15 then UNPREDICTABLE;
+- id: LDRHT
+  mnemonic: LDRHT
+  encodings:
+  - name: T1
+    length_bits: 32
+    pattern: 111110000011xxxxxxxx1110xxxxxxxx
+    bit_fields:
+    - skip: 12
+    - field: Rn
+      width: 4
+    - field: Rt
+      width: 4
+    - skip: 4
+    - field: imm8
+      width: 8
+    decode: |
+      if Rn == '1111' then SEE LDRH (literal);
+      t = UInt(Rt); n = UInt(Rn); postindex = FALSE; add = TRUE;
+      register_form = FALSE; imm32 = ZeroExtend(imm8, 32);
+      if t IN {13,15} then UNPREDICTABLE;
+- id: LDRSBT
+  mnemonic: LDRSBT
+  encodings:
+  - name: T1
+    length_bits: 32
+    pattern: 111110010001xxxxxxxx1110xxxxxxxx
+    bit_fields:
+    - skip: 12
+    - field: Rn
+      width: 4
+    - field: Rt
+      width: 4
+    - skip: 4
+    - field: imm8
+      width: 8
+    decode: |
+      if Rn == '1111' then SEE LDRSB (literal);
+      t = UInt(Rt); n = UInt(Rn); postindex = FALSE; add = TRUE;
+      register_form = FALSE; imm32 = ZeroExtend(imm8, 32);
+      if t IN {13,15} then UNPREDICTABLE;
+- id: LDRSHT
+  mnemonic: LDRSHT
+  encodings:
+  - name: T1
+    length_bits: 32
+    pattern: 111110010011xxxxxxxx1110xxxxxxxx
+    bit_fields:
+    - skip: 12
+    - field: Rn
+      width: 4
+    - field: Rt
+      width: 4
+    - skip: 4
+    - field: imm8
+      width: 8
+    decode: |
+      if Rn == '1111' then SEE LDRSH (literal);
+      t = UInt(Rt); n = UInt(Rn); postindex = FALSE; add = TRUE;
+      register_form = FALSE; imm32 = ZeroExtend(imm8, 32);
+      if t IN {13,15} then UNPREDICTABLE;
+- id: MRRC_MRRC2
+  mnemonic: MRRC
+  encodings:
+  - name: T1
+    length_bits: 32
+    pattern: 111011000101xxxxxxxxxxxxxxxxxxxx
+    bit_fields:
+    - skip: 12
+    - field: Rt2
+      width: 4
+    - field: Rt
+      width: 4
+    - field: coproc
+      width: 4
+    - field: opc1
+      width: 4
+    - field: CRm
+      width: 4
+    decode: |
+      t = UInt(Rt); t2 = UInt(Rt2); cp = UInt(coproc);
+      if t == 15 || t2 == 15 || t == t2 then UNPREDICTABLE;
+      if t == 13 || t2 == 13 then UNPREDICTABLE;
+  - name: T2
+    length_bits: 32
+    pattern: 111111000101xxxxxxxxxxxxxxxxxxxx
+    bit_fields:
+    - skip: 12
+    - field: Rt2
+      width: 4
+    - field: Rt
+      width: 4
+    - field: coproc
+      width: 4
+    - field: opc1
+      width: 4
+    - field: CRm
+      width: 4
+    decode: |
+      t = UInt(Rt); t2 = UInt(Rt2); cp = UInt(coproc);
+      if t == 15 || t2 == 15 || t == t2 then UNPREDICTABLE;
+      if t == 13 || t2 == 13 then UNPREDICTABLE;
+- id: SASX
+  mnemonic: SASX
+  encodings:
+  - name: T1
+    length_bits: 32
+    pattern: 111110101010xxxx1111xxxx0000xxxx
+    bit_fields:
+    - skip: 12
+    - field: Rn
+      width: 4
+    - skip: 4
+    - field: Rd
+      width: 4
+    - skip: 4
+    - field: Rm
+      width: 4
+    decode: |
+      d = UInt(Rd); n = UInt(Rn); m = UInt(Rm);
+      if d IN {13,15} || n IN {13,15} || m IN {13,15} then UNPREDICTABLE;
+- id: SBFX
+  mnemonic: SBFX
+  encodings:
+  - name: T1
+    length_bits: 32
+    pattern: 11110x110100xxxx0xxxxxxxxxxxxxxx
+    bit_fields:
+    - skip: 5
+    - skip: 1
+    - skip: 6
+    - field: Rn
+      width: 4
+    - skip: 1
+    - field: imm3
+      width: 3
+    - field: Rd
+      width: 4
+    - field: imm2
+      width: 2
+    - skip: 1
+    - field: widthm1
+      width: 5
+    decode: |
+      d = UInt(Rd); n = UInt(Rn);
+      lsbit = UInt(imm3:imm2); widthminus1 = UInt(widthm1);
+      if d IN {13,15} || n IN {13,15} then UNPREDICTABLE;
+- id: SEL
+  mnemonic: SEL
+  encodings:
+  - name: T1
+    length_bits: 32
+    pattern: 111110101010xxxx1111xxxx1000xxxx
+    bit_fields:
+    - skip: 12
+    - field: Rn
+      width: 4
+    - skip: 4
+    - field: Rd
+      width: 4
+    - skip: 4
+    - field: Rm
+      width: 4
+    decode: |
+      d = UInt(Rd); n = UInt(Rn); m = UInt(Rm);
+      if d IN {13,15} || n IN {13,15} || m IN {13,15} then UNPREDICTABLE;
+- id: SEV
+  mnemonic: SEV
+  encodings:
+  - name: T1
+    length_bits: 16
+    pattern: '1011111101000000'
+    bit_fields:
+    - skip: 16
+    decode: |
+      // No additional decoding required
+  - name: T2
+    length_bits: 32
+    pattern: 111100111010xxxx10x0x00000000100
+    bit_fields:
+    - skip: 12
+    - skip: 1
+    - skip: 1
+    - skip: 1
+    - skip: 1
+    - skip: 2
+    - skip: 1
+    - skip: 1
+    - skip: 1
+    - skip: 3
+    - skip: 8
+    decode: |
+      // No additional decoding required
+- id: SHADD16
+  mnemonic: SHADD16
+  encodings:
+  - name: T1
+    length_bits: 32
+    pattern: 111110101001xxxx1111xxxx0010xxxx
+    bit_fields:
+    - skip: 12
+    - field: Rn
+      width: 4
+    - skip: 4
+    - field: Rd
+      width: 4
+    - skip: 4
+    - field: Rm
+      width: 4
+    decode: |
+      d = UInt(Rd); n = UInt(Rn); m = UInt(Rm);
+      if d IN {13,15} || n IN {13,15} || m IN {13,15} then UNPREDICTABLE;
+- id: SHADD8
+  mnemonic: SHADD8
+  encodings:
+  - name: T1
+    length_bits: 32
+    pattern: 111110101000xxxx1111xxxx0010xxxx
+    bit_fields:
+    - skip: 12
+    - field: Rn
+      width: 4
+    - skip: 4
+    - field: Rd
+      width: 4
+    - skip: 4
+    - field: Rm
+      width: 4
+    decode: |
+      d = UInt(Rd); n = UInt(Rn); m = UInt(Rm);
+      if d IN {13,15} || n IN {13,15} || m IN {13,15} then UNPREDICTABLE;
+- id: SHASX
+  mnemonic: SHASX
+  encodings:
+  - name: T1
+    length_bits: 32
+    pattern: 111110101010xxxx1111xxxx0010xxxx
+    bit_fields:
+    - skip: 12
+    - field: Rn
+      width: 4
+    - skip: 4
+    - field: Rd
+      width: 4
+    - skip: 4
+    - field: Rm
+      width: 4
+    decode: |
+      d = UInt(Rd); n = UInt(Rn); m = UInt(Rm);
+      if d IN {13,15} || n IN {13,15} || m IN {13,15} then UNPREDICTABLE;
+- id: SHSAX
+  mnemonic: SHSAX
+  encodings:
+  - name: T1
+    length_bits: 32
+    pattern: 111110101110xxxx1111xxxx0010xxxx
+    bit_fields:
+    - skip: 12
+    - field: Rn
+      width: 4
+    - skip: 4
+    - field: Rd
+      width: 4
+    - skip: 4
+    - field: Rm
+      width: 4
+    decode: |
+      d = UInt(Rd); n = UInt(Rn); m = UInt(Rm);
+      if d IN {13,15} || n IN {13,15} || m IN {13,15} then UNPREDICTABLE;
+- id: SHSUB16
+  mnemonic: SHSUB16
+  encodings:
+  - name: T1
+    length_bits: 32
+    pattern: 111110101101xxxx1111xxxx0010xxxx
+    bit_fields:
+    - skip: 12
+    - field: Rn
+      width: 4
+    - skip: 4
+    - field: Rd
+      width: 4
+    - skip: 4
+    - field: Rm
+      width: 4
+    decode: |
+      d = UInt(Rd); n = UInt(Rn); m = UInt(Rm);
+      if d IN {13,15} || n IN {13,15} || m IN {13,15} then UNPREDICTABLE;
+- id: SHSUB8
+  mnemonic: SHSUB8
+  encodings:
+  - name: T1
+    length_bits: 32
+    pattern: 111110101100xxxx1111xxxx0010xxxx
+    bit_fields:
+    - skip: 12
+    - field: Rn
+      width: 4
+    - skip: 4
+    - field: Rd
+      width: 4
+    - skip: 4
+    - field: Rm
+      width: 4
+    decode: |
+      d = UInt(Rd); n = UInt(Rn); m = UInt(Rm);
+      if d IN {13,15} || n IN {13,15} || m IN {13,15} then UNPREDICTABLE;
+- id: STRBT
+  mnemonic: STRBT
+  encodings:
+  - name: T1
+    length_bits: 32
+    pattern: 111110000000xxxxxxxx1110xxxxxxxx
+    bit_fields:
+    - skip: 12
+    - field: Rn
+      width: 4
+    - field: Rt
+      width: 4
+    - skip: 4
+    - field: imm8
+      width: 8
+    decode: |
+      if Rn == '1111' then UNDEFINED;
+      t = UInt(Rt); n = UInt(Rn); postindex = FALSE; add = TRUE;
+      register_form = FALSE; imm32 = ZeroExtend(imm8, 32);
+      if t IN {13,15} then UNPREDICTABLE;
+- id: STREXB
+  mnemonic: STREXB
+  encodings:
+  - name: T1
+    length_bits: 32
+    pattern: 111010001100xxxxxxxxxxxx0100xxxx
+    bit_fields:
+    - skip: 12
+    - field: Rn
+      width: 4
+    - field: Rt
+      width: 4
+    - skip: 1
+    - skip: 1
+    - skip: 1
+    - skip: 1
+    - skip: 4
+    - field: Rd
+      width: 4
+    decode: |
+      d = UInt(Rd); t = UInt(Rt); n = UInt(Rn);
+      if d IN {13,15} || t IN {13,15} || n == 15 then UNPREDICTABLE;
+      if d == n || d == t then UNPREDICTABLE;
+- id: STREXH
+  mnemonic: STREXH
+  encodings:
+  - name: T1
+    length_bits: 32
+    pattern: 111010001100xxxxxxxxxxxx0101xxxx
+    bit_fields:
+    - skip: 12
+    - field: Rn
+      width: 4
+    - field: Rt
+      width: 4
+    - skip: 1
+    - skip: 1
+    - skip: 1
+    - skip: 1
+    - skip: 4
+    - field: Rd
+      width: 4
+    decode: |
+      d = UInt(Rd); t = UInt(Rt); n = UInt(Rn);
+      if d IN {13,15} || t IN {13,15} || n == 15 then UNPREDICTABLE;
+      if d == n || d == t then UNPREDICTABLE;
+- id: STRHT
+  mnemonic: STRHT
+  encodings:
+  - name: T1
+    length_bits: 32
+    pattern: 111110000010xxxxxxxx1110xxxxxxxx
+    bit_fields:
+    - skip: 12
+    - field: Rn
+      width: 4
+    - field: Rt
+      width: 4
+    - skip: 4
+    - field: imm8
+      width: 8
+    decode: |
+      if Rn == '1111' then UNDEFINED;
+      t = UInt(Rt); n = UInt(Rn); postindex = FALSE; add = TRUE;
+      register_form = FALSE; imm32 = ZeroExtend(imm8, 32);
+      if t IN {13,15} then UNPREDICTABLE;
+- id: STRT
+  mnemonic: STRT
+  encodings:
+  - name: T1
+    length_bits: 32
+    pattern: 111110000100xxxxxxxx1110xxxxxxxx
+    bit_fields:
+    - skip: 12
+    - field: Rn
+      width: 4
+    - field: Rt
+      width: 4
+    - skip: 4
+    - field: imm8
+      width: 8
+    decode: |
+      if Rn == '1111' then UNDEFINED;
+      t = UInt(Rt); n = UInt(Rn); postindex = FALSE; add = TRUE;
+      register_form = FALSE; imm32 = ZeroExtend(imm8, 32);
+      if t IN {13,15} then UNPREDICTABLE;
+- id: UASX
+  mnemonic: UASX
+  encodings:
+  - name: T1
+    length_bits: 32
+    pattern: 111110101010xxxx1111xxxx0100xxxx
+    bit_fields:
+    - skip: 12
+    - field: Rn
+      width: 4
+    - skip: 4
+    - field: Rd
+      width: 4
+    - skip: 4
+    - field: Rm
+      width: 4
+    decode: |
+      d = UInt(Rd); n = UInt(Rn); m = UInt(Rm);
+      if d IN {13,15} || n IN {13,15} || m IN {13,15} then UNPREDICTABLE;
+- id: UQADD16
+  mnemonic: UQADD16
+  encodings:
+  - name: T1
+    length_bits: 32
+    pattern: 111110101001xxxx1111xxxx0101xxxx
+    bit_fields:
+    - skip: 12
+    - field: Rn
+      width: 4
+    - skip: 4
+    - field: Rd
+      width: 4
+    - skip: 4
+    - field: Rm
+      width: 4
+    decode: |
+      d = UInt(Rd); n = UInt(Rn); m = UInt(Rm);
+      if d IN {13,15} || n IN {13,15} || m IN {13,15} then UNPREDICTABLE;
+- id: UQADD8
+  mnemonic: UQADD8
+  encodings:
+  - name: T1
+    length_bits: 32
+    pattern: 111110101000xxxx1111xxxx0101xxxx
+    bit_fields:
+    - skip: 12
+    - field: Rn
+      width: 4
+    - skip: 4
+    - field: Rd
+      width: 4
+    - skip: 4
+    - field: Rm
+      width: 4
+    decode: |
+      d = UInt(Rd); n = UInt(Rn); m = UInt(Rm);
+      if d IN {13,15} || n IN {13,15} || m IN {13,15} then UNPREDICTABLE;
+- id: UQASX
+  mnemonic: UQASX
+  encodings:
+  - name: T1
+    length_bits: 32
+    pattern: 111110101010xxxx1111xxxx0101xxxx
+    bit_fields:
+    - skip: 12
+    - field: Rn
+      width: 4
+    - skip: 4
+    - field: Rd
+      width: 4
+    - skip: 4
+    - field: Rm
+      width: 4
+    decode: |
+      d = UInt(Rd); n = UInt(Rn); m = UInt(Rm);
+      if d IN {13,15} || n IN {13,15} || m IN {13,15} then UNPREDICTABLE;
+- id: USAD8
+  mnemonic: USAD8
+  encodings:
+  - name: T1
+    length_bits: 32
+    pattern: 111110110111xxxx1111xxxx0000xxxx
+    bit_fields:
+    - skip: 12
+    - field: Rn
+      width: 4
+    - skip: 4
+    - field: Rd
+      width: 4
+    - skip: 4
+    - field: Rm
+      width: 4
+    decode: |
+      d = UInt(Rd); n = UInt(Rn); m = UInt(Rm);
+      if d IN {13,15} || n IN {13,15} || m IN {13,15} then UNPREDICTABLE;
+- id: USADA8
+  mnemonic: USADA8
+  encodings:
+  - name: T1
+    length_bits: 32
+    pattern: 111110110111xxxxxxxxxxxx0000xxxx
+    bit_fields:
+    - skip: 12
+    - field: Rn
+      width: 4
+    - field: Ra
+      width: 4
+    - field: Rd
+      width: 4
+    - skip: 4
+    - field: Rm
+      width: 4
+    decode: |
+      if Ra == '1111' then SEE USAD8;
+      d = UInt(Rd); n = UInt(Rn); m = UInt(Rm); a = UInt(Ra);
+      if d IN {13,15} || n IN {13,15} || m IN {13,15} || a == 13 then UNPREDICTABLE;
+- id: USAX
+  mnemonic: USAX
+  encodings:
+  - name: T1
+    length_bits: 32
+    pattern: 111110101110xxxx1111xxxx0100xxxx
+    bit_fields:
+    - skip: 12
+    - field: Rn
+      width: 4
+    - skip: 4
+    - field: Rd
+      width: 4
+    - skip: 4
+    - field: Rm
+      width: 4
+    decode: |
+      d = UInt(Rd); n = UInt(Rn); m = UInt(Rm);
+      if d IN {13,15} || n IN {13,15} || m IN {13,15} then UNPREDICTABLE;
+- id: USUB16
+  mnemonic: USUB16
+  encodings:
+  - name: T1
+    length_bits: 32
+    pattern: 111110101101xxxx1111xxxx0100xxxx
+    bit_fields:
+    - skip: 12
+    - field: Rn
+      width: 4
+    - skip: 4
+    - field: Rd
+      width: 4
+    - skip: 4
+    - field: Rm
+      width: 4
+    decode: |
+      d = UInt(Rd); n = UInt(Rn); m = UInt(Rm);
+      if d IN {13,15} || n IN {13,15} || m IN {13,15} then UNPREDICTABLE;
+- id: USUB8
+  mnemonic: USUB8
+  encodings:
+  - name: T1
+    length_bits: 32
+    pattern: 111110101100xxxx1111xxxx0100xxxx
+    bit_fields:
+    - skip: 12
+    - field: Rn
+      width: 4
+    - skip: 4
+    - field: Rd
+      width: 4
+    - skip: 4
+    - field: Rm
+      width: 4
+    decode: |
+      d = UInt(Rd); n = UInt(Rn); m = UInt(Rm);
+      if d IN {13,15} || n IN {13,15} || m IN {13,15} then UNPREDICTABLE;
+- id: UXTAH
+  mnemonic: UXTAH
+  encodings:
+  - name: T1
+    length_bits: 32
+    pattern: 111110100001xxxx1111xxxx1xxxxxxx
+    bit_fields:
+    - skip: 12
+    - field: Rn
+      width: 4
+    - skip: 4
+    - field: Rd
+      width: 4
+    - skip: 1
+    - skip: 1
+    - field: rotate
+      width: 2
+    - field: Rm
+      width: 4
+    decode: |
+      if Rn == '1111' then SEE UXTH;
+      d = UInt(Rd); n = UInt(Rn); m = UInt(Rm); rotation = UInt(rotate:'000');
+      if d IN {13,15} || n == 13 || m IN {13,15} then UNPREDICTABLE;
+- id: UXTB16
+  mnemonic: UXTB16
+  encodings:
+  - name: T1
+    length_bits: 32
+    pattern: 11111010001111111111xxxx1xxxxxxx
+    bit_fields:
+    - skip: 16
+    - skip: 4
+    - field: Rd
+      width: 4
+    - skip: 1
+    - skip: 1
+    - field: rotate
+      width: 2
+    - field: Rm
+      width: 4
+    decode: |
+      d = UInt(Rd); m = UInt(Rm); rotation = UInt(rotate:'000');
+      if d IN {13,15} || m IN {13,15} then UNPREDICTABLE;
+- id: VABS
+  mnemonic: VABS
+  encodings:
+  - name: T1
+    length_bits: 32
+    pattern: 111011101x110000xxxx101x11x0xxxx
+    bit_fields:
+    - skip: 9
+    - field: D
+      width: 1
+    - skip: 6
+    - field: Vd
+      width: 4
+    - skip: 3
+    - field: sz
+      width: 1
+    - skip: 2
+    - field: M
+      width: 1
+    - skip: 1
+    - field: Vm
+      width: 4
+    decode: |
+      dp_operation = (sz == '1');
+      d = if dp_operation then UInt(D:Vd) else UInt(Vd:D);
+      m = if dp_operation then UInt(M:Vm) else UInt(Vm:M);
+- id: VADD
+  mnemonic: VADD
+  encodings:
+  - name: T1
+    length_bits: 32
+    pattern: 111011100x11xxxxxxxx101xx0x0xxxx
+    bit_fields:
+    - skip: 9
+    - field: D
+      width: 1
+    - skip: 2
+    - field: Vn
+      width: 4
+    - field: Vd
+      width: 4
+    - skip: 3
+    - field: sz
+      width: 1
+    - field: N
+      width: 1
+    - skip: 1
+    - field: M
+      width: 1
+    - skip: 1
+    - field: Vm
+      width: 4
+    decode: |
+      dp_operation = (sz == '1');
+      d = if dp_operation then UInt(D:Vd) else UInt(Vd:D);
+      n = if dp_operation then UInt(N:Vn) else UInt(Vn:N);
+      m = if dp_operation then UInt(M:Vm) else UInt(Vm:M);
+- id: VCMP_VCMPE
+  mnemonic: VCMP
+  encodings:
+  - name: T1
+    length_bits: 32
+    pattern: 111011101x110100xxxx101xx1x0xxxx
+    bit_fields:
+    - skip: 9
+    - field: D
+      width: 1
+    - skip: 6
+    - field: Vd
+      width: 4
+    - skip: 3
+    - field: sz
+      width: 1
+    - field: E
+      width: 1
+    - skip: 1
+    - field: M
+      width: 1
+    - skip: 1
+    - field: Vm
+      width: 4
+    decode: |
+      dp_operation = (sz == '1'); quiet_nan_exc = (E == '1'); with_zero = FALSE;
+      d = if dp_operation then UInt(D:Vd) else UInt(Vd:D);
+      m = if dp_operation then UInt(M:Vm) else UInt(Vm:M);
+  - name: T2
+    length_bits: 32
+    pattern: 111011101x110101xxxx101xx1x0xxxx
+    bit_fields:
+    - skip: 9
+    - field: D
+      width: 1
+    - skip: 6
+    - field: Vd
+      width: 4
+    - skip: 3
+    - field: sz
+      width: 1
+    - field: E
+      width: 1
+    - skip: 1
+    - skip: 1
+    - skip: 1
+    - skip: 1
+    - skip: 1
+    - skip: 1
+    - skip: 1
+    decode: |
+      dp_operation = (sz == '1'); quiet_nan_exc = (E == '1'); with_zero = TRUE;
+      d = if dp_operation then UInt(D:Vd) else UInt(Vd:D);
+- id: VCVTA_VCVTN_VCVTP_VCVTM
+  mnemonic: VCVTA
+  encodings:
+  - name: T1
+    length_bits: 32
+    pattern: 111111101x1111xxxxxx101xx1x0xxxx
+    bit_fields:
+    - skip: 9
+    - field: D
+      width: 1
+    - skip: 4
+    - field: RM
+      width: 2
+    - field: Vd
+      width: 4
+    - skip: 3
+    - field: sz
+      width: 1
+    - field: op
+      width: 1
+    - skip: 1
+    - field: M
+      width: 1
+    - skip: 1
+    - field: Vm
+      width: 4
+    decode: |
+      if InITBlock() then UNPREDICTABLE;
+      dp_operation = (sz == '1'); unsigned = (op == '0');
+      round_mode = RM;
+      d = UInt(Vd:D);
+      m = if dp_operation then UInt(M:Vm) else UInt(Vm:M);
+- id: VCVT_VCVTR_integer
+  mnemonic: VCVT
+  encodings:
+  - name: T1
+    length_bits: 32
+    pattern: 111011101x111xxxxxxx101xx1x0xxxx
+    bit_fields:
+    - skip: 9
+    - field: D
+      width: 1
+    - skip: 3
+    - field: opc2
+      width: 3
+    - field: Vd
+      width: 4
+    - skip: 3
+    - field: sz
+      width: 1
+    - field: op
+      width: 1
+    - skip: 1
+    - field: M
+      width: 1
+    - skip: 1
+    - field: Vm
+      width: 4
+    decode: |
+      if opc2 != '000' && !(opc2 IN "10x") then SEE "Related encodings";
+      to_integer = (opc2<2> == '1'); dp_operation = (sz == 1);
+      if to_integer then
+           unsigned = (opc2<0> == '0'); round_zero = (op == '1');
+           d = UInt(Vd:D); m = if dp_operation then UInt(M:Vm) else UInt(Vm:M);
+      else
+           unsigned = (op == '0'); round_nearest = FALSE; // FALSE selects FPSCR rounding
+           m = UInt(Vm:M); d = if dp_operation then UInt(D:Vd) else UInt(Vd:D);
+- id: VCVT_fixed_point
+  mnemonic: VCVT
+  encodings:
+  - name: T1
+    length_bits: 32
+    pattern: 111011101x111x1xxxxx101xx1x0xxxx
+    bit_fields:
+    - skip: 9
+    - field: D
+      width: 1
+    - skip: 3
+    - field: op
+      width: 1
+    - skip: 1
+    - field: U
+      width: 1
+    - field: Vd
+      width: 4
+    - skip: 3
+    - field: sf
+      width: 1
+    - field: sx
+      width: 1
+    - skip: 1
+    - field: i
+      width: 1
+    - skip: 1
+    - field: imm4
+      width: 4
+    decode: |
+      to_fixed = (op == '1'); dp_operation = (sf == '1'); unsigned = (U == '1');
+      size = if sx == '0' then 16 else 32;
+      frac_bits = size - UInt(imm4:i);
+      if to_fixed then
+           round_zero = TRUE;
+      else
+           round_nearest = TRUE;
+      d = if dp_operation then UInt(D:Vd) else UInt(Vd:D);
+      if frac_bits < 0 then UNPREDICTABLE;
+- id: VCVT_double_single
+  mnemonic: VCVT
+  encodings:
+  - name: T1
+    length_bits: 32
+    pattern: 111011101x110111xxxx101x11x0xxxx
+    bit_fields:
+    - skip: 9
+    - field: D
+      width: 1
+    - skip: 6
+    - field: Vd
+      width: 4
+    - skip: 3
+    - field: sz
+      width: 1
+    - skip: 2
+    - field: M
+      width: 1
+    - skip: 1
+    - field: Vm
+      width: 4
+    decode: |
+      double_to_single = (sz == '1');
+      d = if double_to_single then UInt(Vd:D) else UInt(D:Vd);
+      m = if double_to_single then UInt(M:Vm) else UInt(Vm:M);
+- id: VCVTB_VCVTT
+  mnemonic: VCVTB
+  encodings:
+  - name: T1
+    length_bits: 32
+    pattern: 111011101x11001xxxxx101xx1x0xxxx
+    bit_fields:
+    - skip: 9
+    - field: D
+      width: 1
+    - skip: 5
+    - field: op
+      width: 1
+    - field: Vd
+      width: 4
+    - skip: 3
+    - field: sz
+      width: 1
+    - field: T
+      width: 1
+    - skip: 1
+    - field: M
+      width: 1
+    - skip: 1
+    - field: Vm
+      width: 4
+    decode: |
+      dp_operation = (sz == '1');
+      convert_from_half = (op == '0');
+      lowbit = if T == '1' then 16 else 0;
+      if dp_operation then
+           if convert_from_half then
+                d=UInt(D:Vd);m = UInt(Vm:M);
+           else
+                d=UInt(Vd:D);m = UInt(M:Vm);
+      else
+           d=UInt(Vd:D);m = UInt(Vm:M);
+- id: VDIV
+  mnemonic: VDIV
+  encodings:
+  - name: T1
+    length_bits: 32
+    pattern: 111011101x00xxxxxxxx101xx0x0xxxx
+    bit_fields:
+    - skip: 9
+    - field: D
+      width: 1
+    - skip: 2
+    - field: Vn
+      width: 4
+    - field: Vd
+      width: 4
+    - skip: 3
+    - field: sz
+      width: 1
+    - field: N
+      width: 1
+    - skip: 1
+    - field: M
+      width: 1
+    - skip: 1
+    - field: Vm
+      width: 4
+    decode: |
+      dp_operation = (sz == '1');
+      d = if dp_operation then UInt(D:Vd) else UInt(Vd:D);
+      n = if dp_operation then UInt(N:Vn) else UInt(Vn:N);
+      m = if dp_operation then UInt(M:Vm) else UInt(Vm:M);
+- id: VFMA_VFMS
+  mnemonic: VFMA
+  encodings:
+  - name: T1
+    length_bits: 32
+    pattern: 111011101x10xxxxxxxx101xxxx0xxxx
+    bit_fields:
+    - skip: 9
+    - field: D
+      width: 1
+    - skip: 2
+    - field: Vn
+      width: 4
+    - field: Vd
+      width: 4
+    - skip: 3
+    - field: sz
+      width: 1
+    - field: N
+      width: 1
+    - field: op
+      width: 1
+    - field: M
+      width: 1
+    - skip: 1
+    - field: Vm
+      width: 4
+    decode: |
+      dp_operation = (sz == '1'); op1_neg = (op == '1');
+      d = if dp_operation then UInt(D:Vd) else UInt(Vd:D);
+      n = if dp_operation then UInt(N:Vn) else UInt(Vn:N);
+      m = if dp_operation then UInt(M:Vm) else UInt(Vm:M);
+- id: VFNMA_VFNMS
+  mnemonic: VFNMA
+  encodings:
+  - name: T1
+    length_bits: 32
+    pattern: 111011101x01xxxxxxxx101xxxx0xxxx
+    bit_fields:
+    - skip: 9
+    - field: D
+      width: 1
+    - skip: 2
+    - field: Vn
+      width: 4
+    - field: Vd
+      width: 4
+    - skip: 3
+    - field: sz
+      width: 1
+    - field: N
+      width: 1
+    - field: op
+      width: 1
+    - field: M
+      width: 1
+    - skip: 1
+    - field: Vm
+      width: 4
+    decode: |
+      op1_neg = (op == '1');
+      dp_operation = (sz == '1');
+      d = if dp_operation then UInt(D:Vd) else UInt(Vd:D);
+      n = if dp_operation then UInt(N:Vn) else UInt(Vn:N);
+      m = if dp_operation then UInt(M:Vm) else UInt(Vm:M);
+- id: VLDM
+  mnemonic: VLDM
+  encodings:
+  - name: T1
+    length_bits: 32
+    pattern: 1110110xxxx1xxxxxxxx1011xxxxxxxx
+    bit_fields:
+    - skip: 7
+    - field: P
+      width: 1
+    - field: U
+      width: 1
+    - field: D
+      width: 1
+    - field: W
+      width: 1
+    - skip: 1
+    - field: Rn
+      width: 4
+    - field: Vd
+      width: 4
+    - skip: 4
+    - field: imm8
+      width: 8
+    decode: |
+      if P == '0' && U == '0' && W == '0' then SEE "Related encodings";
+      if P == '0' && U == '1' && W == '1' && Rn == '1101' then SEE VPOP;
+      if P == '1' && W == '0' then SEE VLDR;
+      if imm8<0> == '1' then SEE "FLDMX";
+      if P == U && W == '1' then UNDEFINED;
+      // Remaining combinations are PUW = 010 (IA without !), 011 (IA with !), 101 (DB with !)
+      single_regs = FALSE; add = (U == '1'); wback = (W == '1');
+      d = UInt(D:Vd); n = UInt(Rn); imm32 = ZeroExtend(imm8:'00', 32);
+      regs = UInt(imm8) DIV 2;
+      if n == 15 then UNPREDICTABLE;
+      if regs == 0 || regs > 16 || (d+regs) > 32 then UNPREDICTABLE;
+      if VFPSmallRegisterBank() && (d+regs) > 16 then UNPREDICTABLE;
+  - name: T2
+    length_bits: 32
+    pattern: 1110110xxxx1xxxxxxxx1010xxxxxxxx
+    bit_fields:
+    - skip: 7
+    - field: P
+      width: 1
+    - field: U
+      width: 1
+    - field: D
+      width: 1
+    - field: W
+      width: 1
+    - skip: 1
+    - field: Rn
+      width: 4
+    - field: Vd
+      width: 4
+    - skip: 4
+    - field: imm8
+      width: 8
+    decode: |
+      if P == '0' && U == '0' && W == '0' then SEE "Related encodings";
+      if P == '0' && U == '1' && W == '1' && Rn == '1101' then SEE VPOP;
+      if P == '1' && W == '0' then SEE VLDR;
+      if P == U && W == '1' then UNDEFINED;
+      // Remaining combinations are PUW = 010 (IA without !), 011 (IA with !), 101 (DB with !)
+      single_regs = TRUE; add = (U == '1'); wback = (W == '1');
+      d = UInt(Vd:D); n = UInt(Rn); imm32 = ZeroExtend(imm8:'00', 32);
+      regs = UInt(imm8);
+      if n == 15 then UNPREDICTABLE;
+      if regs == 0 || (d+regs) > 32 then UNPREDICTABLE;
+- id: VLDR
+  mnemonic: VLDR
+  encodings:
+  - name: T1
+    length_bits: 32
+    pattern: 11101101xx01xxxxxxxx1011xxxxxxxx
+    bit_fields:
+    - skip: 8
+    - field: U
+      width: 1
+    - field: D
+      width: 1
+    - skip: 2
+    - field: Rn
+      width: 4
+    - field: Vd
+      width: 4
+    - skip: 4
+    - field: imm8
+      width: 8
+    decode: |
+      single_reg = FALSE; add = (U == '1'); imm32 = ZeroExtend(imm8:'00', 32);
+      d = UInt(D:Vd); n = UInt(Rn);
+  - name: T2
+    length_bits: 32
+    pattern: 11101101xx01xxxxxxxx1010xxxxxxxx
+    bit_fields:
+    - skip: 8
+    - field: U
+      width: 1
+    - field: D
+      width: 1
+    - skip: 2
+    - field: Rn
+      width: 4
+    - field: Vd
+      width: 4
+    - skip: 4
+    - field: imm8
+      width: 8
+    decode: |
+      single_reg = TRUE; add = (U == '1'); imm32 = ZeroExtend(imm8:'00', 32);
+      d = UInt(Vd:D); n = UInt(Rn);
+- id: VMAXNM_VMINNM
+  mnemonic: VMAXNM
+  encodings:
+  - name: T1
+    length_bits: 32
+    pattern: 111111101x00xxxxxxxx101xxxx0xxxx
+    bit_fields:
+    - skip: 9
+    - field: D
+      width: 1
+    - skip: 2
+    - field: Vn
+      width: 4
+    - field: Vd
+      width: 4
+    - skip: 3
+    - field: sz
+      width: 1
+    - field: N
+      width: 1
+    - field: op
+      width: 1
+    - field: M
+      width: 1
+    - skip: 1
+    - field: Vm
+      width: 4
+    decode: |
+      if InITBlock() then UNPREDICTABLE;
+      dp_operation = (sz == '1'); maximum = (op == '0');
+      d = if dp_operation then UInt(D:Vd) else UInt(Vd:D);
+      n = if dp_operation then UInt(N:Vn) else UInt(Vn:N);
+      m = if dp_operation then UInt(M:Vm) else UInt(Vm:M);
+- id: VMLA_VMLS
+  mnemonic: VMLA
+  encodings:
+  - name: T1
+    length_bits: 32
+    pattern: 111011100x00xxxxxxxx101xxxx0xxxx
+    bit_fields:
+    - skip: 9
+    - field: D
+      width: 1
+    - skip: 2
+    - field: Vn
+      width: 4
+    - field: Vd
+      width: 4
+    - skip: 3
+    - field: sz
+      width: 1
+    - field: N
+      width: 1
+    - field: op
+      width: 1
+    - field: M
+      width: 1
+    - skip: 1
+    - field: Vm
+      width: 4
+    decode: |
+      dp_operation = (sz == '1'); add = (op == '0');
+      d = if dp_operation then UInt(D:Vd) else UInt(Vd:D);
+      n = if dp_operation then UInt(N:Vn) else UInt(Vn:N);
+      m = if dp_operation then UInt(M:Vm) else UInt(Vm:M);
+- id: VMOV_immediate
+  mnemonic: VMOV
+  encodings:
+  - name: T1
+    length_bits: 32
+    pattern: 111011101x11xxxxxxxx101xx0x0xxxx
+    bit_fields:
+    - skip: 9
+    - field: D
+      width: 1
+    - skip: 2
+    - field: imm4H
+      width: 4
+    - field: Vd
+      width: 4
+    - skip: 3
+    - field: sz
+      width: 1
+    - skip: 1
+    - skip: 1
+    - skip: 1
+    - skip: 1
+    - field: imm4L
+      width: 4
+    decode: |
+      dp_operation = (sz == '1');
+      if dp_operation then
+           d = UInt(D:Vd); imm64 = VFPExpandImm(imm4H:imm4L, 64);
+      else
+           d = UInt(Vd:D); imm32 = VFPExpandImm(imm4H:imm4L, 32);
+- id: VMOV_register
+  mnemonic: VMOV
+  encodings:
+  - name: T1
+    length_bits: 32
+    pattern: 111011101x110000xxxx101x01x0xxxx
+    bit_fields:
+    - skip: 9
+    - field: D
+      width: 1
+    - skip: 6
+    - field: Vd
+      width: 4
+    - skip: 3
+    - field: sz
+      width: 1
+    - skip: 2
+    - field: M
+      width: 1
+    - skip: 1
+    - field: Vm
+      width: 4
+    decode: |
+      dp_operation = (sz == '1');
+      d = if dp_operation then UInt(D:Vd) else UInt(Vd:D);
+      m = if dp_operation then UInt(M:Vm) else UInt(Vm:M);
+- id: VMOV_core_to_scalar
+  mnemonic: VMOV
+  encodings:
+  - name: T1
+    length_bits: 32
+    pattern: 1110111000x0xxxxxxxx1011x001xxxx
+    bit_fields:
+    - skip: 10
+    - field: H
+      width: 1
+    - skip: 1
+    - field: Vd
+      width: 4
+    - field: Rt
+      width: 4
+    - skip: 4
+    - field: D
+      width: 1
+    - skip: 3
+    - skip: 1
+    - skip: 1
+    - skip: 1
+    - skip: 1
+    decode: |
+      d = UInt(D:Vd:H); t = UInt(Rt);
+      if t == 15 || t == 13 then UNPREDICTABLE;
+- id: VMOV_scalar_to_core
+  mnemonic: VMOV
+  encodings:
+  - name: T1
+    length_bits: 32
+    pattern: 1110111000x1xxxxxxxx1011x001xxxx
+    bit_fields:
+    - skip: 10
+    - field: H
+      width: 1
+    - skip: 1
+    - field: Vn
+      width: 4
+    - field: Rt
+      width: 4
+    - skip: 4
+    - field: N
+      width: 1
+    - skip: 3
+    - skip: 1
+    - skip: 1
+    - skip: 1
+    - skip: 1
+    decode: |
+      t = UInt(Rt); n = UInt(N:Vn:H);
+      if t == 15 || t == 13 then UNPREDICTABLE;
+- id: VMOV_core_and_single
+  mnemonic: VMOV
+  encodings:
+  - name: T1
+    length_bits: 32
+    pattern: 11101110000xxxxxxxxx1010xxx1xxxx
+    bit_fields:
+    - skip: 11
+    - field: op
+      width: 1
+    - field: Vn
+      width: 4
+    - field: Rt
+      width: 4
+    - skip: 4
+    - field: N
+      width: 1
+    - skip: 1
+    - skip: 1
+    - skip: 1
+    - skip: 1
+    - skip: 1
+    - skip: 1
+    - skip: 1
+    decode: |
+      to_arm_register = (op == '1'); t = UInt(Rt); n = UInt(Vn:N);
+      if t == 15 || t == 13 then UNPREDICTABLE;
+- id: VMOV_two_core_and_two_single
+  mnemonic: VMOV
+  encodings:
+  - name: T1
+    length_bits: 32
+    pattern: 11101100010xxxxxxxxx101000x1xxxx
+    bit_fields:
+    - skip: 11
+    - field: op
+      width: 1
+    - field: Rt2
+      width: 4
+    - field: Rt
+      width: 4
+    - skip: 4
+    - skip: 2
+    - field: M
+      width: 1
+    - skip: 1
+    - field: Vm
+      width: 4
+    decode: |
+      to_arm_registers = (op == '1'); t = UInt(Rt); t2 = UInt(Rt2); m = UInt(Vm:M);
+      if t == 15 || t2 == 15 || m == 31 then UNPREDICTABLE;
+      if t == 13 || t2 == 13 then UNPREDICTABLE;
+      if to_arm_registers && t == t2 then UNPREDICTABLE;
+- id: VMOV_two_core_and_doubleword
+  mnemonic: VMOV
+  encodings:
+  - name: T1
+    length_bits: 32
+    pattern: 11101100010xxxxxxxxx101100x1xxxx
+    bit_fields:
+    - skip: 11
+    - field: op
+      width: 1
+    - field: Rt2
+      width: 4
+    - field: Rt
+      width: 4
+    - skip: 4
+    - skip: 2
+    - field: M
+      width: 1
+    - skip: 1
+    - field: Vm
+      width: 4
+    decode: |
+      to_arm_registers = (op == '1'); t = UInt(Rt); t2 = UInt(Rt2); m = UInt(M:Vm);
+      if t == 15 || t2 == 15 then UNPREDICTABLE;
+      if t == 13 || t2 == 13 then UNPREDICTABLE;
+      if to_arm_registers && t == t2 then UNPREDICTABLE;
+- id: VMRS
+  mnemonic: VMRS
+  encodings:
+  - name: T1
+    length_bits: 32
+    pattern: 111011101111xxxxxxxx1010xxx1xxxx
+    bit_fields:
+    - skip: 12
+    - skip: 1
+    - skip: 1
+    - skip: 1
+    - skip: 1
+    - field: Rt
+      width: 4
+    - skip: 4
+    - skip: 1
+    - skip: 1
+    - skip: 1
+    - skip: 1
+    - skip: 1
+    - skip: 1
+    - skip: 1
+    - skip: 1
+    decode: |
+      t = UInt(Rt);
+      if t == 13 then UNPREDICTABLE;
+- id: VMSR
+  mnemonic: VMSR
+  encodings:
+  - name: T1
+    length_bits: 32
+    pattern: 111011101110xxxxxxxx1010xxx1xxxx
+    bit_fields:
+    - skip: 12
+    - skip: 1
+    - skip: 1
+    - skip: 1
+    - skip: 1
+    - field: Rt
+      width: 4
+    - skip: 4
+    - skip: 1
+    - skip: 1
+    - skip: 1
+    - skip: 1
+    - skip: 1
+    - skip: 1
+    - skip: 1
+    - skip: 1
+    decode: |
+      t = UInt(Rt);
+      if t == 15 || t == 13 then UNPREDICTABLE;
+- id: VMUL
+  mnemonic: VMUL
+  encodings:
+  - name: T1
+    length_bits: 32
+    pattern: 111011100x10xxxxxxxx101xx0x0xxxx
+    bit_fields:
+    - skip: 9
+    - field: D
+      width: 1
+    - skip: 2
+    - field: Vn
+      width: 4
+    - field: Vd
+      width: 4
+    - skip: 3
+    - field: sz
+      width: 1
+    - field: N
+      width: 1
+    - skip: 1
+    - field: M
+      width: 1
+    - skip: 1
+    - field: Vm
+      width: 4
+    decode: |
+      dp_operation = (sz == '1');
+      d = if dp_operation then UInt(D:Vd) else UInt(Vd:D);
+      n = if dp_operation then UInt(N:Vn) else UInt(Vn:N);
+      m = if dp_operation then UInt(M:Vm) else UInt(Vm:M);
+- id: VNEG
+  mnemonic: VNEG
+  encodings:
+  - name: T1
+    length_bits: 32
+    pattern: 111011101x110001xxxx101x01x0xxxx
+    bit_fields:
+    - skip: 9
+    - field: D
+      width: 1
+    - skip: 6
+    - field: Vd
+      width: 4
+    - skip: 3
+    - field: sz
+      width: 1
+    - skip: 2
+    - field: M
+      width: 1
+    - skip: 1
+    - field: Vm
+      width: 4
+    decode: |
+      dp_operation = (sz == '1');
+      d = if dp_operation then UInt(D:Vd) else UInt(Vd:D);
+      m = if dp_operation then UInt(M:Vm) else UInt(Vm:M);
+- id: VNMLA_VNMLS_VNMUL
+  mnemonic: VNMLA
+  encodings:
+  - name: T1
+    length_bits: 32
+    pattern: 111011100x01xxxxxxxx101xxxx0xxxx
+    bit_fields:
+    - skip: 9
+    - field: D
+      width: 1
+    - skip: 2
+    - field: Vn
+      width: 4
+    - field: Vd
+      width: 4
+    - skip: 3
+    - field: sz
+      width: 1
+    - field: N
+      width: 1
+    - field: op
+      width: 1
+    - field: M
+      width: 1
+    - skip: 1
+    - field: Vm
+      width: 4
+    decode: |
+      type = if op == '1' then VFPNegMul_VNMLA else VFPNegMul_VNMLS;
+      dp_operation = (sz == '1');
+      d = if dp_operation then UInt(D:Vd) else UInt(Vd:D);
+      n = if dp_operation then UInt(N:Vn) else UInt(Vn:N);
+      m = if dp_operation then UInt(M:Vm) else UInt(Vm:M);
+  - name: T2
+    length_bits: 32
+    pattern: 111011100x10xxxxxxxx101xx1x0xxxx
+    bit_fields:
+    - skip: 9
+    - field: D
+      width: 1
+    - skip: 2
+    - field: Vn
+      width: 4
+    - field: Vd
+      width: 4
+    - skip: 3
+    - field: sz
+      width: 1
+    - field: N
+      width: 1
+    - skip: 1
+    - field: M
+      width: 1
+    - skip: 1
+    - field: Vm
+      width: 4
+    decode: |
+      type = VFPNegMul_VNMUL;
+      dp_operation = (sz == '1');
+      d = if dp_operation then UInt(D:Vd) else UInt(Vd:D);
+      n = if dp_operation then UInt(N:Vn) else UInt(Vn:N);
+      m = if dp_operation then UInt(M:Vm) else UInt(Vm:M);
+- id: VPOP
+  mnemonic: VPOP
+  encodings:
+  - name: T1
+    length_bits: 32
+    pattern: 111011001x111101xxxx1011xxxxxxxx
+    bit_fields:
+    - skip: 9
+    - field: D
+      width: 1
+    - skip: 6
+    - field: Vd
+      width: 4
+    - skip: 4
+    - field: imm8
+      width: 8
+    decode: |
+      single_regs = FALSE; d = UInt(D:Vd); imm32 = ZeroExtend(imm8:'00', 32);
+      regs = UInt(imm8) DIV 2;
+      if regs == 0 || regs > 16 || (d+regs) > 32 then UNPREDICTABLE;
+      if VFPSmallRegisterBank() && (d+regs) > 16 then UNPREDICTABLE;
+  - name: T2
+    length_bits: 32
+    pattern: 111011001x111101xxxx1010xxxxxxxx
+    bit_fields:
+    - skip: 9
+    - field: D
+      width: 1
+    - skip: 6
+    - field: Vd
+      width: 4
+    - skip: 4
+    - field: imm8
+      width: 8
+    decode: |
+      single_regs = TRUE; d = UInt(Vd:D); imm32 = ZeroExtend(imm8:'00', 32);
+      regs = UInt(imm8);
+      if regs == 0 || (d+regs) > 32 then UNPREDICTABLE;
+- id: VPUSH
+  mnemonic: VPUSH
+  encodings:
+  - name: T1
+    length_bits: 32
+    pattern: 111011010x101101xxxx1011xxxxxxxx
+    bit_fields:
+    - skip: 9
+    - field: D
+      width: 1
+    - skip: 6
+    - field: Vd
+      width: 4
+    - skip: 4
+    - field: imm8
+      width: 8
+    decode: |
+      single_regs = FALSE; d = UInt(D:Vd); imm32 = ZeroExtend(imm8:'00', 32);
+      regs = UInt(imm8) DIV 2;
+      if regs == 0 || regs > 16 || (d+regs) > 32 then UNPREDICTABLE;
+      if VFPSmallRegisterBank() && (d+regs) > 16 then UNPREDICTABLE;
+  - name: T2
+    length_bits: 32
+    pattern: 111011010x101101xxxx1010xxxxxxxx
+    bit_fields:
+    - skip: 9
+    - field: D
+      width: 1
+    - skip: 6
+    - field: Vd
+      width: 4
+    - skip: 4
+    - field: imm8
+      width: 8
+    decode: |
+      single_regs = TRUE; d = UInt(Vd:D);
+      imm32 = ZeroExtend(imm8:'00', 32); regs = UInt(imm8);
+      if regs == 0 || (d+regs) > 32 then UNPREDICTABLE;
+- id: VRINTA_VRINTN_VRINTP_VRINTM
+  mnemonic: VRINTA
+  encodings:
+  - name: T1
+    length_bits: 32
+    pattern: 111111101x1110xxxxxx101x01x0xxxx
+    bit_fields:
+    - skip: 9
+    - field: D
+      width: 1
+    - skip: 4
+    - field: RM
+      width: 2
+    - field: Vd
+      width: 4
+    - skip: 3
+    - field: sz
+      width: 1
+    - skip: 2
+    - field: M
+      width: 1
+    - skip: 1
+    - field: Vm
+      width: 4
+    decode: |
+      if InITBlock() then UNPREDICTABLE;
+      dp_operation = (sz == '1');
+      case RM
+          when '00' // Round to nearest, with ties away
+              rmode = '01'; away = TRUE;
+          when '01' // Round to nearest, with ties to even
+              rmode = '00'; away = FALSE;
+          when '10' // Round towards Plus Infinity
+              rmode = '01'; away = FALSE;
+          when '11' // Round towards Minus Infinity
+              rmode = '10'; away = FALSE;
+      d = if dp_operation then UInt(D:Vd) else UInt(Vd:D);
+      m = if dp_operation then UInt(M:Vm) else UInt(Vm:M);
+- id: VRINTX
+  mnemonic: VRINTX
+  encodings:
+  - name: T1
+    length_bits: 32
+    pattern: 111011101x110111xxxx101x01x0xxxx
+    bit_fields:
+    - skip: 9
+    - field: D
+      width: 1
+    - skip: 6
+    - field: Vd
+      width: 4
+    - skip: 3
+    - field: sz
+      width: 1
+    - skip: 2
+    - field: M
+      width: 1
+    - skip: 1
+    - field: Vm
+      width: 4
+    decode: |
+      dp_operation = (sz == '1');
+      d = if dp_operation then UInt(D:Vd) else UInt(Vd:D);
+      m = if dp_operation then UInt(M:Vm) else UInt(Vm:M);
+- id: VRINTZ_VRINTR
+  mnemonic: VRINTZ
+  encodings:
+  - name: T1
+    length_bits: 32
+    pattern: 111011101x110110xxxx101xx1x0xxxx
+    bit_fields:
+    - skip: 9
+    - field: D
+      width: 1
+    - skip: 6
+    - field: Vd
+      width: 4
+    - skip: 3
+    - field: sz
+      width: 1
+    - field: op
+      width: 1
+    - skip: 1
+    - field: M
+      width: 1
+    - skip: 1
+    - field: Vm
+      width: 4
+    decode: |
+      dp_operation = (sz == '1');
+      rmode = if op == '1' then '11' else FPSCR<23:22>;
+      d = if dp_operation then UInt(D:Vd) else UInt(Vd:D);
+      m = if dp_operation then UInt(M:Vm) else UInt(Vm:M);
+- id: VSEL
+  mnemonic: VSEL
+  encodings:
+  - name: T1
+    length_bits: 32
+    pattern: 111111100xxxxxxxxxxx101xx0x0xxxx
+    bit_fields:
+    - skip: 9
+    - field: D
+      width: 1
+    - field: cc
+      width: 2
+    - field: Vn
+      width: 4
+    - field: Vd
+      width: 4
+    - skip: 3
+    - field: sz
+      width: 1
+    - field: N
+      width: 1
+    - skip: 1
+    - field: M
+      width: 1
+    - skip: 1
+    - field: Vm
+      width: 4
+    decode: |
+      if InITBlock() then UNPREDICTABLE;
+      dp_operation = (sz == '1'); cond = cc:(cc<1> XOR cc<0>):'0';
+      d = if dp_operation then UInt(D:Vd) else UInt(Vd:D);
+      n = if dp_operation then UInt(N:Vn) else UInt(Vn:N);
+      m = if dp_operation then UInt(M:Vm) else UInt(Vm:M);
+- id: VSQRT
+  mnemonic: VSQRT
+  encodings:
+  - name: T1
+    length_bits: 32
+    pattern: 111011101x110001xxxx101x11x0xxxx
+    bit_fields:
+    - skip: 9
+    - field: D
+      width: 1
+    - skip: 6
+    - field: Vd
+      width: 4
+    - skip: 3
+    - field: sz
+      width: 1
+    - skip: 2
+    - field: M
+      width: 1
+    - skip: 1
+    - field: Vm
+      width: 4
+    decode: |
+      dp_operation = (sz == '1');
+      d = if dp_operation then UInt(D:Vd) else UInt(Vd:D);
+      m = if dp_operation then UInt(M:Vm) else UInt(Vm:M);
+- id: VSTM
+  mnemonic: VSTM
+  encodings:
+  - name: T1
+    length_bits: 32
+    pattern: 1110110xxxx0xxxxxxxx1011xxxxxxxx
+    bit_fields:
+    - skip: 7
+    - field: P
+      width: 1
+    - field: U
+      width: 1
+    - field: D
+      width: 1
+    - field: W
+      width: 1
+    - skip: 1
+    - field: Rn
+      width: 4
+    - field: Vd
+      width: 4
+    - skip: 4
+    - field: imm8
+      width: 8
+    decode: |
+      if P == '0' && U == '0' && W == '0' then SEE "Related encodings";
+      if P == '1' && U == '0' && W == '1' && Rn == '1101' then SEE VPUSH;
+      if P == '1' && W == '0' then SEE VSTR;
+      if imm8<0> == '1' then SEE "FSTMX";
+      if P == U && W == '1' then UNDEFINED;
+      // Remaining combinations are PUW = 010 (IA without !), 011 (IA with !), 101 (DB with !)
+      single_regs = FALSE; add = (U == '1'); wback = (W == '1');
+      d = UInt(D:Vd); n = UInt(Rn); imm32 = ZeroExtend(imm8:'00', 32);
+      regs = UInt(imm8) DIV 2;
+      if n == 15 then UNPREDICTABLE;
+      if regs == 0 || regs > 16 || (d+regs) > 32 then UNPREDICTABLE;
+      if VFPSmallRegisterBank() && (d+regs) > 16 then UNPREDICTABLE;
+  - name: T2
+    length_bits: 32
+    pattern: 1110110xxxx0xxxxxxxx1010xxxxxxxx
+    bit_fields:
+    - skip: 7
+    - field: P
+      width: 1
+    - field: U
+      width: 1
+    - field: D
+      width: 1
+    - field: W
+      width: 1
+    - skip: 1
+    - field: Rn
+      width: 4
+    - field: Vd
+      width: 4
+    - skip: 4
+    - field: imm8
+      width: 8
+    decode: |
+      if P == '0' && U == '0' && W == '0' then SEE "Related encodings";
+      if P == '1' && U == '0' && W == '1' && Rn == '1101' then SEE VPUSH;
+      if P == '1' && W == '0' then SEE VSTR;
+      if P == U && W == '1' then UNDEFINED;
+      // Remaining combinations are PUW = 010 (IA without !), 011 (IA with !), 101 (DB with !)
+      single_regs = TRUE; add = (U == '1'); wback = (W == '1'); d = UInt(Vd:D); n = UInt(Rn);
+      imm32 = ZeroExtend(imm8:'00', 32); regs = UInt(imm8);
+      if n == 15 then UNPREDICTABLE;
+      if regs == 0 || (d+regs) > 32 then UNPREDICTABLE;
+- id: VSTR
+  mnemonic: VSTR
+  encodings:
+  - name: T1
+    length_bits: 32
+    pattern: 11101101xx00xxxxxxxx1011xxxxxxxx
+    bit_fields:
+    - skip: 8
+    - field: U
+      width: 1
+    - field: D
+      width: 1
+    - skip: 2
+    - field: Rn
+      width: 4
+    - field: Vd
+      width: 4
+    - skip: 4
+    - field: imm8
+      width: 8
+    decode: |
+      single_reg = FALSE; add = (U == '1'); imm32 = ZeroExtend(imm8:'00', 32);
+      d = UInt(D:Vd); n = UInt(Rn);
+      if n == 15 then UNPREDICTABLE;
+  - name: T2
+    length_bits: 32
+    pattern: 11101101xx00xxxxxxxx1010xxxxxxxx
+    bit_fields:
+    - skip: 8
+    - field: U
+      width: 1
+    - field: D
+      width: 1
+    - skip: 2
+    - field: Rn
+      width: 4
+    - field: Vd
+      width: 4
+    - skip: 4
+    - field: imm8
+      width: 8
+    decode: |
+      single_reg = TRUE; add = (U == '1'); imm32 = ZeroExtend(imm8:'00', 32);
+      d = UInt(Vd:D); n = UInt(Rn);
+      if n == 15 then UNPREDICTABLE;
+- id: VSUB
+  mnemonic: VSUB
+  encodings:
+  - name: T1
+    length_bits: 32
+    pattern: 111011100x11xxxxxxxx101xx1x0xxxx
+    bit_fields:
+    - skip: 9
+    - field: D
+      width: 1
+    - skip: 2
+    - field: Vn
+      width: 4
+    - field: Vd
+      width: 4
+    - skip: 3
+    - field: sz
+      width: 1
+    - field: N
+      width: 1
+    - skip: 1
+    - field: M
+      width: 1
+    - skip: 1
+    - field: Vm
+      width: 4
+    decode: |
+      dp_operation = (sz == '1');
+      d = if dp_operation then UInt(D:Vd) else UInt(Vd:D);
+      n = if dp_operation then UInt(N:Vn) else UInt(Vn:N);
+      m = if dp_operation then UInt(M:Vm) else UInt(Vm:M);
