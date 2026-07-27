@@ -88,7 +88,7 @@ def decode_cmd(
                 hex_bytes = f"{hw1:04x}"
             else:
                 hex_bytes = f"{hw1:04x} {hw2:04x}"
-            out.write(f"{offset:8x}:  {hex_bytes}\t{result}\n")
+            out.write(f"{offset:8x}:  {hex_bytes:<9}  {result}\n")
 
         offset += n_bytes
         total += 1
@@ -99,3 +99,4 @@ def decode_cmd(
 
 if __name__ == "__main__":
     main()
+
