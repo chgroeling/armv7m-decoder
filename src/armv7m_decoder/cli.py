@@ -77,12 +77,18 @@ def decode_cmd(
         if len(buf) < eval_bytes:
             buf = buf + b"\x00" * (eval_bytes - len(buf))
 
-        instr = struct.unpack("<I", buf[:4])[0]
+        hw1 = struct.unpack("<H", buf[0:2])[0]
+        hw2 = struct.unpack("<H", buf[2:4])[0]
+        instr = (hw1 << 16) | hw2
 
         result, n_bytes = decode(instr, ctx)
 
         if result is not None:
-            out.write(f"{offset:#010x}:  {result}\n")
+            if n_bytes == 2:
+                hex_bytes = f"{hw1:04x}"
+            else:
+                hex_bytes = f"{hw1:04x} {hw2:04x}"
+            out.write(f"{offset:8x}:  {hex_bytes}\t{result}\n")
 
         offset += n_bytes
         total += 1
