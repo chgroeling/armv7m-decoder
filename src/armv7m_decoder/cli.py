@@ -12,7 +12,13 @@ from typing import Optional
 
 import click
 
-from armv7m_decoder import Context, decode, get_decoder_eval_bytes, get_min_instr_bytes
+from armv7m_decoder import (
+    Context,
+    decode,
+    disassemble,
+    get_decoder_eval_bytes,
+    get_min_instr_bytes,
+)
 
 
 def parse_address(_ctx, _param, value: str) -> int:
@@ -88,7 +94,8 @@ def decode_cmd(
                 hex_bytes = f"{hw1:04x}"
             else:
                 hex_bytes = f"{hw1:04x} {hw2:04x}"
-            out.write(f"{offset:8x}:  {hex_bytes:<9}  {result}\n")
+            asm = disassemble(result, instr, offset)
+            out.write(f"{offset:8x}:  {hex_bytes:<9}  {asm}\n")
 
         offset += n_bytes
         total += 1
@@ -99,4 +106,3 @@ def decode_cmd(
 
 if __name__ == "__main__":
     main()
-

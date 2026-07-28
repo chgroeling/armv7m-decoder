@@ -1,7 +1,8 @@
 """Public API for the ARMv7-M instruction decoder.
 
 Provides the :func:`decode` entry point, the :class:`Context` for threading runtime
-state, the pseudo-instruction classes (:class:`NoMatch`, :class:`Undefined`,
+state, the :func:`disassemble` function for assembler formatting, the
+pseudo-instruction classes (:class:`NoMatch`, :class:`Undefined`,
 :class:`Unpredictable`, :class:`See`), and all instruction dataclasses.
 """
 
@@ -15,6 +16,7 @@ from armv7m_decoder._decoder import (  # noqa: F401
     get_decoder_eval_bytes,
     get_min_instr_bytes,
 )
+from armv7m_decoder._disasm import disassemble  # noqa: F401
 
 __all__ = [
     "Context",
@@ -23,6 +25,7 @@ __all__ = [
     "Undefined",
     "Unpredictable",
     "decode",
+    "disassemble",
     "get_decoder_eval_bytes",
     "get_min_instr_bytes",
 ]
