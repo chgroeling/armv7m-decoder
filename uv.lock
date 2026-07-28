@@ -27,7 +27,7 @@ dev = [
 
 [package.metadata.requires-dev]
 dev = [
-    { name = "decoder-forge", git = "https://github.com/chgroeling/decoder-forge?tag=v1.1.1" },
+    { name = "decoder-forge", git = "https://github.com/chgroeling/decoder-forge?tag=v1.2.0" },
     { name = "pytest", specifier = ">=8" },
     { name = "ruff", specifier = ">=0.9" },
 ]
@@ -55,8 +55,8 @@ wheels = [
 
 [[package]]
 name = "decoder-forge"
-version = "1.1.1"
-source = { git = "https://github.com/chgroeling/decoder-forge?tag=v1.1.1#f8b6714010e1c4ccb0902f93b5fc35f84472dcd7" }
+version = "1.2.0"
+source = { git = "https://github.com/chgroeling/decoder-forge?tag=v1.2.0#88dc2b8596c51e2ea6e91eb5ab689865dd3ac8b9" }
 dependencies = [
     { name = "arm-transpiller" },
     { name = "click" },

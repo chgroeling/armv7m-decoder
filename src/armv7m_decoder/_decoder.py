@@ -4,6 +4,7 @@
 # The runtime those blocks call into is arm-transpiller's own ``armruntime``, embedded
 # verbatim below, followed by the few decoder-forge additions layered on top of it.
 from dataclasses import dataclass
+from enum import IntEnum
 from typing import ClassVar
 
 
@@ -246,11 +247,278 @@ def VFPSmallRegisterBank() -> bool:
 
 
 # --- decoder-forge additions -----------------------------------------------------
+class Opcode(IntEnum):
+    OP_NO_MATCH = -1
+    OP_UNDEFINED = -2
+    OP_UNPREDICTABLE = -3
+    OP_SEE = -4
+    OP_ADC_IMMEDIATE = 0
+    OP_ADC_REGISTER = 1
+    OP_ADD_IMMEDIATE = 2
+    OP_ADD_REGISTER = 3
+    OP_ADD_SP_PLUS_IMMEDIATE = 4
+    OP_ADD_SP_PLUS_REGISTER = 5
+    OP_ADR = 6
+    OP_SUB_IMMEDIATE = 7
+    OP_SUB_REGISTER = 8
+    OP_SUB_SP_MINUS_IMMEDIATE = 9
+    OP_SUB_SP_MINUS_REGISTER = 10
+    OP_MOV_IMMEDIATE = 11
+    OP_MOV_REGISTER = 12
+    OP_NOP = 13
+    OP_LDR_IMMEDIATE = 14
+    OP_LDR_LITERAL = 15
+    OP_LDR_REGISTER = 16
+    OP_LSL_IMMEDIATE = 17
+    OP_LSL_REGISTER = 18
+    OP_LSR_IMMEDIATE = 19
+    OP_LSR_REGISTER = 20
+    OP_AND_IMMEDIATE = 21
+    OP_AND_REGISTER = 22
+    OP_ORR_IMMEDIATE = 23
+    OP_ORR_REGISTER = 24
+    OP_LDRB_IMMEDIATE = 25
+    OP_LDRB_LITERAL = 26
+    OP_LDRB_REGISTER = 27
+    OP_B = 28
+    OP_BKPT = 29
+    OP_BL = 30
+    OP_LDRH_IMMEDIATE = 31
+    OP_LDRH_LITERAL = 32
+    OP_LDRH_REGISTER = 33
+    OP_POP = 34
+    OP_PUSH = 35
+    OP_STR_IMMEDIATE = 36
+    OP_STR_REGISTER = 37
+    OP_STRD_IMMEDIATE = 38
+    OP_STREX = 39
+    OP_ASR_IMMEDIATE = 40
+    OP_ASR_REGISTER = 41
+    OP_EOR_IMMEDIATE = 42
+    OP_EOR_REGISTER = 43
+    OP_MVN_IMMEDIATE = 44
+    OP_MVN_REGISTER = 45
+    OP_TST_IMMEDIATE = 46
+    OP_TST_REGISTER = 47
+    OP_LDRSB_IMMEDIATE = 48
+    OP_LDRSB_LITERAL = 49
+    OP_LDRSB_REGISTER = 50
+    OP_LDRSH_IMMEDIATE = 51
+    OP_LDRSH_LITERAL = 52
+    OP_LDRSH_REGISTER = 53
+    OP_LDM = 54
+    OP_STM = 55
+    OP_BLX_REGISTER = 56
+    OP_BX = 57
+    OP_IT = 58
+    OP_SVC = 59
+    OP_BFI = 60
+    OP_CBNZ_CBZ = 61
+    OP_CLZ = 62
+    OP_CMN_IMMEDIATE = 63
+    OP_CMN_REGISTER = 64
+    OP_CMP_IMMEDIATE = 65
+    OP_CMP_REGISTER = 66
+    OP_DMB = 67
+    OP_BIC_IMMEDIATE = 68
+    OP_BIC_REGISTER = 69
+    OP_TEQ_IMMEDIATE = 70
+    OP_TEQ_REGISTER = 71
+    OP_RSB_IMMEDIATE = 72
+    OP_RSB_REGISTER = 73
+    OP_SBC_IMMEDIATE = 74
+    OP_SBC_REGISTER = 75
+    OP_MUL = 76
+    OP_MLA = 77
+    OP_MLS = 78
+    OP_SMULL = 79
+    OP_UMULL = 80
+    OP_UMLAL = 81
+    OP_SDIV = 82
+    OP_UDIV = 83
+    OP_SXTAB = 84
+    OP_SXTAB16 = 85
+    OP_SXTAH = 86
+    OP_SXTB = 87
+    OP_SXTB16 = 88
+    OP_SXTH = 89
+    OP_UXTB = 90
+    OP_UXTH = 91
+    OP_UBFX = 92
+    OP_RRX = 93
+    OP_STRB_IMMEDIATE = 94
+    OP_STRB_REGISTER = 95
+    OP_STRH_IMMEDIATE = 96
+    OP_STRH_REGISTER = 97
+    OP_LDREX = 98
+    OP_STMDB = 99
+    OP_MRS = 100
+    OP_MSR = 101
+    OP_TBB_TBH = 102
+    OP_BFC = 103
+    OP_CDP_CDP2 = 104
+    OP_ISB = 105
+    OP_LDMDB = 106
+    OP_LDRD_IMMEDIATE = 107
+    OP_LDRD_LITERAL = 108
+    OP_STC_STC2 = 109
+    OP_LDC_LDC2_IMMEDIATE = 110
+    OP_LDC_LDC2_LITERAL = 111
+    OP_CLREX = 112
+    OP_CPS = 113
+    OP_CSDB = 114
+    OP_DBG = 115
+    OP_DSB = 116
+    OP_LDRT = 117
+    OP_MCR_MCR2 = 118
+    OP_MCRR_MCRR2 = 119
+    OP_MOVT = 120
+    OP_MRC_MRC2 = 121
+    OP_ORN_IMMEDIATE = 122
+    OP_ORN_REGISTER = 123
+    OP_PLD_IMMEDIATE = 124
+    OP_PLD_LITERAL = 125
+    OP_PLD_REGISTER = 126
+    OP_PLI_IMMEDIATE_LITERAL = 127
+    OP_PLI_REGISTER = 128
+    OP_REV = 129
+    OP_REV16 = 130
+    OP_REVSH = 131
+    OP_ROR_IMMEDIATE = 132
+    OP_ROR_REGISTER = 133
+    OP_WFE = 134
+    OP_WFI = 135
+    OP_UXTAB = 136
+    OP_UXTAB16 = 137
+    OP_UADD16 = 138
+    OP_UADD8 = 139
+    OP_PKHBT_PKHTB = 140
+    OP_PSSBB = 141
+    OP_QADD = 142
+    OP_QADD16 = 143
+    OP_QADD8 = 144
+    OP_QASX = 145
+    OP_QDADD = 146
+    OP_QDSUB = 147
+    OP_QSAX = 148
+    OP_QSUB = 149
+    OP_QSUB16 = 150
+    OP_QSUB8 = 151
+    OP_RBIT = 152
+    OP_SADD16 = 153
+    OP_SADD8 = 154
+    OP_SMLABB_SMLABT_SMLATB_SMLATT = 155
+    OP_SMLAD_SMLADX = 156
+    OP_SMLAL = 157
+    OP_SMLALBB_SMLALBT_SMLALTB_SMLALTT = 158
+    OP_SMLALD_SMLALDX = 159
+    OP_SMLAWB_SMLAWT = 160
+    OP_SMLSD_SMLSDX = 161
+    OP_SMLSLD_SMLSLDX = 162
+    OP_SMMLA_SMMLAR = 163
+    OP_SMMLS_SMMLSR = 164
+    OP_SMMUL_SMMULR = 165
+    OP_SMUAD_SMUADX = 166
+    OP_SMULBB_SMULBT_SMULTB_SMULTT = 167
+    OP_SMULWB_SMULWT = 168
+    OP_SMUSD_SMUSDX = 169
+    OP_SSAT = 170
+    OP_SSAT16 = 171
+    OP_SSAX = 172
+    OP_SSBB = 173
+    OP_SSUB16 = 174
+    OP_SSUB8 = 175
+    OP_UDF = 176
+    OP_UHADD16 = 177
+    OP_UHADD8 = 178
+    OP_UHASX = 179
+    OP_UHSAX = 180
+    OP_UHSUB16 = 181
+    OP_UHSUB8 = 182
+    OP_UMAAL = 183
+    OP_UQSAX = 184
+    OP_UQSUB16 = 185
+    OP_UQSUB8 = 186
+    OP_USAT = 187
+    OP_USAT16 = 188
+    OP_YIELD = 189
+    OP_LDRBT = 190
+    OP_LDREXB = 191
+    OP_LDREXH = 192
+    OP_LDRHT = 193
+    OP_LDRSBT = 194
+    OP_LDRSHT = 195
+    OP_MRRC_MRRC2 = 196
+    OP_SASX = 197
+    OP_SBFX = 198
+    OP_SEL = 199
+    OP_SEV = 200
+    OP_SHADD16 = 201
+    OP_SHADD8 = 202
+    OP_SHASX = 203
+    OP_SHSAX = 204
+    OP_SHSUB16 = 205
+    OP_SHSUB8 = 206
+    OP_STRBT = 207
+    OP_STREXB = 208
+    OP_STREXH = 209
+    OP_STRHT = 210
+    OP_STRT = 211
+    OP_UASX = 212
+    OP_UQADD16 = 213
+    OP_UQADD8 = 214
+    OP_UQASX = 215
+    OP_USAD8 = 216
+    OP_USADA8 = 217
+    OP_USAX = 218
+    OP_USUB16 = 219
+    OP_USUB8 = 220
+    OP_UXTAH = 221
+    OP_UXTB16 = 222
+    OP_VABS = 223
+    OP_VADD = 224
+    OP_VCMP_VCMPE = 225
+    OP_VCVTA_VCVTN_VCVTP_VCVTM = 226
+    OP_VCVT_VCVTR_INTEGER = 227
+    OP_VCVT_FIXED_POINT = 228
+    OP_VCVT_DOUBLE_SINGLE = 229
+    OP_VCVTB_VCVTT = 230
+    OP_VDIV = 231
+    OP_VFMA_VFMS = 232
+    OP_VFNMA_VFNMS = 233
+    OP_VLDM = 234
+    OP_VLDR = 235
+    OP_VMAXNM_VMINNM = 236
+    OP_VMLA_VMLS = 237
+    OP_VMOV_IMMEDIATE = 238
+    OP_VMOV_REGISTER = 239
+    OP_VMOV_CORE_TO_SCALAR = 240
+    OP_VMOV_SCALAR_TO_CORE = 241
+    OP_VMOV_CORE_AND_SINGLE = 242
+    OP_VMOV_TWO_CORE_AND_TWO_SINGLE = 243
+    OP_VMOV_TWO_CORE_AND_DOUBLEWORD = 244
+    OP_VMRS = 245
+    OP_VMSR = 246
+    OP_VMUL = 247
+    OP_VNEG = 248
+    OP_VNMLA_VNMLS_VNMUL = 249
+    OP_VPOP = 250
+    OP_VPUSH = 251
+    OP_VRINTA_VRINTN_VRINTP_VRINTM = 252
+    OP_VRINTX = 253
+    OP_VRINTZ_VRINTR = 254
+    OP_VSEL = 255
+    OP_VSQRT = 256
+    OP_VSTM = 257
+    OP_VSTR = 258
+    OP_VSUB = 259
+
+
 @dataclass(frozen=True, eq=True)
 class NoMatch:
     """Returned when no encoding matches the instruction word."""
 
-    _id: ClassVar[int] = -1
+    opcode: ClassVar[int] = Opcode.OP_NO_MATCH
     code: int = 0
 
 
@@ -258,7 +526,7 @@ class NoMatch:
 class Undefined:
     """Pseudo-instruction returned when a decode flags the UNDEFINED side effect."""
 
-    _id: ClassVar[int] = -2
+    opcode: ClassVar[int] = Opcode.OP_UNDEFINED
     code: int = 0
 
 
@@ -266,7 +534,7 @@ class Undefined:
 class Unpredictable:
     """Pseudo-instruction returned when a decode flags the UNPREDICTABLE side effect."""
 
-    _id: ClassVar[int] = -3
+    opcode: ClassVar[int] = Opcode.OP_UNPREDICTABLE
     code: int = 0
 
 
@@ -279,7 +547,7 @@ class See:
     transpiled block), so this carries just the raw instruction word.
     """
 
-    _id: ClassVar[int] = -4
+    opcode: ClassVar[int] = Opcode.OP_SEE
     code: int = 0
 
 
@@ -311,7 +579,7 @@ def _bits(instr, lsb, width):
 
 @dataclass(frozen=True, eq=True)
 class ADC_immediate:
-    _id: ClassVar[int] = 0
+    opcode: ClassVar[int] = Opcode.OP_ADC_IMMEDIATE
     d: int  # uint32
     n: int  # uint32
     setflags: bool
@@ -320,7 +588,7 @@ class ADC_immediate:
 
 @dataclass(frozen=True, eq=True)
 class ADC_register:
-    _id: ClassVar[int] = 1
+    opcode: ClassVar[int] = Opcode.OP_ADC_REGISTER
     d: int  # uint32
     n: int  # uint32
     m: int  # uint32
@@ -331,7 +599,7 @@ class ADC_register:
 
 @dataclass(frozen=True, eq=True)
 class ADD_immediate:
-    _id: ClassVar[int] = 2
+    opcode: ClassVar[int] = Opcode.OP_ADD_IMMEDIATE
     d: int  # uint32
     n: int  # uint32
     setflags: bool
@@ -340,7 +608,7 @@ class ADD_immediate:
 
 @dataclass(frozen=True, eq=True)
 class ADD_register:
-    _id: ClassVar[int] = 3
+    opcode: ClassVar[int] = Opcode.OP_ADD_REGISTER
     d: int  # uint32
     n: int  # uint32
     m: int  # uint32
@@ -351,7 +619,7 @@ class ADD_register:
 
 @dataclass(frozen=True, eq=True)
 class ADD_SP_plus_immediate:
-    _id: ClassVar[int] = 4
+    opcode: ClassVar[int] = Opcode.OP_ADD_SP_PLUS_IMMEDIATE
     d: int  # uint32
     setflags: bool
     imm32: int  # bits32
@@ -359,7 +627,7 @@ class ADD_SP_plus_immediate:
 
 @dataclass(frozen=True, eq=True)
 class ADD_SP_plus_register:
-    _id: ClassVar[int] = 5
+    opcode: ClassVar[int] = Opcode.OP_ADD_SP_PLUS_REGISTER
     d: int  # uint32
     m: int  # uint32
     setflags: bool
@@ -369,7 +637,7 @@ class ADD_SP_plus_register:
 
 @dataclass(frozen=True, eq=True)
 class ADR:
-    _id: ClassVar[int] = 6
+    opcode: ClassVar[int] = Opcode.OP_ADR
     d: int  # uint32
     imm32: int  # bits32
     add: bool
@@ -377,7 +645,7 @@ class ADR:
 
 @dataclass(frozen=True, eq=True)
 class SUB_immediate:
-    _id: ClassVar[int] = 7
+    opcode: ClassVar[int] = Opcode.OP_SUB_IMMEDIATE
     d: int  # uint32
     n: int  # uint32
     setflags: bool
@@ -386,7 +654,7 @@ class SUB_immediate:
 
 @dataclass(frozen=True, eq=True)
 class SUB_register:
-    _id: ClassVar[int] = 8
+    opcode: ClassVar[int] = Opcode.OP_SUB_REGISTER
     d: int  # uint32
     n: int  # uint32
     m: int  # uint32
@@ -397,7 +665,7 @@ class SUB_register:
 
 @dataclass(frozen=True, eq=True)
 class SUB_SP_minus_immediate:
-    _id: ClassVar[int] = 9
+    opcode: ClassVar[int] = Opcode.OP_SUB_SP_MINUS_IMMEDIATE
     d: int  # uint32
     setflags: bool
     imm32: int  # bits32
@@ -405,7 +673,7 @@ class SUB_SP_minus_immediate:
 
 @dataclass(frozen=True, eq=True)
 class SUB_SP_minus_register:
-    _id: ClassVar[int] = 10
+    opcode: ClassVar[int] = Opcode.OP_SUB_SP_MINUS_REGISTER
     d: int  # uint32
     m: int  # uint32
     setflags: bool
@@ -415,7 +683,7 @@ class SUB_SP_minus_register:
 
 @dataclass(frozen=True, eq=True)
 class MOV_immediate:
-    _id: ClassVar[int] = 11
+    opcode: ClassVar[int] = Opcode.OP_MOV_IMMEDIATE
     d: int  # uint32
     setflags: bool
     imm32: int  # bits32
@@ -424,7 +692,7 @@ class MOV_immediate:
 
 @dataclass(frozen=True, eq=True)
 class MOV_register:
-    _id: ClassVar[int] = 12
+    opcode: ClassVar[int] = Opcode.OP_MOV_REGISTER
     d: int  # uint32
     m: int  # uint32
     setflags: bool
@@ -432,13 +700,13 @@ class MOV_register:
 
 @dataclass(frozen=True, eq=True)
 class NOP:
-    _id: ClassVar[int] = 13
+    opcode: ClassVar[int] = Opcode.OP_NOP
     pass
 
 
 @dataclass(frozen=True, eq=True)
 class LDR_immediate:
-    _id: ClassVar[int] = 14
+    opcode: ClassVar[int] = Opcode.OP_LDR_IMMEDIATE
     t: int  # uint32
     n: int  # uint32
     imm32: int  # bits32
@@ -449,7 +717,7 @@ class LDR_immediate:
 
 @dataclass(frozen=True, eq=True)
 class LDR_literal:
-    _id: ClassVar[int] = 15
+    opcode: ClassVar[int] = Opcode.OP_LDR_LITERAL
     t: int  # uint32
     imm32: int  # bits32
     add: bool
@@ -457,7 +725,7 @@ class LDR_literal:
 
 @dataclass(frozen=True, eq=True)
 class LDR_register:
-    _id: ClassVar[int] = 16
+    opcode: ClassVar[int] = Opcode.OP_LDR_REGISTER
     t: int  # uint32
     n: int  # uint32
     m: int  # uint32
@@ -470,7 +738,7 @@ class LDR_register:
 
 @dataclass(frozen=True, eq=True)
 class LSL_immediate:
-    _id: ClassVar[int] = 17
+    opcode: ClassVar[int] = Opcode.OP_LSL_IMMEDIATE
     d: int  # uint32
     m: int  # uint32
     setflags: bool
@@ -479,7 +747,7 @@ class LSL_immediate:
 
 @dataclass(frozen=True, eq=True)
 class LSL_register:
-    _id: ClassVar[int] = 18
+    opcode: ClassVar[int] = Opcode.OP_LSL_REGISTER
     d: int  # uint32
     n: int  # uint32
     m: int  # uint32
@@ -488,7 +756,7 @@ class LSL_register:
 
 @dataclass(frozen=True, eq=True)
 class LSR_immediate:
-    _id: ClassVar[int] = 19
+    opcode: ClassVar[int] = Opcode.OP_LSR_IMMEDIATE
     d: int  # uint32
     m: int  # uint32
     setflags: bool
@@ -497,7 +765,7 @@ class LSR_immediate:
 
 @dataclass(frozen=True, eq=True)
 class LSR_register:
-    _id: ClassVar[int] = 20
+    opcode: ClassVar[int] = Opcode.OP_LSR_REGISTER
     d: int  # uint32
     n: int  # uint32
     m: int  # uint32
@@ -506,7 +774,7 @@ class LSR_register:
 
 @dataclass(frozen=True, eq=True)
 class AND_immediate:
-    _id: ClassVar[int] = 21
+    opcode: ClassVar[int] = Opcode.OP_AND_IMMEDIATE
     d: int  # uint32
     n: int  # uint32
     setflags: bool
@@ -516,7 +784,7 @@ class AND_immediate:
 
 @dataclass(frozen=True, eq=True)
 class AND_register:
-    _id: ClassVar[int] = 22
+    opcode: ClassVar[int] = Opcode.OP_AND_REGISTER
     d: int  # uint32
     n: int  # uint32
     m: int  # uint32
@@ -527,7 +795,7 @@ class AND_register:
 
 @dataclass(frozen=True, eq=True)
 class ORR_immediate:
-    _id: ClassVar[int] = 23
+    opcode: ClassVar[int] = Opcode.OP_ORR_IMMEDIATE
     d: int  # uint32
     n: int  # uint32
     setflags: bool
@@ -537,7 +805,7 @@ class ORR_immediate:
 
 @dataclass(frozen=True, eq=True)
 class ORR_register:
-    _id: ClassVar[int] = 24
+    opcode: ClassVar[int] = Opcode.OP_ORR_REGISTER
     d: int  # uint32
     n: int  # uint32
     m: int  # uint32
@@ -548,7 +816,7 @@ class ORR_register:
 
 @dataclass(frozen=True, eq=True)
 class LDRB_immediate:
-    _id: ClassVar[int] = 25
+    opcode: ClassVar[int] = Opcode.OP_LDRB_IMMEDIATE
     t: int  # uint32
     n: int  # uint32
     imm32: int  # bits32
@@ -559,7 +827,7 @@ class LDRB_immediate:
 
 @dataclass(frozen=True, eq=True)
 class LDRB_literal:
-    _id: ClassVar[int] = 26
+    opcode: ClassVar[int] = Opcode.OP_LDRB_LITERAL
     t: int  # uint32
     imm32: int  # bits32
     add: bool
@@ -567,7 +835,7 @@ class LDRB_literal:
 
 @dataclass(frozen=True, eq=True)
 class LDRB_register:
-    _id: ClassVar[int] = 27
+    opcode: ClassVar[int] = Opcode.OP_LDRB_REGISTER
     t: int  # uint32
     n: int  # uint32
     m: int  # uint32
@@ -580,26 +848,26 @@ class LDRB_register:
 
 @dataclass(frozen=True, eq=True)
 class B:
-    _id: ClassVar[int] = 28
+    opcode: ClassVar[int] = Opcode.OP_B
     imm32: int  # bits32
     cond: int  # bits4
 
 
 @dataclass(frozen=True, eq=True)
 class BKPT:
-    _id: ClassVar[int] = 29
+    opcode: ClassVar[int] = Opcode.OP_BKPT
     imm32: int  # bits32
 
 
 @dataclass(frozen=True, eq=True)
 class BL:
-    _id: ClassVar[int] = 30
+    opcode: ClassVar[int] = Opcode.OP_BL
     imm32: int  # bits32
 
 
 @dataclass(frozen=True, eq=True)
 class LDRH_immediate:
-    _id: ClassVar[int] = 31
+    opcode: ClassVar[int] = Opcode.OP_LDRH_IMMEDIATE
     t: int  # uint32
     n: int  # uint32
     imm32: int  # bits32
@@ -610,7 +878,7 @@ class LDRH_immediate:
 
 @dataclass(frozen=True, eq=True)
 class LDRH_literal:
-    _id: ClassVar[int] = 32
+    opcode: ClassVar[int] = Opcode.OP_LDRH_LITERAL
     t: int  # uint32
     imm32: int  # bits32
     add: bool
@@ -618,7 +886,7 @@ class LDRH_literal:
 
 @dataclass(frozen=True, eq=True)
 class LDRH_register:
-    _id: ClassVar[int] = 33
+    opcode: ClassVar[int] = Opcode.OP_LDRH_REGISTER
     t: int  # uint32
     n: int  # uint32
     m: int  # uint32
@@ -631,7 +899,7 @@ class LDRH_register:
 
 @dataclass(frozen=True, eq=True)
 class POP:
-    _id: ClassVar[int] = 34
+    opcode: ClassVar[int] = Opcode.OP_POP
     registers: int  # bits16
     UnalignedAllowed: bool
     t: int  # uint32
@@ -639,7 +907,7 @@ class POP:
 
 @dataclass(frozen=True, eq=True)
 class PUSH:
-    _id: ClassVar[int] = 35
+    opcode: ClassVar[int] = Opcode.OP_PUSH
     registers: int  # bits16
     UnalignedAllowed: bool
     t: int  # uint32
@@ -647,7 +915,7 @@ class PUSH:
 
 @dataclass(frozen=True, eq=True)
 class STR_immediate:
-    _id: ClassVar[int] = 36
+    opcode: ClassVar[int] = Opcode.OP_STR_IMMEDIATE
     t: int  # uint32
     n: int  # uint32
     imm32: int  # bits32
@@ -658,7 +926,7 @@ class STR_immediate:
 
 @dataclass(frozen=True, eq=True)
 class STR_register:
-    _id: ClassVar[int] = 37
+    opcode: ClassVar[int] = Opcode.OP_STR_REGISTER
     t: int  # uint32
     n: int  # uint32
     m: int  # uint32
@@ -671,7 +939,7 @@ class STR_register:
 
 @dataclass(frozen=True, eq=True)
 class STRD_immediate:
-    _id: ClassVar[int] = 38
+    opcode: ClassVar[int] = Opcode.OP_STRD_IMMEDIATE
     t: int  # uint32
     t2: int  # uint32
     n: int  # uint32
@@ -683,7 +951,7 @@ class STRD_immediate:
 
 @dataclass(frozen=True, eq=True)
 class STREX:
-    _id: ClassVar[int] = 39
+    opcode: ClassVar[int] = Opcode.OP_STREX
     d: int  # uint32
     t: int  # uint32
     n: int  # uint32
@@ -692,7 +960,7 @@ class STREX:
 
 @dataclass(frozen=True, eq=True)
 class ASR_immediate:
-    _id: ClassVar[int] = 40
+    opcode: ClassVar[int] = Opcode.OP_ASR_IMMEDIATE
     d: int  # uint32
     m: int  # uint32
     setflags: bool
@@ -701,7 +969,7 @@ class ASR_immediate:
 
 @dataclass(frozen=True, eq=True)
 class ASR_register:
-    _id: ClassVar[int] = 41
+    opcode: ClassVar[int] = Opcode.OP_ASR_REGISTER
     d: int  # uint32
     n: int  # uint32
     m: int  # uint32
@@ -710,7 +978,7 @@ class ASR_register:
 
 @dataclass(frozen=True, eq=True)
 class EOR_immediate:
-    _id: ClassVar[int] = 42
+    opcode: ClassVar[int] = Opcode.OP_EOR_IMMEDIATE
     d: int  # uint32
     n: int  # uint32
     setflags: bool
@@ -720,7 +988,7 @@ class EOR_immediate:
 
 @dataclass(frozen=True, eq=True)
 class EOR_register:
-    _id: ClassVar[int] = 43
+    opcode: ClassVar[int] = Opcode.OP_EOR_REGISTER
     d: int  # uint32
     n: int  # uint32
     m: int  # uint32
@@ -731,7 +999,7 @@ class EOR_register:
 
 @dataclass(frozen=True, eq=True)
 class MVN_immediate:
-    _id: ClassVar[int] = 44
+    opcode: ClassVar[int] = Opcode.OP_MVN_IMMEDIATE
     d: int  # uint32
     setflags: bool
     imm32: int  # bits32
@@ -740,7 +1008,7 @@ class MVN_immediate:
 
 @dataclass(frozen=True, eq=True)
 class MVN_register:
-    _id: ClassVar[int] = 45
+    opcode: ClassVar[int] = Opcode.OP_MVN_REGISTER
     d: int  # uint32
     m: int  # uint32
     setflags: bool
@@ -750,7 +1018,7 @@ class MVN_register:
 
 @dataclass(frozen=True, eq=True)
 class TST_immediate:
-    _id: ClassVar[int] = 46
+    opcode: ClassVar[int] = Opcode.OP_TST_IMMEDIATE
     n: int  # uint32
     imm32: int  # bits32
     carry: int  # bits1
@@ -758,7 +1026,7 @@ class TST_immediate:
 
 @dataclass(frozen=True, eq=True)
 class TST_register:
-    _id: ClassVar[int] = 47
+    opcode: ClassVar[int] = Opcode.OP_TST_REGISTER
     n: int  # uint32
     m: int  # uint32
     shift_t: int  # bits3
@@ -767,7 +1035,7 @@ class TST_register:
 
 @dataclass(frozen=True, eq=True)
 class LDRSB_immediate:
-    _id: ClassVar[int] = 48
+    opcode: ClassVar[int] = Opcode.OP_LDRSB_IMMEDIATE
     t: int  # uint32
     n: int  # uint32
     imm32: int  # bits32
@@ -778,7 +1046,7 @@ class LDRSB_immediate:
 
 @dataclass(frozen=True, eq=True)
 class LDRSB_literal:
-    _id: ClassVar[int] = 49
+    opcode: ClassVar[int] = Opcode.OP_LDRSB_LITERAL
     t: int  # uint32
     imm32: int  # bits32
     add: bool
@@ -786,7 +1054,7 @@ class LDRSB_literal:
 
 @dataclass(frozen=True, eq=True)
 class LDRSB_register:
-    _id: ClassVar[int] = 50
+    opcode: ClassVar[int] = Opcode.OP_LDRSB_REGISTER
     t: int  # uint32
     n: int  # uint32
     m: int  # uint32
@@ -799,7 +1067,7 @@ class LDRSB_register:
 
 @dataclass(frozen=True, eq=True)
 class LDRSH_immediate:
-    _id: ClassVar[int] = 51
+    opcode: ClassVar[int] = Opcode.OP_LDRSH_IMMEDIATE
     t: int  # uint32
     n: int  # uint32
     imm32: int  # bits32
@@ -810,7 +1078,7 @@ class LDRSH_immediate:
 
 @dataclass(frozen=True, eq=True)
 class LDRSH_literal:
-    _id: ClassVar[int] = 52
+    opcode: ClassVar[int] = Opcode.OP_LDRSH_LITERAL
     t: int  # uint32
     imm32: int  # bits32
     add: bool
@@ -818,7 +1086,7 @@ class LDRSH_literal:
 
 @dataclass(frozen=True, eq=True)
 class LDRSH_register:
-    _id: ClassVar[int] = 53
+    opcode: ClassVar[int] = Opcode.OP_LDRSH_REGISTER
     t: int  # uint32
     n: int  # uint32
     m: int  # uint32
@@ -831,7 +1099,7 @@ class LDRSH_register:
 
 @dataclass(frozen=True, eq=True)
 class LDM:
-    _id: ClassVar[int] = 54
+    opcode: ClassVar[int] = Opcode.OP_LDM
     n: int  # uint32
     registers: int  # bits16
     wback: bool
@@ -839,7 +1107,7 @@ class LDM:
 
 @dataclass(frozen=True, eq=True)
 class STM:
-    _id: ClassVar[int] = 55
+    opcode: ClassVar[int] = Opcode.OP_STM
     n: int  # uint32
     registers: int  # bits16
     wback: bool
@@ -847,32 +1115,32 @@ class STM:
 
 @dataclass(frozen=True, eq=True)
 class BLX_register:
-    _id: ClassVar[int] = 56
+    opcode: ClassVar[int] = Opcode.OP_BLX_REGISTER
     m: int  # uint32
 
 
 @dataclass(frozen=True, eq=True)
 class BX:
-    _id: ClassVar[int] = 57
+    opcode: ClassVar[int] = Opcode.OP_BX
     m: int  # uint32
 
 
 @dataclass(frozen=True, eq=True)
 class IT:
-    _id: ClassVar[int] = 58
+    opcode: ClassVar[int] = Opcode.OP_IT
     firstcond: int  # bits4
     mask: int  # bits4
 
 
 @dataclass(frozen=True, eq=True)
 class SVC:
-    _id: ClassVar[int] = 59
+    opcode: ClassVar[int] = Opcode.OP_SVC
     imm32: int  # bits32
 
 
 @dataclass(frozen=True, eq=True)
 class BFI:
-    _id: ClassVar[int] = 60
+    opcode: ClassVar[int] = Opcode.OP_BFI
     d: int  # uint32
     n: int  # uint32
     msbit: int  # uint32
@@ -881,7 +1149,7 @@ class BFI:
 
 @dataclass(frozen=True, eq=True)
 class CBNZ_CBZ:
-    _id: ClassVar[int] = 61
+    opcode: ClassVar[int] = Opcode.OP_CBNZ_CBZ
     n: int  # uint32
     imm32: int  # bits32
     nonzero: bool
@@ -889,21 +1157,21 @@ class CBNZ_CBZ:
 
 @dataclass(frozen=True, eq=True)
 class CLZ:
-    _id: ClassVar[int] = 62
+    opcode: ClassVar[int] = Opcode.OP_CLZ
     d: int  # uint32
     m: int  # uint32
 
 
 @dataclass(frozen=True, eq=True)
 class CMN_immediate:
-    _id: ClassVar[int] = 63
+    opcode: ClassVar[int] = Opcode.OP_CMN_IMMEDIATE
     n: int  # uint32
     imm32: int  # bits32
 
 
 @dataclass(frozen=True, eq=True)
 class CMN_register:
-    _id: ClassVar[int] = 64
+    opcode: ClassVar[int] = Opcode.OP_CMN_REGISTER
     n: int  # uint32
     m: int  # uint32
     shift_t: int  # bits3
@@ -912,14 +1180,14 @@ class CMN_register:
 
 @dataclass(frozen=True, eq=True)
 class CMP_immediate:
-    _id: ClassVar[int] = 65
+    opcode: ClassVar[int] = Opcode.OP_CMP_IMMEDIATE
     n: int  # uint32
     imm32: int  # bits32
 
 
 @dataclass(frozen=True, eq=True)
 class CMP_register:
-    _id: ClassVar[int] = 66
+    opcode: ClassVar[int] = Opcode.OP_CMP_REGISTER
     n: int  # uint32
     m: int  # uint32
     shift_t: int  # bits3
@@ -928,13 +1196,13 @@ class CMP_register:
 
 @dataclass(frozen=True, eq=True)
 class DMB:
-    _id: ClassVar[int] = 67
+    opcode: ClassVar[int] = Opcode.OP_DMB
     option: int  # bits4
 
 
 @dataclass(frozen=True, eq=True)
 class BIC_immediate:
-    _id: ClassVar[int] = 68
+    opcode: ClassVar[int] = Opcode.OP_BIC_IMMEDIATE
     d: int  # uint32
     n: int  # uint32
     setflags: bool
@@ -944,7 +1212,7 @@ class BIC_immediate:
 
 @dataclass(frozen=True, eq=True)
 class BIC_register:
-    _id: ClassVar[int] = 69
+    opcode: ClassVar[int] = Opcode.OP_BIC_REGISTER
     d: int  # uint32
     n: int  # uint32
     m: int  # uint32
@@ -955,7 +1223,7 @@ class BIC_register:
 
 @dataclass(frozen=True, eq=True)
 class TEQ_immediate:
-    _id: ClassVar[int] = 70
+    opcode: ClassVar[int] = Opcode.OP_TEQ_IMMEDIATE
     n: int  # uint32
     imm32: int  # bits32
     carry: int  # bits1
@@ -963,7 +1231,7 @@ class TEQ_immediate:
 
 @dataclass(frozen=True, eq=True)
 class TEQ_register:
-    _id: ClassVar[int] = 71
+    opcode: ClassVar[int] = Opcode.OP_TEQ_REGISTER
     n: int  # uint32
     m: int  # uint32
     shift_t: int  # bits3
@@ -972,7 +1240,7 @@ class TEQ_register:
 
 @dataclass(frozen=True, eq=True)
 class RSB_immediate:
-    _id: ClassVar[int] = 72
+    opcode: ClassVar[int] = Opcode.OP_RSB_IMMEDIATE
     d: int  # uint32
     n: int  # uint32
     setflags: bool
@@ -981,7 +1249,7 @@ class RSB_immediate:
 
 @dataclass(frozen=True, eq=True)
 class RSB_register:
-    _id: ClassVar[int] = 73
+    opcode: ClassVar[int] = Opcode.OP_RSB_REGISTER
     d: int  # uint32
     n: int  # uint32
     m: int  # uint32
@@ -992,7 +1260,7 @@ class RSB_register:
 
 @dataclass(frozen=True, eq=True)
 class SBC_immediate:
-    _id: ClassVar[int] = 74
+    opcode: ClassVar[int] = Opcode.OP_SBC_IMMEDIATE
     d: int  # uint32
     n: int  # uint32
     setflags: bool
@@ -1001,7 +1269,7 @@ class SBC_immediate:
 
 @dataclass(frozen=True, eq=True)
 class SBC_register:
-    _id: ClassVar[int] = 75
+    opcode: ClassVar[int] = Opcode.OP_SBC_REGISTER
     d: int  # uint32
     n: int  # uint32
     m: int  # uint32
@@ -1012,7 +1280,7 @@ class SBC_register:
 
 @dataclass(frozen=True, eq=True)
 class MUL:
-    _id: ClassVar[int] = 76
+    opcode: ClassVar[int] = Opcode.OP_MUL
     d: int  # uint32
     n: int  # uint32
     m: int  # uint32
@@ -1021,7 +1289,7 @@ class MUL:
 
 @dataclass(frozen=True, eq=True)
 class MLA:
-    _id: ClassVar[int] = 77
+    opcode: ClassVar[int] = Opcode.OP_MLA
     d: int  # uint32
     n: int  # uint32
     m: int  # uint32
@@ -1031,7 +1299,7 @@ class MLA:
 
 @dataclass(frozen=True, eq=True)
 class MLS:
-    _id: ClassVar[int] = 78
+    opcode: ClassVar[int] = Opcode.OP_MLS
     d: int  # uint32
     n: int  # uint32
     m: int  # uint32
@@ -1040,7 +1308,7 @@ class MLS:
 
 @dataclass(frozen=True, eq=True)
 class SMULL:
-    _id: ClassVar[int] = 79
+    opcode: ClassVar[int] = Opcode.OP_SMULL
     dLo: int  # uint32
     dHi: int  # uint32
     n: int  # uint32
@@ -1050,7 +1318,7 @@ class SMULL:
 
 @dataclass(frozen=True, eq=True)
 class UMULL:
-    _id: ClassVar[int] = 80
+    opcode: ClassVar[int] = Opcode.OP_UMULL
     dLo: int  # uint32
     dHi: int  # uint32
     n: int  # uint32
@@ -1060,7 +1328,7 @@ class UMULL:
 
 @dataclass(frozen=True, eq=True)
 class UMLAL:
-    _id: ClassVar[int] = 81
+    opcode: ClassVar[int] = Opcode.OP_UMLAL
     dLo: int  # uint32
     dHi: int  # uint32
     n: int  # uint32
@@ -1070,7 +1338,7 @@ class UMLAL:
 
 @dataclass(frozen=True, eq=True)
 class SDIV:
-    _id: ClassVar[int] = 82
+    opcode: ClassVar[int] = Opcode.OP_SDIV
     d: int  # uint32
     n: int  # uint32
     m: int  # uint32
@@ -1078,7 +1346,7 @@ class SDIV:
 
 @dataclass(frozen=True, eq=True)
 class UDIV:
-    _id: ClassVar[int] = 83
+    opcode: ClassVar[int] = Opcode.OP_UDIV
     d: int  # uint32
     n: int  # uint32
     m: int  # uint32
@@ -1086,7 +1354,7 @@ class UDIV:
 
 @dataclass(frozen=True, eq=True)
 class SXTAB:
-    _id: ClassVar[int] = 84
+    opcode: ClassVar[int] = Opcode.OP_SXTAB
     d: int  # uint32
     n: int  # uint32
     m: int  # uint32
@@ -1095,7 +1363,7 @@ class SXTAB:
 
 @dataclass(frozen=True, eq=True)
 class SXTAB16:
-    _id: ClassVar[int] = 85
+    opcode: ClassVar[int] = Opcode.OP_SXTAB16
     d: int  # uint32
     n: int  # uint32
     m: int  # uint32
@@ -1104,7 +1372,7 @@ class SXTAB16:
 
 @dataclass(frozen=True, eq=True)
 class SXTAH:
-    _id: ClassVar[int] = 86
+    opcode: ClassVar[int] = Opcode.OP_SXTAH
     d: int  # uint32
     n: int  # uint32
     m: int  # uint32
@@ -1113,7 +1381,7 @@ class SXTAH:
 
 @dataclass(frozen=True, eq=True)
 class SXTB:
-    _id: ClassVar[int] = 87
+    opcode: ClassVar[int] = Opcode.OP_SXTB
     d: int  # uint32
     m: int  # uint32
     rotation: int  # uint32
@@ -1121,7 +1389,7 @@ class SXTB:
 
 @dataclass(frozen=True, eq=True)
 class SXTB16:
-    _id: ClassVar[int] = 88
+    opcode: ClassVar[int] = Opcode.OP_SXTB16
     d: int  # uint32
     m: int  # uint32
     rotation: int  # uint32
@@ -1129,7 +1397,7 @@ class SXTB16:
 
 @dataclass(frozen=True, eq=True)
 class SXTH:
-    _id: ClassVar[int] = 89
+    opcode: ClassVar[int] = Opcode.OP_SXTH
     d: int  # uint32
     m: int  # uint32
     rotation: int  # uint32
@@ -1137,7 +1405,7 @@ class SXTH:
 
 @dataclass(frozen=True, eq=True)
 class UXTB:
-    _id: ClassVar[int] = 90
+    opcode: ClassVar[int] = Opcode.OP_UXTB
     d: int  # uint32
     m: int  # uint32
     rotation: int  # uint32
@@ -1145,7 +1413,7 @@ class UXTB:
 
 @dataclass(frozen=True, eq=True)
 class UXTH:
-    _id: ClassVar[int] = 91
+    opcode: ClassVar[int] = Opcode.OP_UXTH
     d: int  # uint32
     m: int  # uint32
     rotation: int  # uint32
@@ -1153,7 +1421,7 @@ class UXTH:
 
 @dataclass(frozen=True, eq=True)
 class UBFX:
-    _id: ClassVar[int] = 92
+    opcode: ClassVar[int] = Opcode.OP_UBFX
     d: int  # uint32
     n: int  # uint32
     lsbit: int  # uint32
@@ -1162,7 +1430,7 @@ class UBFX:
 
 @dataclass(frozen=True, eq=True)
 class RRX:
-    _id: ClassVar[int] = 93
+    opcode: ClassVar[int] = Opcode.OP_RRX
     d: int  # uint32
     m: int  # uint32
     setflags: bool
@@ -1170,7 +1438,7 @@ class RRX:
 
 @dataclass(frozen=True, eq=True)
 class STRB_immediate:
-    _id: ClassVar[int] = 94
+    opcode: ClassVar[int] = Opcode.OP_STRB_IMMEDIATE
     t: int  # uint32
     n: int  # uint32
     imm32: int  # bits32
@@ -1181,7 +1449,7 @@ class STRB_immediate:
 
 @dataclass(frozen=True, eq=True)
 class STRB_register:
-    _id: ClassVar[int] = 95
+    opcode: ClassVar[int] = Opcode.OP_STRB_REGISTER
     t: int  # uint32
     n: int  # uint32
     m: int  # uint32
@@ -1194,7 +1462,7 @@ class STRB_register:
 
 @dataclass(frozen=True, eq=True)
 class STRH_immediate:
-    _id: ClassVar[int] = 96
+    opcode: ClassVar[int] = Opcode.OP_STRH_IMMEDIATE
     t: int  # uint32
     n: int  # uint32
     imm32: int  # bits32
@@ -1205,7 +1473,7 @@ class STRH_immediate:
 
 @dataclass(frozen=True, eq=True)
 class STRH_register:
-    _id: ClassVar[int] = 97
+    opcode: ClassVar[int] = Opcode.OP_STRH_REGISTER
     t: int  # uint32
     n: int  # uint32
     m: int  # uint32
@@ -1218,7 +1486,7 @@ class STRH_register:
 
 @dataclass(frozen=True, eq=True)
 class LDREX:
-    _id: ClassVar[int] = 98
+    opcode: ClassVar[int] = Opcode.OP_LDREX
     t: int  # uint32
     n: int  # uint32
     imm32: int  # bits32
@@ -1226,7 +1494,7 @@ class LDREX:
 
 @dataclass(frozen=True, eq=True)
 class STMDB:
-    _id: ClassVar[int] = 99
+    opcode: ClassVar[int] = Opcode.OP_STMDB
     n: int  # uint32
     registers: int  # bits16
     wback: bool
@@ -1234,14 +1502,14 @@ class STMDB:
 
 @dataclass(frozen=True, eq=True)
 class MRS:
-    _id: ClassVar[int] = 100
+    opcode: ClassVar[int] = Opcode.OP_MRS
     d: int  # uint32
     SYSm: int  # bits8
 
 
 @dataclass(frozen=True, eq=True)
 class MSR:
-    _id: ClassVar[int] = 101
+    opcode: ClassVar[int] = Opcode.OP_MSR
     n: int  # uint32
     mask: int  # bits2
     SYSm: int  # bits8
@@ -1249,7 +1517,7 @@ class MSR:
 
 @dataclass(frozen=True, eq=True)
 class TBB_TBH:
-    _id: ClassVar[int] = 102
+    opcode: ClassVar[int] = Opcode.OP_TBB_TBH
     n: int  # uint32
     m: int  # uint32
     is_tbh: bool
@@ -1257,7 +1525,7 @@ class TBB_TBH:
 
 @dataclass(frozen=True, eq=True)
 class BFC:
-    _id: ClassVar[int] = 103
+    opcode: ClassVar[int] = Opcode.OP_BFC
     d: int  # uint32
     msbit: int  # uint32
     lsbit: int  # uint32
@@ -1265,7 +1533,7 @@ class BFC:
 
 @dataclass(frozen=True, eq=True)
 class CDP_CDP2:
-    _id: ClassVar[int] = 104
+    opcode: ClassVar[int] = Opcode.OP_CDP_CDP2
     cp: int  # uint32
     opc1: int  # bits4
     CRn: int  # bits4
@@ -1276,13 +1544,13 @@ class CDP_CDP2:
 
 @dataclass(frozen=True, eq=True)
 class ISB:
-    _id: ClassVar[int] = 105
+    opcode: ClassVar[int] = Opcode.OP_ISB
     option: int  # bits4
 
 
 @dataclass(frozen=True, eq=True)
 class LDMDB:
-    _id: ClassVar[int] = 106
+    opcode: ClassVar[int] = Opcode.OP_LDMDB
     n: int  # uint32
     registers: int  # bits16
     wback: bool
@@ -1290,7 +1558,7 @@ class LDMDB:
 
 @dataclass(frozen=True, eq=True)
 class LDRD_immediate:
-    _id: ClassVar[int] = 107
+    opcode: ClassVar[int] = Opcode.OP_LDRD_IMMEDIATE
     t: int  # uint32
     t2: int  # uint32
     n: int  # uint32
@@ -1302,7 +1570,7 @@ class LDRD_immediate:
 
 @dataclass(frozen=True, eq=True)
 class LDRD_literal:
-    _id: ClassVar[int] = 108
+    opcode: ClassVar[int] = Opcode.OP_LDRD_LITERAL
     t: int  # uint32
     t2: int  # uint32
     imm32: int  # bits32
@@ -1313,7 +1581,7 @@ class LDRD_literal:
 
 @dataclass(frozen=True, eq=True)
 class STC_STC2:
-    _id: ClassVar[int] = 109
+    opcode: ClassVar[int] = Opcode.OP_STC_STC2
     n: int  # uint32
     cp: int  # uint32
     imm32: int  # bits32
@@ -1326,7 +1594,7 @@ class STC_STC2:
 
 @dataclass(frozen=True, eq=True)
 class LDC_LDC2_immediate:
-    _id: ClassVar[int] = 110
+    opcode: ClassVar[int] = Opcode.OP_LDC_LDC2_IMMEDIATE
     n: int  # uint32
     cp: int  # uint32
     imm32: int  # bits32
@@ -1339,7 +1607,7 @@ class LDC_LDC2_immediate:
 
 @dataclass(frozen=True, eq=True)
 class LDC_LDC2_literal:
-    _id: ClassVar[int] = 111
+    opcode: ClassVar[int] = Opcode.OP_LDC_LDC2_LITERAL
     index: bool
     add: bool
     cp: int  # uint32
@@ -1351,13 +1619,13 @@ class LDC_LDC2_literal:
 
 @dataclass(frozen=True, eq=True)
 class CLREX:
-    _id: ClassVar[int] = 112
+    opcode: ClassVar[int] = Opcode.OP_CLREX
     pass
 
 
 @dataclass(frozen=True, eq=True)
 class CPS:
-    _id: ClassVar[int] = 113
+    opcode: ClassVar[int] = Opcode.OP_CPS
     enable: bool
     disable: bool
     affectPRI: bool
@@ -1366,25 +1634,25 @@ class CPS:
 
 @dataclass(frozen=True, eq=True)
 class CSDB:
-    _id: ClassVar[int] = 114
+    opcode: ClassVar[int] = Opcode.OP_CSDB
     pass
 
 
 @dataclass(frozen=True, eq=True)
 class DBG:
-    _id: ClassVar[int] = 115
+    opcode: ClassVar[int] = Opcode.OP_DBG
     option: int  # bits4
 
 
 @dataclass(frozen=True, eq=True)
 class DSB:
-    _id: ClassVar[int] = 116
+    opcode: ClassVar[int] = Opcode.OP_DSB
     option: int  # bits4
 
 
 @dataclass(frozen=True, eq=True)
 class LDRT:
-    _id: ClassVar[int] = 117
+    opcode: ClassVar[int] = Opcode.OP_LDRT
     t: int  # uint32
     n: int  # uint32
     postindex: bool
@@ -1395,7 +1663,7 @@ class LDRT:
 
 @dataclass(frozen=True, eq=True)
 class MCR_MCR2:
-    _id: ClassVar[int] = 118
+    opcode: ClassVar[int] = Opcode.OP_MCR_MCR2
     t: int  # uint32
     cp: int  # uint32
     opc1: int  # bits3
@@ -1406,7 +1674,7 @@ class MCR_MCR2:
 
 @dataclass(frozen=True, eq=True)
 class MCRR_MCRR2:
-    _id: ClassVar[int] = 119
+    opcode: ClassVar[int] = Opcode.OP_MCRR_MCRR2
     t: int  # uint32
     t2: int  # uint32
     cp: int  # uint32
@@ -1416,14 +1684,14 @@ class MCRR_MCRR2:
 
 @dataclass(frozen=True, eq=True)
 class MOVT:
-    _id: ClassVar[int] = 120
+    opcode: ClassVar[int] = Opcode.OP_MOVT
     d: int  # uint32
     imm16: int  # bits16
 
 
 @dataclass(frozen=True, eq=True)
 class MRC_MRC2:
-    _id: ClassVar[int] = 121
+    opcode: ClassVar[int] = Opcode.OP_MRC_MRC2
     t: int  # uint32
     cp: int  # uint32
     opc1: int  # bits3
@@ -1434,7 +1702,7 @@ class MRC_MRC2:
 
 @dataclass(frozen=True, eq=True)
 class ORN_immediate:
-    _id: ClassVar[int] = 122
+    opcode: ClassVar[int] = Opcode.OP_ORN_IMMEDIATE
     d: int  # uint32
     n: int  # uint32
     setflags: bool
@@ -1444,7 +1712,7 @@ class ORN_immediate:
 
 @dataclass(frozen=True, eq=True)
 class ORN_register:
-    _id: ClassVar[int] = 123
+    opcode: ClassVar[int] = Opcode.OP_ORN_REGISTER
     d: int  # uint32
     n: int  # uint32
     m: int  # uint32
@@ -1455,7 +1723,7 @@ class ORN_register:
 
 @dataclass(frozen=True, eq=True)
 class PLD_immediate:
-    _id: ClassVar[int] = 124
+    opcode: ClassVar[int] = Opcode.OP_PLD_IMMEDIATE
     n: int  # uint32
     imm32: int  # bits32
     add: bool
@@ -1463,14 +1731,14 @@ class PLD_immediate:
 
 @dataclass(frozen=True, eq=True)
 class PLD_literal:
-    _id: ClassVar[int] = 125
+    opcode: ClassVar[int] = Opcode.OP_PLD_LITERAL
     imm32: int  # bits32
     add: bool
 
 
 @dataclass(frozen=True, eq=True)
 class PLD_register:
-    _id: ClassVar[int] = 126
+    opcode: ClassVar[int] = Opcode.OP_PLD_REGISTER
     n: int  # uint32
     m: int  # uint32
     add: bool
@@ -1480,7 +1748,7 @@ class PLD_register:
 
 @dataclass(frozen=True, eq=True)
 class PLI_immediate_literal:
-    _id: ClassVar[int] = 127
+    opcode: ClassVar[int] = Opcode.OP_PLI_IMMEDIATE_LITERAL
     n: int  # uint32
     imm32: int  # bits32
     add: bool
@@ -1488,7 +1756,7 @@ class PLI_immediate_literal:
 
 @dataclass(frozen=True, eq=True)
 class PLI_register:
-    _id: ClassVar[int] = 128
+    opcode: ClassVar[int] = Opcode.OP_PLI_REGISTER
     n: int  # uint32
     m: int  # uint32
     add: bool
@@ -1498,28 +1766,28 @@ class PLI_register:
 
 @dataclass(frozen=True, eq=True)
 class REV:
-    _id: ClassVar[int] = 129
+    opcode: ClassVar[int] = Opcode.OP_REV
     d: int  # uint32
     m: int  # uint32
 
 
 @dataclass(frozen=True, eq=True)
 class REV16:
-    _id: ClassVar[int] = 130
+    opcode: ClassVar[int] = Opcode.OP_REV16
     d: int  # uint32
     m: int  # uint32
 
 
 @dataclass(frozen=True, eq=True)
 class REVSH:
-    _id: ClassVar[int] = 131
+    opcode: ClassVar[int] = Opcode.OP_REVSH
     d: int  # uint32
     m: int  # uint32
 
 
 @dataclass(frozen=True, eq=True)
 class ROR_immediate:
-    _id: ClassVar[int] = 132
+    opcode: ClassVar[int] = Opcode.OP_ROR_IMMEDIATE
     d: int  # uint32
     m: int  # uint32
     setflags: bool
@@ -1528,7 +1796,7 @@ class ROR_immediate:
 
 @dataclass(frozen=True, eq=True)
 class ROR_register:
-    _id: ClassVar[int] = 133
+    opcode: ClassVar[int] = Opcode.OP_ROR_REGISTER
     d: int  # uint32
     n: int  # uint32
     m: int  # uint32
@@ -1537,19 +1805,19 @@ class ROR_register:
 
 @dataclass(frozen=True, eq=True)
 class WFE:
-    _id: ClassVar[int] = 134
+    opcode: ClassVar[int] = Opcode.OP_WFE
     pass
 
 
 @dataclass(frozen=True, eq=True)
 class WFI:
-    _id: ClassVar[int] = 135
+    opcode: ClassVar[int] = Opcode.OP_WFI
     pass
 
 
 @dataclass(frozen=True, eq=True)
 class UXTAB:
-    _id: ClassVar[int] = 136
+    opcode: ClassVar[int] = Opcode.OP_UXTAB
     d: int  # uint32
     n: int  # uint32
     m: int  # uint32
@@ -1558,7 +1826,7 @@ class UXTAB:
 
 @dataclass(frozen=True, eq=True)
 class UXTAB16:
-    _id: ClassVar[int] = 137
+    opcode: ClassVar[int] = Opcode.OP_UXTAB16
     d: int  # uint32
     n: int  # uint32
     m: int  # uint32
@@ -1567,7 +1835,7 @@ class UXTAB16:
 
 @dataclass(frozen=True, eq=True)
 class UADD16:
-    _id: ClassVar[int] = 138
+    opcode: ClassVar[int] = Opcode.OP_UADD16
     d: int  # uint32
     n: int  # uint32
     m: int  # uint32
@@ -1575,7 +1843,7 @@ class UADD16:
 
 @dataclass(frozen=True, eq=True)
 class UADD8:
-    _id: ClassVar[int] = 139
+    opcode: ClassVar[int] = Opcode.OP_UADD8
     d: int  # uint32
     n: int  # uint32
     m: int  # uint32
@@ -1583,7 +1851,7 @@ class UADD8:
 
 @dataclass(frozen=True, eq=True)
 class PKHBT_PKHTB:
-    _id: ClassVar[int] = 140
+    opcode: ClassVar[int] = Opcode.OP_PKHBT_PKHTB
     d: int  # uint32
     n: int  # uint32
     m: int  # uint32
@@ -1596,13 +1864,13 @@ class PKHBT_PKHTB:
 
 @dataclass(frozen=True, eq=True)
 class PSSBB:
-    _id: ClassVar[int] = 141
+    opcode: ClassVar[int] = Opcode.OP_PSSBB
     pass
 
 
 @dataclass(frozen=True, eq=True)
 class QADD:
-    _id: ClassVar[int] = 142
+    opcode: ClassVar[int] = Opcode.OP_QADD
     d: int  # uint32
     n: int  # uint32
     m: int  # uint32
@@ -1610,7 +1878,7 @@ class QADD:
 
 @dataclass(frozen=True, eq=True)
 class QADD16:
-    _id: ClassVar[int] = 143
+    opcode: ClassVar[int] = Opcode.OP_QADD16
     d: int  # uint32
     n: int  # uint32
     m: int  # uint32
@@ -1618,7 +1886,7 @@ class QADD16:
 
 @dataclass(frozen=True, eq=True)
 class QADD8:
-    _id: ClassVar[int] = 144
+    opcode: ClassVar[int] = Opcode.OP_QADD8
     d: int  # uint32
     n: int  # uint32
     m: int  # uint32
@@ -1626,7 +1894,7 @@ class QADD8:
 
 @dataclass(frozen=True, eq=True)
 class QASX:
-    _id: ClassVar[int] = 145
+    opcode: ClassVar[int] = Opcode.OP_QASX
     d: int  # uint32
     n: int  # uint32
     m: int  # uint32
@@ -1634,7 +1902,7 @@ class QASX:
 
 @dataclass(frozen=True, eq=True)
 class QDADD:
-    _id: ClassVar[int] = 146
+    opcode: ClassVar[int] = Opcode.OP_QDADD
     d: int  # uint32
     n: int  # uint32
     m: int  # uint32
@@ -1642,7 +1910,7 @@ class QDADD:
 
 @dataclass(frozen=True, eq=True)
 class QDSUB:
-    _id: ClassVar[int] = 147
+    opcode: ClassVar[int] = Opcode.OP_QDSUB
     d: int  # uint32
     n: int  # uint32
     m: int  # uint32
@@ -1650,7 +1918,7 @@ class QDSUB:
 
 @dataclass(frozen=True, eq=True)
 class QSAX:
-    _id: ClassVar[int] = 148
+    opcode: ClassVar[int] = Opcode.OP_QSAX
     d: int  # uint32
     n: int  # uint32
     m: int  # uint32
@@ -1658,7 +1926,7 @@ class QSAX:
 
 @dataclass(frozen=True, eq=True)
 class QSUB:
-    _id: ClassVar[int] = 149
+    opcode: ClassVar[int] = Opcode.OP_QSUB
     d: int  # uint32
     n: int  # uint32
     m: int  # uint32
@@ -1666,7 +1934,7 @@ class QSUB:
 
 @dataclass(frozen=True, eq=True)
 class QSUB16:
-    _id: ClassVar[int] = 150
+    opcode: ClassVar[int] = Opcode.OP_QSUB16
     d: int  # uint32
     n: int  # uint32
     m: int  # uint32
@@ -1674,7 +1942,7 @@ class QSUB16:
 
 @dataclass(frozen=True, eq=True)
 class QSUB8:
-    _id: ClassVar[int] = 151
+    opcode: ClassVar[int] = Opcode.OP_QSUB8
     d: int  # uint32
     n: int  # uint32
     m: int  # uint32
@@ -1682,14 +1950,14 @@ class QSUB8:
 
 @dataclass(frozen=True, eq=True)
 class RBIT:
-    _id: ClassVar[int] = 152
+    opcode: ClassVar[int] = Opcode.OP_RBIT
     d: int  # uint32
     m: int  # uint32
 
 
 @dataclass(frozen=True, eq=True)
 class SADD16:
-    _id: ClassVar[int] = 153
+    opcode: ClassVar[int] = Opcode.OP_SADD16
     d: int  # uint32
     n: int  # uint32
     m: int  # uint32
@@ -1697,7 +1965,7 @@ class SADD16:
 
 @dataclass(frozen=True, eq=True)
 class SADD8:
-    _id: ClassVar[int] = 154
+    opcode: ClassVar[int] = Opcode.OP_SADD8
     d: int  # uint32
     n: int  # uint32
     m: int  # uint32
@@ -1705,7 +1973,7 @@ class SADD8:
 
 @dataclass(frozen=True, eq=True)
 class SMLABB_SMLABT_SMLATB_SMLATT:
-    _id: ClassVar[int] = 155
+    opcode: ClassVar[int] = Opcode.OP_SMLABB_SMLABT_SMLATB_SMLATT
     d: int  # uint32
     n: int  # uint32
     m: int  # uint32
@@ -1716,7 +1984,7 @@ class SMLABB_SMLABT_SMLATB_SMLATT:
 
 @dataclass(frozen=True, eq=True)
 class SMLAD_SMLADX:
-    _id: ClassVar[int] = 156
+    opcode: ClassVar[int] = Opcode.OP_SMLAD_SMLADX
     d: int  # uint32
     n: int  # uint32
     m: int  # uint32
@@ -1726,7 +1994,7 @@ class SMLAD_SMLADX:
 
 @dataclass(frozen=True, eq=True)
 class SMLAL:
-    _id: ClassVar[int] = 157
+    opcode: ClassVar[int] = Opcode.OP_SMLAL
     dLo: int  # uint32
     dHi: int  # uint32
     n: int  # uint32
@@ -1736,7 +2004,7 @@ class SMLAL:
 
 @dataclass(frozen=True, eq=True)
 class SMLALBB_SMLALBT_SMLALTB_SMLALTT:
-    _id: ClassVar[int] = 158
+    opcode: ClassVar[int] = Opcode.OP_SMLALBB_SMLALBT_SMLALTB_SMLALTT
     dLo: int  # uint32
     dHi: int  # uint32
     n: int  # uint32
@@ -1747,7 +2015,7 @@ class SMLALBB_SMLALBT_SMLALTB_SMLALTT:
 
 @dataclass(frozen=True, eq=True)
 class SMLALD_SMLALDX:
-    _id: ClassVar[int] = 159
+    opcode: ClassVar[int] = Opcode.OP_SMLALD_SMLALDX
     dLo: int  # uint32
     dHi: int  # uint32
     n: int  # uint32
@@ -1757,7 +2025,7 @@ class SMLALD_SMLALDX:
 
 @dataclass(frozen=True, eq=True)
 class SMLAWB_SMLAWT:
-    _id: ClassVar[int] = 160
+    opcode: ClassVar[int] = Opcode.OP_SMLAWB_SMLAWT
     d: int  # uint32
     n: int  # uint32
     m: int  # uint32
@@ -1767,7 +2035,7 @@ class SMLAWB_SMLAWT:
 
 @dataclass(frozen=True, eq=True)
 class SMLSD_SMLSDX:
-    _id: ClassVar[int] = 161
+    opcode: ClassVar[int] = Opcode.OP_SMLSD_SMLSDX
     d: int  # uint32
     n: int  # uint32
     m: int  # uint32
@@ -1777,7 +2045,7 @@ class SMLSD_SMLSDX:
 
 @dataclass(frozen=True, eq=True)
 class SMLSLD_SMLSLDX:
-    _id: ClassVar[int] = 162
+    opcode: ClassVar[int] = Opcode.OP_SMLSLD_SMLSLDX
     dLo: int  # uint32
     dHi: int  # uint32
     n: int  # uint32
@@ -1787,7 +2055,7 @@ class SMLSLD_SMLSLDX:
 
 @dataclass(frozen=True, eq=True)
 class SMMLA_SMMLAR:
-    _id: ClassVar[int] = 163
+    opcode: ClassVar[int] = Opcode.OP_SMMLA_SMMLAR
     d: int  # uint32
     n: int  # uint32
     m: int  # uint32
@@ -1797,7 +2065,7 @@ class SMMLA_SMMLAR:
 
 @dataclass(frozen=True, eq=True)
 class SMMLS_SMMLSR:
-    _id: ClassVar[int] = 164
+    opcode: ClassVar[int] = Opcode.OP_SMMLS_SMMLSR
     d: int  # uint32
     n: int  # uint32
     m: int  # uint32
@@ -1807,7 +2075,7 @@ class SMMLS_SMMLSR:
 
 @dataclass(frozen=True, eq=True)
 class SMMUL_SMMULR:
-    _id: ClassVar[int] = 165
+    opcode: ClassVar[int] = Opcode.OP_SMMUL_SMMULR
     d: int  # uint32
     n: int  # uint32
     m: int  # uint32
@@ -1816,7 +2084,7 @@ class SMMUL_SMMULR:
 
 @dataclass(frozen=True, eq=True)
 class SMUAD_SMUADX:
-    _id: ClassVar[int] = 166
+    opcode: ClassVar[int] = Opcode.OP_SMUAD_SMUADX
     d: int  # uint32
     n: int  # uint32
     m: int  # uint32
@@ -1825,7 +2093,7 @@ class SMUAD_SMUADX:
 
 @dataclass(frozen=True, eq=True)
 class SMULBB_SMULBT_SMULTB_SMULTT:
-    _id: ClassVar[int] = 167
+    opcode: ClassVar[int] = Opcode.OP_SMULBB_SMULBT_SMULTB_SMULTT
     d: int  # uint32
     n: int  # uint32
     m: int  # uint32
@@ -1835,7 +2103,7 @@ class SMULBB_SMULBT_SMULTB_SMULTT:
 
 @dataclass(frozen=True, eq=True)
 class SMULWB_SMULWT:
-    _id: ClassVar[int] = 168
+    opcode: ClassVar[int] = Opcode.OP_SMULWB_SMULWT
     d: int  # uint32
     n: int  # uint32
     m: int  # uint32
@@ -1844,7 +2112,7 @@ class SMULWB_SMULWT:
 
 @dataclass(frozen=True, eq=True)
 class SMUSD_SMUSDX:
-    _id: ClassVar[int] = 169
+    opcode: ClassVar[int] = Opcode.OP_SMUSD_SMUSDX
     d: int  # uint32
     n: int  # uint32
     m: int  # uint32
@@ -1853,7 +2121,7 @@ class SMUSD_SMUSDX:
 
 @dataclass(frozen=True, eq=True)
 class SSAT:
-    _id: ClassVar[int] = 170
+    opcode: ClassVar[int] = Opcode.OP_SSAT
     d: int  # uint32
     n: int  # uint32
     saturate_to: int  # uint32
@@ -1863,7 +2131,7 @@ class SSAT:
 
 @dataclass(frozen=True, eq=True)
 class SSAT16:
-    _id: ClassVar[int] = 171
+    opcode: ClassVar[int] = Opcode.OP_SSAT16
     d: int  # uint32
     n: int  # uint32
     saturate_to: int  # uint32
@@ -1871,7 +2139,7 @@ class SSAT16:
 
 @dataclass(frozen=True, eq=True)
 class SSAX:
-    _id: ClassVar[int] = 172
+    opcode: ClassVar[int] = Opcode.OP_SSAX
     d: int  # uint32
     n: int  # uint32
     m: int  # uint32
@@ -1879,13 +2147,13 @@ class SSAX:
 
 @dataclass(frozen=True, eq=True)
 class SSBB:
-    _id: ClassVar[int] = 173
+    opcode: ClassVar[int] = Opcode.OP_SSBB
     pass
 
 
 @dataclass(frozen=True, eq=True)
 class SSUB16:
-    _id: ClassVar[int] = 174
+    opcode: ClassVar[int] = Opcode.OP_SSUB16
     d: int  # uint32
     n: int  # uint32
     m: int  # uint32
@@ -1893,7 +2161,7 @@ class SSUB16:
 
 @dataclass(frozen=True, eq=True)
 class SSUB8:
-    _id: ClassVar[int] = 175
+    opcode: ClassVar[int] = Opcode.OP_SSUB8
     d: int  # uint32
     n: int  # uint32
     m: int  # uint32
@@ -1901,13 +2169,13 @@ class SSUB8:
 
 @dataclass(frozen=True, eq=True)
 class UDF:
-    _id: ClassVar[int] = 176
+    opcode: ClassVar[int] = Opcode.OP_UDF
     imm32: int  # bits32
 
 
 @dataclass(frozen=True, eq=True)
 class UHADD16:
-    _id: ClassVar[int] = 177
+    opcode: ClassVar[int] = Opcode.OP_UHADD16
     d: int  # uint32
     n: int  # uint32
     m: int  # uint32
@@ -1915,7 +2183,7 @@ class UHADD16:
 
 @dataclass(frozen=True, eq=True)
 class UHADD8:
-    _id: ClassVar[int] = 178
+    opcode: ClassVar[int] = Opcode.OP_UHADD8
     d: int  # uint32
     n: int  # uint32
     m: int  # uint32
@@ -1923,7 +2191,7 @@ class UHADD8:
 
 @dataclass(frozen=True, eq=True)
 class UHASX:
-    _id: ClassVar[int] = 179
+    opcode: ClassVar[int] = Opcode.OP_UHASX
     d: int  # uint32
     n: int  # uint32
     m: int  # uint32
@@ -1931,7 +2199,7 @@ class UHASX:
 
 @dataclass(frozen=True, eq=True)
 class UHSAX:
-    _id: ClassVar[int] = 180
+    opcode: ClassVar[int] = Opcode.OP_UHSAX
     d: int  # uint32
     n: int  # uint32
     m: int  # uint32
@@ -1939,7 +2207,7 @@ class UHSAX:
 
 @dataclass(frozen=True, eq=True)
 class UHSUB16:
-    _id: ClassVar[int] = 181
+    opcode: ClassVar[int] = Opcode.OP_UHSUB16
     d: int  # uint32
     n: int  # uint32
     m: int  # uint32
@@ -1947,7 +2215,7 @@ class UHSUB16:
 
 @dataclass(frozen=True, eq=True)
 class UHSUB8:
-    _id: ClassVar[int] = 182
+    opcode: ClassVar[int] = Opcode.OP_UHSUB8
     d: int  # uint32
     n: int  # uint32
     m: int  # uint32
@@ -1955,7 +2223,7 @@ class UHSUB8:
 
 @dataclass(frozen=True, eq=True)
 class UMAAL:
-    _id: ClassVar[int] = 183
+    opcode: ClassVar[int] = Opcode.OP_UMAAL
     dLo: int  # uint32
     dHi: int  # uint32
     n: int  # uint32
@@ -1964,7 +2232,7 @@ class UMAAL:
 
 @dataclass(frozen=True, eq=True)
 class UQSAX:
-    _id: ClassVar[int] = 184
+    opcode: ClassVar[int] = Opcode.OP_UQSAX
     d: int  # uint32
     n: int  # uint32
     m: int  # uint32
@@ -1972,7 +2240,7 @@ class UQSAX:
 
 @dataclass(frozen=True, eq=True)
 class UQSUB16:
-    _id: ClassVar[int] = 185
+    opcode: ClassVar[int] = Opcode.OP_UQSUB16
     d: int  # uint32
     n: int  # uint32
     m: int  # uint32
@@ -1980,7 +2248,7 @@ class UQSUB16:
 
 @dataclass(frozen=True, eq=True)
 class UQSUB8:
-    _id: ClassVar[int] = 186
+    opcode: ClassVar[int] = Opcode.OP_UQSUB8
     d: int  # uint32
     n: int  # uint32
     m: int  # uint32
@@ -1988,7 +2256,7 @@ class UQSUB8:
 
 @dataclass(frozen=True, eq=True)
 class USAT:
-    _id: ClassVar[int] = 187
+    opcode: ClassVar[int] = Opcode.OP_USAT
     d: int  # uint32
     n: int  # uint32
     saturate_to: int  # uint32
@@ -1998,7 +2266,7 @@ class USAT:
 
 @dataclass(frozen=True, eq=True)
 class USAT16:
-    _id: ClassVar[int] = 188
+    opcode: ClassVar[int] = Opcode.OP_USAT16
     d: int  # uint32
     n: int  # uint32
     saturate_to: int  # uint32
@@ -2006,13 +2274,13 @@ class USAT16:
 
 @dataclass(frozen=True, eq=True)
 class YIELD:
-    _id: ClassVar[int] = 189
+    opcode: ClassVar[int] = Opcode.OP_YIELD
     pass
 
 
 @dataclass(frozen=True, eq=True)
 class LDRBT:
-    _id: ClassVar[int] = 190
+    opcode: ClassVar[int] = Opcode.OP_LDRBT
     t: int  # uint32
     n: int  # uint32
     postindex: bool
@@ -2023,21 +2291,21 @@ class LDRBT:
 
 @dataclass(frozen=True, eq=True)
 class LDREXB:
-    _id: ClassVar[int] = 191
+    opcode: ClassVar[int] = Opcode.OP_LDREXB
     t: int  # uint32
     n: int  # uint32
 
 
 @dataclass(frozen=True, eq=True)
 class LDREXH:
-    _id: ClassVar[int] = 192
+    opcode: ClassVar[int] = Opcode.OP_LDREXH
     t: int  # uint32
     n: int  # uint32
 
 
 @dataclass(frozen=True, eq=True)
 class LDRHT:
-    _id: ClassVar[int] = 193
+    opcode: ClassVar[int] = Opcode.OP_LDRHT
     t: int  # uint32
     n: int  # uint32
     postindex: bool
@@ -2048,7 +2316,7 @@ class LDRHT:
 
 @dataclass(frozen=True, eq=True)
 class LDRSBT:
-    _id: ClassVar[int] = 194
+    opcode: ClassVar[int] = Opcode.OP_LDRSBT
     t: int  # uint32
     n: int  # uint32
     postindex: bool
@@ -2059,7 +2327,7 @@ class LDRSBT:
 
 @dataclass(frozen=True, eq=True)
 class LDRSHT:
-    _id: ClassVar[int] = 195
+    opcode: ClassVar[int] = Opcode.OP_LDRSHT
     t: int  # uint32
     n: int  # uint32
     postindex: bool
@@ -2070,7 +2338,7 @@ class LDRSHT:
 
 @dataclass(frozen=True, eq=True)
 class MRRC_MRRC2:
-    _id: ClassVar[int] = 196
+    opcode: ClassVar[int] = Opcode.OP_MRRC_MRRC2
     t: int  # uint32
     t2: int  # uint32
     cp: int  # uint32
@@ -2080,7 +2348,7 @@ class MRRC_MRRC2:
 
 @dataclass(frozen=True, eq=True)
 class SASX:
-    _id: ClassVar[int] = 197
+    opcode: ClassVar[int] = Opcode.OP_SASX
     d: int  # uint32
     n: int  # uint32
     m: int  # uint32
@@ -2088,7 +2356,7 @@ class SASX:
 
 @dataclass(frozen=True, eq=True)
 class SBFX:
-    _id: ClassVar[int] = 198
+    opcode: ClassVar[int] = Opcode.OP_SBFX
     d: int  # uint32
     n: int  # uint32
     lsbit: int  # uint32
@@ -2097,7 +2365,7 @@ class SBFX:
 
 @dataclass(frozen=True, eq=True)
 class SEL:
-    _id: ClassVar[int] = 199
+    opcode: ClassVar[int] = Opcode.OP_SEL
     d: int  # uint32
     n: int  # uint32
     m: int  # uint32
@@ -2105,13 +2373,13 @@ class SEL:
 
 @dataclass(frozen=True, eq=True)
 class SEV:
-    _id: ClassVar[int] = 200
+    opcode: ClassVar[int] = Opcode.OP_SEV
     pass
 
 
 @dataclass(frozen=True, eq=True)
 class SHADD16:
-    _id: ClassVar[int] = 201
+    opcode: ClassVar[int] = Opcode.OP_SHADD16
     d: int  # uint32
     n: int  # uint32
     m: int  # uint32
@@ -2119,7 +2387,7 @@ class SHADD16:
 
 @dataclass(frozen=True, eq=True)
 class SHADD8:
-    _id: ClassVar[int] = 202
+    opcode: ClassVar[int] = Opcode.OP_SHADD8
     d: int  # uint32
     n: int  # uint32
     m: int  # uint32
@@ -2127,7 +2395,7 @@ class SHADD8:
 
 @dataclass(frozen=True, eq=True)
 class SHASX:
-    _id: ClassVar[int] = 203
+    opcode: ClassVar[int] = Opcode.OP_SHASX
     d: int  # uint32
     n: int  # uint32
     m: int  # uint32
@@ -2135,7 +2403,7 @@ class SHASX:
 
 @dataclass(frozen=True, eq=True)
 class SHSAX:
-    _id: ClassVar[int] = 204
+    opcode: ClassVar[int] = Opcode.OP_SHSAX
     d: int  # uint32
     n: int  # uint32
     m: int  # uint32
@@ -2143,7 +2411,7 @@ class SHSAX:
 
 @dataclass(frozen=True, eq=True)
 class SHSUB16:
-    _id: ClassVar[int] = 205
+    opcode: ClassVar[int] = Opcode.OP_SHSUB16
     d: int  # uint32
     n: int  # uint32
     m: int  # uint32
@@ -2151,7 +2419,7 @@ class SHSUB16:
 
 @dataclass(frozen=True, eq=True)
 class SHSUB8:
-    _id: ClassVar[int] = 206
+    opcode: ClassVar[int] = Opcode.OP_SHSUB8
     d: int  # uint32
     n: int  # uint32
     m: int  # uint32
@@ -2159,7 +2427,7 @@ class SHSUB8:
 
 @dataclass(frozen=True, eq=True)
 class STRBT:
-    _id: ClassVar[int] = 207
+    opcode: ClassVar[int] = Opcode.OP_STRBT
     t: int  # uint32
     n: int  # uint32
     postindex: bool
@@ -2170,7 +2438,7 @@ class STRBT:
 
 @dataclass(frozen=True, eq=True)
 class STREXB:
-    _id: ClassVar[int] = 208
+    opcode: ClassVar[int] = Opcode.OP_STREXB
     d: int  # uint32
     t: int  # uint32
     n: int  # uint32
@@ -2178,7 +2446,7 @@ class STREXB:
 
 @dataclass(frozen=True, eq=True)
 class STREXH:
-    _id: ClassVar[int] = 209
+    opcode: ClassVar[int] = Opcode.OP_STREXH
     d: int  # uint32
     t: int  # uint32
     n: int  # uint32
@@ -2186,7 +2454,7 @@ class STREXH:
 
 @dataclass(frozen=True, eq=True)
 class STRHT:
-    _id: ClassVar[int] = 210
+    opcode: ClassVar[int] = Opcode.OP_STRHT
     t: int  # uint32
     n: int  # uint32
     postindex: bool
@@ -2197,7 +2465,7 @@ class STRHT:
 
 @dataclass(frozen=True, eq=True)
 class STRT:
-    _id: ClassVar[int] = 211
+    opcode: ClassVar[int] = Opcode.OP_STRT
     t: int  # uint32
     n: int  # uint32
     postindex: bool
@@ -2208,7 +2476,7 @@ class STRT:
 
 @dataclass(frozen=True, eq=True)
 class UASX:
-    _id: ClassVar[int] = 212
+    opcode: ClassVar[int] = Opcode.OP_UASX
     d: int  # uint32
     n: int  # uint32
     m: int  # uint32
@@ -2216,7 +2484,7 @@ class UASX:
 
 @dataclass(frozen=True, eq=True)
 class UQADD16:
-    _id: ClassVar[int] = 213
+    opcode: ClassVar[int] = Opcode.OP_UQADD16
     d: int  # uint32
     n: int  # uint32
     m: int  # uint32
@@ -2224,7 +2492,7 @@ class UQADD16:
 
 @dataclass(frozen=True, eq=True)
 class UQADD8:
-    _id: ClassVar[int] = 214
+    opcode: ClassVar[int] = Opcode.OP_UQADD8
     d: int  # uint32
     n: int  # uint32
     m: int  # uint32
@@ -2232,7 +2500,7 @@ class UQADD8:
 
 @dataclass(frozen=True, eq=True)
 class UQASX:
-    _id: ClassVar[int] = 215
+    opcode: ClassVar[int] = Opcode.OP_UQASX
     d: int  # uint32
     n: int  # uint32
     m: int  # uint32
@@ -2240,7 +2508,7 @@ class UQASX:
 
 @dataclass(frozen=True, eq=True)
 class USAD8:
-    _id: ClassVar[int] = 216
+    opcode: ClassVar[int] = Opcode.OP_USAD8
     d: int  # uint32
     n: int  # uint32
     m: int  # uint32
@@ -2248,7 +2516,7 @@ class USAD8:
 
 @dataclass(frozen=True, eq=True)
 class USADA8:
-    _id: ClassVar[int] = 217
+    opcode: ClassVar[int] = Opcode.OP_USADA8
     d: int  # uint32
     n: int  # uint32
     m: int  # uint32
@@ -2257,7 +2525,7 @@ class USADA8:
 
 @dataclass(frozen=True, eq=True)
 class USAX:
-    _id: ClassVar[int] = 218
+    opcode: ClassVar[int] = Opcode.OP_USAX
     d: int  # uint32
     n: int  # uint32
     m: int  # uint32
@@ -2265,7 +2533,7 @@ class USAX:
 
 @dataclass(frozen=True, eq=True)
 class USUB16:
-    _id: ClassVar[int] = 219
+    opcode: ClassVar[int] = Opcode.OP_USUB16
     d: int  # uint32
     n: int  # uint32
     m: int  # uint32
@@ -2273,7 +2541,7 @@ class USUB16:
 
 @dataclass(frozen=True, eq=True)
 class USUB8:
-    _id: ClassVar[int] = 220
+    opcode: ClassVar[int] = Opcode.OP_USUB8
     d: int  # uint32
     n: int  # uint32
     m: int  # uint32
@@ -2281,7 +2549,7 @@ class USUB8:
 
 @dataclass(frozen=True, eq=True)
 class UXTAH:
-    _id: ClassVar[int] = 221
+    opcode: ClassVar[int] = Opcode.OP_UXTAH
     d: int  # uint32
     n: int  # uint32
     m: int  # uint32
@@ -2290,7 +2558,7 @@ class UXTAH:
 
 @dataclass(frozen=True, eq=True)
 class UXTB16:
-    _id: ClassVar[int] = 222
+    opcode: ClassVar[int] = Opcode.OP_UXTB16
     d: int  # uint32
     m: int  # uint32
     rotation: int  # uint32
@@ -2298,7 +2566,7 @@ class UXTB16:
 
 @dataclass(frozen=True, eq=True)
 class VABS:
-    _id: ClassVar[int] = 223
+    opcode: ClassVar[int] = Opcode.OP_VABS
     dp_operation: bool
     d: int  # uint32
     m: int  # uint32
@@ -2306,7 +2574,7 @@ class VABS:
 
 @dataclass(frozen=True, eq=True)
 class VADD:
-    _id: ClassVar[int] = 224
+    opcode: ClassVar[int] = Opcode.OP_VADD
     dp_operation: bool
     d: int  # uint32
     n: int  # uint32
@@ -2315,7 +2583,7 @@ class VADD:
 
 @dataclass(frozen=True, eq=True)
 class VCMP_VCMPE:
-    _id: ClassVar[int] = 225
+    opcode: ClassVar[int] = Opcode.OP_VCMP_VCMPE
     dp_operation: bool
     quiet_nan_exc: bool
     with_zero: bool
@@ -2325,7 +2593,7 @@ class VCMP_VCMPE:
 
 @dataclass(frozen=True, eq=True)
 class VCVTA_VCVTN_VCVTP_VCVTM:
-    _id: ClassVar[int] = 226
+    opcode: ClassVar[int] = Opcode.OP_VCVTA_VCVTN_VCVTP_VCVTM
     dp_operation: bool
     unsigned: bool
     round_mode: int  # bits2
@@ -2335,7 +2603,7 @@ class VCVTA_VCVTN_VCVTP_VCVTM:
 
 @dataclass(frozen=True, eq=True)
 class VCVT_VCVTR_integer:
-    _id: ClassVar[int] = 227
+    opcode: ClassVar[int] = Opcode.OP_VCVT_VCVTR_INTEGER
     to_integer: bool
     dp_operation: bool
     unsigned: bool
@@ -2347,7 +2615,7 @@ class VCVT_VCVTR_integer:
 
 @dataclass(frozen=True, eq=True)
 class VCVT_fixed_point:
-    _id: ClassVar[int] = 228
+    opcode: ClassVar[int] = Opcode.OP_VCVT_FIXED_POINT
     to_fixed: bool
     dp_operation: bool
     unsigned: bool
@@ -2360,7 +2628,7 @@ class VCVT_fixed_point:
 
 @dataclass(frozen=True, eq=True)
 class VCVT_double_single:
-    _id: ClassVar[int] = 229
+    opcode: ClassVar[int] = Opcode.OP_VCVT_DOUBLE_SINGLE
     double_to_single: bool
     d: int  # uint32
     m: int  # uint32
@@ -2368,7 +2636,7 @@ class VCVT_double_single:
 
 @dataclass(frozen=True, eq=True)
 class VCVTB_VCVTT:
-    _id: ClassVar[int] = 230
+    opcode: ClassVar[int] = Opcode.OP_VCVTB_VCVTT
     dp_operation: bool
     convert_from_half: bool
     lowbit: int  # bits5
@@ -2378,7 +2646,7 @@ class VCVTB_VCVTT:
 
 @dataclass(frozen=True, eq=True)
 class VDIV:
-    _id: ClassVar[int] = 231
+    opcode: ClassVar[int] = Opcode.OP_VDIV
     dp_operation: bool
     d: int  # uint32
     n: int  # uint32
@@ -2387,7 +2655,7 @@ class VDIV:
 
 @dataclass(frozen=True, eq=True)
 class VFMA_VFMS:
-    _id: ClassVar[int] = 232
+    opcode: ClassVar[int] = Opcode.OP_VFMA_VFMS
     dp_operation: bool
     op1_neg: bool
     d: int  # uint32
@@ -2397,7 +2665,7 @@ class VFMA_VFMS:
 
 @dataclass(frozen=True, eq=True)
 class VFNMA_VFNMS:
-    _id: ClassVar[int] = 233
+    opcode: ClassVar[int] = Opcode.OP_VFNMA_VFNMS
     op1_neg: bool
     dp_operation: bool
     d: int  # uint32
@@ -2407,7 +2675,7 @@ class VFNMA_VFNMS:
 
 @dataclass(frozen=True, eq=True)
 class VLDM:
-    _id: ClassVar[int] = 234
+    opcode: ClassVar[int] = Opcode.OP_VLDM
     single_regs: bool
     add: bool
     wback: bool
@@ -2420,7 +2688,7 @@ class VLDM:
 
 @dataclass(frozen=True, eq=True)
 class VLDR:
-    _id: ClassVar[int] = 235
+    opcode: ClassVar[int] = Opcode.OP_VLDR
     single_reg: bool
     add: bool
     imm32: int  # bits32
@@ -2430,7 +2698,7 @@ class VLDR:
 
 @dataclass(frozen=True, eq=True)
 class VMAXNM_VMINNM:
-    _id: ClassVar[int] = 236
+    opcode: ClassVar[int] = Opcode.OP_VMAXNM_VMINNM
     dp_operation: bool
     maximum: bool
     d: int  # uint32
@@ -2440,7 +2708,7 @@ class VMAXNM_VMINNM:
 
 @dataclass(frozen=True, eq=True)
 class VMLA_VMLS:
-    _id: ClassVar[int] = 237
+    opcode: ClassVar[int] = Opcode.OP_VMLA_VMLS
     dp_operation: bool
     add: bool
     d: int  # uint32
@@ -2450,7 +2718,7 @@ class VMLA_VMLS:
 
 @dataclass(frozen=True, eq=True)
 class VMOV_immediate:
-    _id: ClassVar[int] = 238
+    opcode: ClassVar[int] = Opcode.OP_VMOV_IMMEDIATE
     dp_operation: bool
     d: int  # uint32
     imm64: int  # bits64
@@ -2459,7 +2727,7 @@ class VMOV_immediate:
 
 @dataclass(frozen=True, eq=True)
 class VMOV_register:
-    _id: ClassVar[int] = 239
+    opcode: ClassVar[int] = Opcode.OP_VMOV_REGISTER
     dp_operation: bool
     d: int  # uint32
     m: int  # uint32
@@ -2467,21 +2735,21 @@ class VMOV_register:
 
 @dataclass(frozen=True, eq=True)
 class VMOV_core_to_scalar:
-    _id: ClassVar[int] = 240
+    opcode: ClassVar[int] = Opcode.OP_VMOV_CORE_TO_SCALAR
     d: int  # uint32
     t: int  # uint32
 
 
 @dataclass(frozen=True, eq=True)
 class VMOV_scalar_to_core:
-    _id: ClassVar[int] = 241
+    opcode: ClassVar[int] = Opcode.OP_VMOV_SCALAR_TO_CORE
     t: int  # uint32
     n: int  # uint32
 
 
 @dataclass(frozen=True, eq=True)
 class VMOV_core_and_single:
-    _id: ClassVar[int] = 242
+    opcode: ClassVar[int] = Opcode.OP_VMOV_CORE_AND_SINGLE
     to_arm_register: bool
     t: int  # uint32
     n: int  # uint32
@@ -2489,7 +2757,7 @@ class VMOV_core_and_single:
 
 @dataclass(frozen=True, eq=True)
 class VMOV_two_core_and_two_single:
-    _id: ClassVar[int] = 243
+    opcode: ClassVar[int] = Opcode.OP_VMOV_TWO_CORE_AND_TWO_SINGLE
     to_arm_registers: bool
     t: int  # uint32
     t2: int  # uint32
@@ -2498,7 +2766,7 @@ class VMOV_two_core_and_two_single:
 
 @dataclass(frozen=True, eq=True)
 class VMOV_two_core_and_doubleword:
-    _id: ClassVar[int] = 244
+    opcode: ClassVar[int] = Opcode.OP_VMOV_TWO_CORE_AND_DOUBLEWORD
     to_arm_registers: bool
     t: int  # uint32
     t2: int  # uint32
@@ -2507,19 +2775,19 @@ class VMOV_two_core_and_doubleword:
 
 @dataclass(frozen=True, eq=True)
 class VMRS:
-    _id: ClassVar[int] = 245
+    opcode: ClassVar[int] = Opcode.OP_VMRS
     t: int  # uint32
 
 
 @dataclass(frozen=True, eq=True)
 class VMSR:
-    _id: ClassVar[int] = 246
+    opcode: ClassVar[int] = Opcode.OP_VMSR
     t: int  # uint32
 
 
 @dataclass(frozen=True, eq=True)
 class VMUL:
-    _id: ClassVar[int] = 247
+    opcode: ClassVar[int] = Opcode.OP_VMUL
     dp_operation: bool
     d: int  # uint32
     n: int  # uint32
@@ -2528,7 +2796,7 @@ class VMUL:
 
 @dataclass(frozen=True, eq=True)
 class VNEG:
-    _id: ClassVar[int] = 248
+    opcode: ClassVar[int] = Opcode.OP_VNEG
     dp_operation: bool
     d: int  # uint32
     m: int  # uint32
@@ -2536,7 +2804,7 @@ class VNEG:
 
 @dataclass(frozen=True, eq=True)
 class VNMLA_VNMLS_VNMUL:
-    _id: ClassVar[int] = 249
+    opcode: ClassVar[int] = Opcode.OP_VNMLA_VNMLS_VNMUL
     type: int  # bits2
     dp_operation: bool
     d: int  # uint32
@@ -2546,7 +2814,7 @@ class VNMLA_VNMLS_VNMUL:
 
 @dataclass(frozen=True, eq=True)
 class VPOP:
-    _id: ClassVar[int] = 250
+    opcode: ClassVar[int] = Opcode.OP_VPOP
     single_regs: bool
     d: int  # uint32
     imm32: int  # bits32
@@ -2555,7 +2823,7 @@ class VPOP:
 
 @dataclass(frozen=True, eq=True)
 class VPUSH:
-    _id: ClassVar[int] = 251
+    opcode: ClassVar[int] = Opcode.OP_VPUSH
     single_regs: bool
     d: int  # uint32
     imm32: int  # bits32
@@ -2564,7 +2832,7 @@ class VPUSH:
 
 @dataclass(frozen=True, eq=True)
 class VRINTA_VRINTN_VRINTP_VRINTM:
-    _id: ClassVar[int] = 252
+    opcode: ClassVar[int] = Opcode.OP_VRINTA_VRINTN_VRINTP_VRINTM
     dp_operation: bool
     rmode: int  # bits2
     away: bool
@@ -2575,7 +2843,7 @@ class VRINTA_VRINTN_VRINTP_VRINTM:
 
 @dataclass(frozen=True, eq=True)
 class VRINTX:
-    _id: ClassVar[int] = 253
+    opcode: ClassVar[int] = Opcode.OP_VRINTX
     dp_operation: bool
     d: int  # uint32
     m: int  # uint32
@@ -2583,7 +2851,7 @@ class VRINTX:
 
 @dataclass(frozen=True, eq=True)
 class VRINTZ_VRINTR:
-    _id: ClassVar[int] = 254
+    opcode: ClassVar[int] = Opcode.OP_VRINTZ_VRINTR
     dp_operation: bool
     rmode: int  # bits2
     d: int  # uint32
@@ -2592,7 +2860,7 @@ class VRINTZ_VRINTR:
 
 @dataclass(frozen=True, eq=True)
 class VSEL:
-    _id: ClassVar[int] = 255
+    opcode: ClassVar[int] = Opcode.OP_VSEL
     dp_operation: bool
     cond: int  # bits4
     d: int  # uint32
@@ -2602,7 +2870,7 @@ class VSEL:
 
 @dataclass(frozen=True, eq=True)
 class VSQRT:
-    _id: ClassVar[int] = 256
+    opcode: ClassVar[int] = Opcode.OP_VSQRT
     dp_operation: bool
     d: int  # uint32
     m: int  # uint32
@@ -2610,7 +2878,7 @@ class VSQRT:
 
 @dataclass(frozen=True, eq=True)
 class VSTM:
-    _id: ClassVar[int] = 257
+    opcode: ClassVar[int] = Opcode.OP_VSTM
     single_regs: bool
     add: bool
     wback: bool
@@ -2623,7 +2891,7 @@ class VSTM:
 
 @dataclass(frozen=True, eq=True)
 class VSTR:
-    _id: ClassVar[int] = 258
+    opcode: ClassVar[int] = Opcode.OP_VSTR
     single_reg: bool
     add: bool
     imm32: int  # bits32
@@ -2633,7 +2901,7 @@ class VSTR:
 
 @dataclass(frozen=True, eq=True)
 class VSUB:
-    _id: ClassVar[int] = 259
+    opcode: ClassVar[int] = Opcode.OP_VSUB
     dp_operation: bool
     d: int  # uint32
     n: int  # uint32

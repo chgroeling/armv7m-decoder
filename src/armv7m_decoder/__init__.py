@@ -9,6 +9,7 @@ pseudo-instruction classes (:class:`NoMatch`, :class:`Undefined`,
 from armv7m_decoder._decoder import (  # noqa: F401
     Context,
     NoMatch,
+    Opcode,
     See,
     Undefined,
     Unpredictable,
@@ -21,6 +22,7 @@ from armv7m_decoder._disasm import disassemble  # noqa: F401
 __all__ = [
     "Context",
     "NoMatch",
+    "Opcode",
     "See",
     "Undefined",
     "Unpredictable",
@@ -31,18 +33,18 @@ __all__ = [
 ]
 
 # Re-export all instruction dataclasses from the generated decoder.  An instruction
-# dataclass is identified by a non-negative ``_id`` ClassVar.
+# dataclass is identified by a non-negative ``opcode`` ClassVar.
 from armv7m_decoder import _decoder  # noqa: E402
 
-_id_to_name: dict[int, str] = {}
+_opcode_to_name: dict[int, str] = {}
 for _name, _obj in vars(_decoder).items():
     if _name.startswith("_"):
         continue
-    _id = getattr(_obj, "_id", None)
-    if isinstance(_id, int) and _id >= 0:
-        _id_to_name[_id] = _name
+    _opc = getattr(_obj, "opcode", None)
+    if isinstance(_opc, int) and _opc >= 0:
+        _opcode_to_name[_opc] = _name
         globals()[_name] = _obj
         __all__.append(_name)
 
-# Export a lookup table for reverse-mapping instruction ids to class names.
-__all__.append("_id_to_name")
+# Export a lookup table for reverse-mapping opcodes to class names.
+__all__.append("_opcode_to_name")

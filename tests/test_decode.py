@@ -153,11 +153,11 @@ class TestPseudoInstructions:
 
 
 class TestIDToName:
-    """Verify the _id_to_name lookup table."""
+    """Verify the _opcode_to_name lookup table."""
 
     def test_id_to_name_has_instructions(self) -> None:
-        from armv7m_decoder import _id_to_name
+        from armv7m_decoder import _opcode_to_name
 
-        assert len(_id_to_name) > 0
-        nop_ids = [i for i, n in _id_to_name.items() if n == "NOP"]
+        assert len(_opcode_to_name) > 0
+        nop_ids = [i for i, n in _opcode_to_name.items() if n == "NOP"]
         assert len(nop_ids) == 1
