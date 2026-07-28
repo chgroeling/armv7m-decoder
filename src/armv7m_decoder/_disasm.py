@@ -10,6 +10,10 @@ from typing import Any
 
 from armv7m_decoder._decoder import Opcode
 
+# Number of characters the mnemonic field is padded to (0 = no padding).
+# Set to e.g. 8 to right-pad mnemonics so operands align in columns.
+MNEMONIC_PAD: int = 5
+
 # ---------------------------------------------------------------------------
 # Constants
 # ---------------------------------------------------------------------------
@@ -1504,4 +1508,10 @@ def disassemble(result: object, instr: int = 0, offset: int = 0) -> str:
     if fmt_func is None:
         return repr(result)
 
-    return fmt_func(result)
+    asm = fmt_func(result)
+    _pad = MNEMONIC_PAD
+    if _pad > 0:
+        parts = asm.split(" ", 1)
+        if len(parts) == 2:
+            asm = f"{parts[0]:<{_pad}} {parts[1]}"
+    return asm
