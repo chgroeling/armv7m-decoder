@@ -214,6 +214,10 @@ def _branch_target(offset: int, imm32: int) -> str:
     return f"0x{((offset + 4 + imm32) & 0xFFFFFFFF):x}"
 
 
+def _hex_comment(imm: int) -> str:
+    return f"\t@ 0x{imm:x}" if imm > 16 or imm < -16 else ""
+
+
 # ---------------------------------------------------------------------------
 # Combined-mnemonic helpers
 # ---------------------------------------------------------------------------
@@ -255,22 +259,31 @@ def _round_mnemonic(base: str, round_val: bool) -> str:
 
 def _fmt_dp_imm(result: Any, mnemonic: str) -> str:
     s = _flags(result.setflags)
-    return f"{mnemonic}{s} {_reg(result.d)}, {_reg(result.n)}, #{result.imm32}"
+    return (
+        f"{mnemonic}{s} {_reg(result.d)}, {_reg(result.n)}, #{result.imm32}"
+        f"{_hex_comment(result.imm32)}"
+    )
 
 
 def _fmt_mov_imm(result: Any) -> str:
     s = _flags(result.setflags)
-    return f"mov{s} {_reg(result.d)}, #{result.imm32}"
+    return f"mov{s} {_reg(result.d)}, #{result.imm32}{_hex_comment(result.imm32)}"
 
 
 def _fmt_mvn_imm(result: Any, mnemonic: str = "mvn") -> str:
     s = _flags(result.setflags)
-    return f"{mnemonic}{s} {_reg(result.d)}, #{result.imm32}"
+    return (
+        f"{mnemonic}{s} {_reg(result.d)}, #{result.imm32}"
+        f"{_hex_comment(result.imm32)}"
+    )
 
 
 def _fmt_and_imm(result: Any, mnemonic: str = "and") -> str:
     s = _flags(getattr(result, "setflags", False))
-    return f"{mnemonic}{s} {_reg(result.d)}, {_reg(result.n)}, #{result.imm32}"
+    return (
+        f"{mnemonic}{s} {_reg(result.d)}, {_reg(result.n)}, #{result.imm32}"
+        f"{_hex_comment(result.imm32)}"
+    )
 
 
 # --- Data-processing register ---
@@ -302,7 +315,7 @@ def _fmt_rrx(result: Any) -> str:
 
 
 def _fmt_test_imm(result: Any, mnemonic: str) -> str:
-    return f"{mnemonic} {_reg(result.n)}, #{result.imm32}"
+    return f"{mnemonic} {_reg(result.n)}, #{result.imm32}{_hex_comment(result.imm32)}"
 
 
 def _fmt_test_reg(result: Any, mnemonic: str) -> str:
@@ -336,7 +349,7 @@ def _fmt_shift_reg(result: Any, mnemonic: str) -> str:
 
 def _fmt_add_sp_imm(result: Any) -> str:
     s = _flags(result.setflags)
-    return f"add{s} {_reg(result.d)}, sp, #{result.imm32}"
+    return f"add{s} {_reg(result.d)}, sp, #{result.imm32}{_hex_comment(result.imm32)}"
 
 
 def _fmt_add_sp_reg(result: Any) -> str:
@@ -347,7 +360,7 @@ def _fmt_add_sp_reg(result: Any) -> str:
 
 def _fmt_sub_sp_imm(result: Any) -> str:
     s = _flags(result.setflags)
-    return f"sub{s} {_reg(result.d)}, sp, #{result.imm32}"
+    return f"sub{s} {_reg(result.d)}, sp, #{result.imm32}{_hex_comment(result.imm32)}"
 
 
 def _fmt_sub_sp_reg(result: Any) -> str:
@@ -748,7 +761,7 @@ def _fmt_pkhbt_pkhtb(result: Any) -> str:
 
 
 def _fmt_movt(result: Any) -> str:
-    return f"movt {_reg(result.d)}, #{result.imm16}"
+    return f"movt {_reg(result.d)}, #{result.imm16}{_hex_comment(result.imm16)}"
 
 
 # --- USAD8 / USADA8 ---
