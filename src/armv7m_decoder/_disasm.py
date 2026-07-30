@@ -159,7 +159,7 @@ def _vfp_reg(dp_operation: bool, r: int) -> str:
 
 def _addr_imm(n: int, imm32: int, index: bool, add: bool, wback: bool) -> str:
     sign = "" if add else "-"
-    offset_text = "" if imm32 == 0 and add else f", #{sign}{imm32}"
+    offset_text = f", #{sign}{imm32}"
     if index and wback:
         return f"[{_reg(n)}{offset_text}]!"
     if index and not wback:

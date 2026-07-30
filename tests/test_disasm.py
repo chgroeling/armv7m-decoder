@@ -38,11 +38,11 @@ class TestDisasmBasics:
 
     def test_ldr_immediate(self, ctx) -> None:
         result, _ = decode(0x6800 << 16, ctx)
-        assert disassemble(result) == "ldr\tr0, [r0]"
+        assert disassemble(result) == "ldr\tr0, [r0, #0]"
 
     def test_str_immediate(self, ctx) -> None:
         result, _ = decode(0x6000 << 16, ctx)
-        assert disassemble(result) == "str\tr0, [r0]"
+        assert disassemble(result) == "str\tr0, [r0, #0]"
 
     def test_mul(self, ctx) -> None:
         result, _ = decode(0x4340 << 16, ctx)
