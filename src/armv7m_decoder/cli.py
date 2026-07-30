@@ -92,9 +92,11 @@ def decode_cmd(
         if result is not None:
             if n_bytes == 2:
                 hex_bytes = f"{hw1:04x}"
+                instr_clean = hw1 << 16
             else:
                 hex_bytes = f"{hw1:04x} {hw2:04x}"
-            asm = disassemble(result, instr, offset)
+                instr_clean = instr
+            asm = disassemble(result, instr_clean, offset)
             out.write(f"{offset:8x}: {hex_bytes:<9}   {asm}\n")
 
         offset += n_bytes
