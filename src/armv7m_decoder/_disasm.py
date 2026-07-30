@@ -1508,7 +1508,10 @@ def disassemble(result: object, instr: int = 0, offset: int = 0) -> str:
     if fmt_func is None:
         return repr(result)
 
-    asm = fmt_func(result)
+    try:
+        asm = fmt_func(result, offset)
+    except TypeError:
+        asm = fmt_func(result)
     _pad = MNEMONIC_PAD
     if _pad > 0:
         parts = asm.split(" ", 1)
