@@ -52,7 +52,7 @@ class TestDisasmBasics:
 class TestDisasmBranch:
     def test_b_t2(self, ctx) -> None:
         result, _ = decode(0xE010 << 16, ctx)
-        assert disassemble(result) == "b #0x24"
+        assert disassemble(result) == "b.n #0x24"
 
     def test_b_t2_backwards(self, ctx) -> None:
         result, _ = decode(0xE7FE << 16, ctx)
@@ -60,11 +60,11 @@ class TestDisasmBranch:
 
     def test_blx_register(self, ctx) -> None:
         result, _ = decode(0x4780 << 16, ctx)
-        assert disassemble(result) == "blx r0"
+        assert disassemble(result) == "blx.n r0"
 
     def test_bx(self, ctx) -> None:
         result, _ = decode(0x4700 << 16, ctx)
-        assert disassemble(result) == "bx r0"
+        assert disassemble(result) == "bx.n r0"
 
 
 class TestDisasmRegisterNames:

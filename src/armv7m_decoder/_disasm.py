@@ -511,9 +511,10 @@ def _fmt_push(result: Any) -> str:
 # --- Branch ---
 
 
-def _fmt_b(result: Any, offset: int = 0) -> str:
+def _fmt_b(result: Any, offset: int = 0, instr: int = 0) -> str:
     c = _cond(result.cond)
-    return f"b{c} {_branch_target(offset, result.imm32)}"
+    narrow = ".n" if (instr & 0xFFFF) == 0 else ""
+    return f"b{c}{narrow} {_branch_target(offset, result.imm32)}"
 
 
 def _fmt_bl(result: Any, offset: int = 0) -> str:
@@ -521,16 +522,16 @@ def _fmt_bl(result: Any, offset: int = 0) -> str:
 
 
 def _fmt_blx_reg(result: Any) -> str:
-    return f"blx {_reg(result.m)}"
+    return f"blx.n {_reg(result.m)}"
 
 
 def _fmt_bx(result: Any) -> str:
-    return f"bx {_reg(result.m)}"
+    return f"bx.n {_reg(result.m)}"
 
 
 def _fmt_cbnz_cbz(result: Any, offset: int = 0) -> str:
     mnemonic = "cbnz" if result.nonzero else "cbz"
-    return f"{mnemonic} {_reg(result.n)}, {_branch_target(offset, result.imm32)}"
+    return f"{mnemonic}.n {_reg(result.n)}, {_branch_target(offset, result.imm32)}"
 
 
 def _fmt_tbb_tbh(result: Any, offset: int = 0) -> str:
