@@ -374,7 +374,7 @@ def _fmt_ldst_imm(result: Any, mnemonic: str) -> str:
 
 def _fmt_ldst_imm_t(result: Any, mnemonic: str) -> str:
     addr = _addr_imm(result.n, result.imm32, result.index, result.add, result.wback)
-    return f"{mnemonic} {_reg(result.t)}, {addr}"
+    return f"{mnemonic} {_reg(result.t)}, {addr}\t@ 0x{result.imm32:x}"
 
 
 def _fmt_ldst_imm_dual(result: Any, mnemonic: str) -> str:
@@ -387,7 +387,7 @@ def _fmt_ldst_imm_dual(result: Any, mnemonic: str) -> str:
         result.add,
         result.wback,
     )
-    return f"{mnemonic} {addr}"
+    return f"{mnemonic} {addr}\t@ 0x{result.imm32:x}"
 
 
 # --- Load/store register ---
