@@ -30,7 +30,7 @@ class TestDisasmBasics:
 
     def test_bkpt(self, ctx) -> None:
         result, _ = decode(0xBE00 << 16, ctx)
-        assert disassemble(result) == "bkpt #0x0"
+        assert disassemble(result) == "bkpt 0x0"
 
     def test_push(self, ctx) -> None:
         result, _ = decode(0xB401 << 16, ctx)
@@ -52,7 +52,7 @@ class TestDisasmBasics:
 class TestDisasmBranch:
     def test_b_t2(self, ctx) -> None:
         result, _ = decode(0xE010 << 16, ctx)
-        assert disassemble(result) == "b.n #0x24"
+        assert disassemble(result) == "b.n 0x00000024"
 
     def test_b_t2_backwards(self, ctx) -> None:
         result, _ = decode(0xE7FE << 16, ctx)

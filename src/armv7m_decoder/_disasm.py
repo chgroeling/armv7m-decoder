@@ -211,7 +211,7 @@ def _addr_unpriv_ldr(t: int, n: int, imm32: int) -> str:
 
 
 def _branch_target(offset: int, imm32: int) -> str:
-    return f"#{hex((offset + 4 + imm32) & 0xFFFFFFFF)}"
+    return f"0x{((offset + 4 + imm32) & 0xFFFFFFFF):08x}"
 
 
 # ---------------------------------------------------------------------------
@@ -798,7 +798,7 @@ def _fmt_noargs(mnemonic: str) -> str:
 
 
 def _fmt_bkpt(result: Any) -> str:
-    return f"bkpt #{hex(result.imm32)}"
+    return f"bkpt 0x{result.imm32:x}"
 
 
 def _fmt_svc(result: Any) -> str:
