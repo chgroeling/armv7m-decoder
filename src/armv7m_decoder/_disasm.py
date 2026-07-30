@@ -531,7 +531,7 @@ def _fmt_bx(result: Any) -> str:
 
 def _fmt_cbnz_cbz(result: Any, offset: int = 0) -> str:
     mnemonic = "cbnz" if result.nonzero else "cbz"
-    return f"{mnemonic}.n {_reg(result.n)}, {_branch_target(offset, result.imm32)}"
+    return f"{mnemonic} {_reg(result.n)}, {_branch_target(offset, result.imm32)}"
 
 
 def _fmt_tbb_tbh(result: Any, offset: int = 0) -> str:
