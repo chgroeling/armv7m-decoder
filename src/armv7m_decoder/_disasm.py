@@ -6,6 +6,7 @@ Language) syntax strings, suitable for display as disassembled output.
 
 from __future__ import annotations
 
+import inspect as _inspect
 from typing import Any
 
 from armv7m_decoder._decoder import Opcode
@@ -511,7 +512,7 @@ def _fmt_push(result: Any) -> str:
 
 
 def _fmt_b(result: Any, offset: int = 0) -> str:
-    c = "" if result.cond == 0 else _cond(result.cond)
+    c = _cond(result.cond)
     return f"b{c} {_branch_target(offset, result.imm32)}"
 
 
@@ -1509,8 +1510,14 @@ def disassemble(result: object, instr: int = 0, offset: int = 0) -> str:
         return repr(result)
 
     try:
-        asm = fmt_func(result, offset)
-    except TypeError:
+        sig = _inspect.signature(fmt_func)
+        kwargs: dict[str, Any] = {}
+        if "offset" in sig.parameters:
+            kwargs["offset"] = offset
+        if "instr" in sig.parameters:
+            kwargs["instr"] = instr
+        asm = fmt_func(result, **kwargs)
+    except (ValueError, TypeError):
         asm = fmt_func(result)
     _pad = MNEMONIC_PAD
     if _pad > 0:

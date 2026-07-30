@@ -4103,9 +4103,8 @@ def decode(instr: int, ctx: Context):
                     J1 = _bits(instr, 13, 1)
                     J2 = _bits(instr, 11, 1)
                     imm11 = _bits(instr, 0, 11)
-                    # members this encoding does not produce
-                    cond = 0
                     # decode
+                    cond = 14
                     I1 = (~((J1 ^ S) & 0x1)) & 0x1
                     I2 = (~((J2 ^ S) & 0x1)) & 0x1
                     imm32 = SignExtend(
@@ -10918,9 +10917,8 @@ def decode(instr: int, ctx: Context):
             # -> B
             # operands
             imm11 = _bits(instr, 16, 11)
-            # members this encoding does not produce
-            cond = 0
             # decode
+            cond = 14
             imm32 = SignExtend(concat_bits(imm11, 0, 1), 12)
             if InITBlock(ctx) and (not (LastInITBlock(ctx))):
                 ctx.sideeffect |= SIDEFFECT_UNPREDICTABLE

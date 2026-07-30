@@ -1272,6 +1272,7 @@ instructions:
     - field: imm11
       width: 11
     decode: |
+      cond = 14;
       imm32 = SignExtend(imm11:'0', 32);
       if InITBlock() && !LastInITBlock() then UNPREDICTABLE;
   - name: T3
@@ -1315,6 +1316,7 @@ instructions:
     - field: imm11
       width: 11
     decode: |
+      cond = 14;
       I1 = NOT(J1 EOR S); I2 = NOT(J2 EOR S);
       imm32 = SignExtend(S:I1:I2:imm10:imm11:'0', 32);
       if InITBlock() && !LastInITBlock() then UNPREDICTABLE;
