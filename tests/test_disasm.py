@@ -52,7 +52,7 @@ class TestDisasmBasics:
 class TestDisasmBranch:
     def test_b_t2(self, ctx) -> None:
         result, _ = decode(0xE010 << 16, ctx)
-        assert disassemble(result) == "b.n 0x00000024"
+        assert disassemble(result) == "b.n 0x24"
 
     def test_b_t2_backwards(self, ctx) -> None:
         result, _ = decode(0xE7FE << 16, ctx)

@@ -211,7 +211,7 @@ def _addr_unpriv_ldr(t: int, n: int, imm32: int) -> str:
 
 
 def _branch_target(offset: int, imm32: int) -> str:
-    return f"0x{((offset + 4 + imm32) & 0xFFFFFFFF):08x}"
+    return f"0x{((offset + 4 + imm32) & 0xFFFFFFFF):x}"
 
 
 # ---------------------------------------------------------------------------
