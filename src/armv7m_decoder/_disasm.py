@@ -259,6 +259,11 @@ def _round_mnemonic(base: str, round_val: bool) -> str:
 
 def _fmt_dp_imm(result: Any, mnemonic: str) -> str:
     s = _flags(result.setflags)
+    if result.d == result.n:
+        return (
+            f"{mnemonic}{s} {_reg(result.d)}, #{result.imm32}"
+            f"{_hex_comment(result.imm32)}"
+        )
     return (
         f"{mnemonic}{s} {_reg(result.d)}, {_reg(result.n)}, #{result.imm32}"
         f"{_hex_comment(result.imm32)}"
@@ -280,6 +285,11 @@ def _fmt_mvn_imm(result: Any, mnemonic: str = "mvn") -> str:
 
 def _fmt_and_imm(result: Any, mnemonic: str = "and") -> str:
     s = _flags(getattr(result, "setflags", False))
+    if result.d == result.n:
+        return (
+            f"{mnemonic}{s} {_reg(result.d)}, #{result.imm32}"
+            f"{_hex_comment(result.imm32)}"
+        )
     return (
         f"{mnemonic}{s} {_reg(result.d)}, {_reg(result.n)}, #{result.imm32}"
         f"{_hex_comment(result.imm32)}"
