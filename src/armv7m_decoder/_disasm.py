@@ -798,7 +798,7 @@ def _fmt_noargs(mnemonic: str) -> str:
 
 
 def _fmt_bkpt(result: Any) -> str:
-    return f"bkpt 0x{result.imm32:x}"
+    return f"bkpt 0x{result.imm32:02x}"
 
 
 def _fmt_svc(result: Any) -> str:
