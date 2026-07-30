@@ -60,11 +60,11 @@ class TestDisasmBranch:
 
     def test_blx_register(self, ctx) -> None:
         result, _ = decode(0x4780 << 16, ctx)
-        assert disassemble(result) == "blx.n\tr0"
+        assert disassemble(result) == "blx\tr0"
 
     def test_bx(self, ctx) -> None:
         result, _ = decode(0x4700 << 16, ctx)
-        assert disassemble(result) == "bx.n\tr0"
+        assert disassemble(result) == "bx\tr0"
 
 
 class TestDisasmRegisterNames:

@@ -522,11 +522,11 @@ def _fmt_bl(result: Any, offset: int = 0) -> str:
 
 
 def _fmt_blx_reg(result: Any) -> str:
-    return f"blx.n {_reg(result.m)}"
+    return f"blx {_reg(result.m)}"
 
 
 def _fmt_bx(result: Any) -> str:
-    return f"bx.n {_reg(result.m)}"
+    return f"bx {_reg(result.m)}"
 
 
 def _fmt_cbnz_cbz(result: Any, offset: int = 0) -> str:
