@@ -255,31 +255,22 @@ def _round_mnemonic(base: str, round_val: bool) -> str:
 
 def _fmt_dp_imm(result: Any, mnemonic: str) -> str:
     s = _flags(result.setflags)
-    return (
-        f"{mnemonic}{s} {_reg(result.d)}, {_reg(result.n)}, #{result.imm32}"
-        f"\t@ 0x{result.imm32:x}"
-    )
+    return f"{mnemonic}{s} {_reg(result.d)}, {_reg(result.n)}, #{result.imm32}"
 
 
 def _fmt_mov_imm(result: Any) -> str:
     s = _flags(result.setflags)
-    return f"mov{s} {_reg(result.d)}, #{result.imm32}\t@ 0x{result.imm32:x}"
+    return f"mov{s} {_reg(result.d)}, #{result.imm32}"
 
 
 def _fmt_mvn_imm(result: Any, mnemonic: str = "mvn") -> str:
     s = _flags(result.setflags)
-    return (
-        f"{mnemonic}{s} {_reg(result.d)}, #{result.imm32}"
-        f"\t@ 0x{result.imm32:x}"
-    )
+    return f"{mnemonic}{s} {_reg(result.d)}, #{result.imm32}"
 
 
 def _fmt_and_imm(result: Any, mnemonic: str = "and") -> str:
     s = _flags(getattr(result, "setflags", False))
-    return (
-        f"{mnemonic}{s} {_reg(result.d)}, {_reg(result.n)}, #{result.imm32}"
-        f"\t@ 0x{result.imm32:x}"
-    )
+    return f"{mnemonic}{s} {_reg(result.d)}, {_reg(result.n)}, #{result.imm32}"
 
 
 # --- Data-processing register ---
@@ -311,7 +302,7 @@ def _fmt_rrx(result: Any) -> str:
 
 
 def _fmt_test_imm(result: Any, mnemonic: str) -> str:
-    return f"{mnemonic} {_reg(result.n)}, #{result.imm32}\t@ 0x{result.imm32:x}"
+    return f"{mnemonic} {_reg(result.n)}, #{result.imm32}"
 
 
 def _fmt_test_reg(result: Any, mnemonic: str) -> str:
@@ -757,7 +748,7 @@ def _fmt_pkhbt_pkhtb(result: Any) -> str:
 
 
 def _fmt_movt(result: Any) -> str:
-    return f"movt {_reg(result.d)}, #{result.imm16}\t@ 0x{result.imm16:x}"
+    return f"movt {_reg(result.d)}, #{result.imm16}"
 
 
 # --- USAD8 / USADA8 ---
