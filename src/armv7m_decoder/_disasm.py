@@ -406,15 +406,21 @@ def _fmt_ldst_reg_rt(result: Any, mnemonic: str) -> str:
 # --- Load/store literal ---
 
 
-def _fmt_ldst_lit(result: Any, mnemonic: str) -> str:
-    return f"{mnemonic} {_addr_literal(result.t, result.imm32, result.add)}"
+def _fmt_ldst_lit(result: Any, mnemonic: str, offset: int = 0) -> str:
+    asm = f"{mnemonic} {_addr_literal(result.t, result.imm32, result.add)}"
+    base = ((offset + 4) & ~3) & 0xFFFFFFFF
+    target = base + (result.imm32 if result.add else -result.imm32)
+    return f"{asm}\t@ (0x{target:x})"
 
 
-def _fmt_ldst_lit_dual(result: Any, mnemonic: str = "ldrd") -> str:
+def _fmt_ldst_lit_dual(result: Any, mnemonic: str = "ldrd", offset: int = 0) -> str:
     sign = "" if result.add else "-"
-    return (
+    asm = (
         f"{mnemonic} {_reg(result.t)}, {_reg(result.t2)}, [pc, #{sign}{result.imm32}]"
     )
+    base = ((offset + 4) & ~3) & 0xFFFFFFFF
+    target = base + (result.imm32 if result.add else -result.imm32)
+    return f"{asm}\t@ (0x{target:x})"
 
 
 # --- Preload (PLD / PLI) ---
@@ -425,9 +431,12 @@ def _fmt_pld_imm(result: Any) -> str:
     return f"pld [{_reg(result.n)}, #{sign}{result.imm32}]"
 
 
-def _fmt_pld_lit(result: Any) -> str:
+def _fmt_pld_lit(result: Any, offset: int = 0) -> str:
     sign = "" if result.add else "-"
-    return f"pld [pc, #{sign}{result.imm32}]"
+    asm = f"pld [pc, #{sign}{result.imm32}]"
+    base = ((offset + 4) & ~3) & 0xFFFFFFFF
+    target = base + (result.imm32 if result.add else -result.imm32)
+    return f"{asm}\t@ (0x{target:x})"
 
 
 def _fmt_pld_reg(result: Any) -> str:
@@ -1254,10 +1263,10 @@ _DISPATCH: dict[int, Any] = {
     Opcode.OP_LDM: lambda r: _fmt_multi_xfer(r, "ldmia"),
     Opcode.OP_LDMDB: lambda r: _fmt_multi_xfer(r, "ldmdb"),
     Opcode.OP_LDR_IMMEDIATE: lambda r: _fmt_ldst_imm_t(r, "ldr"),
-    Opcode.OP_LDR_LITERAL: lambda r: _fmt_ldst_lit(r, "ldr"),
+    Opcode.OP_LDR_LITERAL: lambda r, offset=0: _fmt_ldst_lit(r, "ldr", offset=offset),
     Opcode.OP_LDR_REGISTER: lambda r: _fmt_ldst_reg(r, "ldr"),
     Opcode.OP_LDRB_IMMEDIATE: lambda r: _fmt_ldst_imm_t(r, "ldrb"),
-    Opcode.OP_LDRB_LITERAL: lambda r: _fmt_ldst_lit(r, "ldrb"),
+    Opcode.OP_LDRB_LITERAL: lambda r, offset=0: _fmt_ldst_lit(r, "ldrb", offset=offset),
     Opcode.OP_LDRB_REGISTER: lambda r: _fmt_ldst_reg(r, "ldrb"),
     Opcode.OP_LDRBT: lambda r: _fmt_unpriv_ldr(r, "ldrbt"),
     Opcode.OP_LDRD_IMMEDIATE: lambda r: _fmt_ldst_imm_dual(r, "ldrd"),
@@ -1266,15 +1275,19 @@ _DISPATCH: dict[int, Any] = {
     Opcode.OP_LDREXB: _fmt_ldrexb,
     Opcode.OP_LDREXH: _fmt_ldrexh,
     Opcode.OP_LDRH_IMMEDIATE: lambda r: _fmt_ldst_imm_t(r, "ldrh"),
-    Opcode.OP_LDRH_LITERAL: lambda r: _fmt_ldst_lit(r, "ldrh"),
+    Opcode.OP_LDRH_LITERAL: lambda r, offset=0: _fmt_ldst_lit(r, "ldrh", offset=offset),
     Opcode.OP_LDRH_REGISTER: lambda r: _fmt_ldst_reg(r, "ldrh"),
     Opcode.OP_LDRHT: lambda r: _fmt_unpriv_ldr(r, "ldrht"),
     Opcode.OP_LDRSB_IMMEDIATE: lambda r: _fmt_ldst_imm_t(r, "ldrsb"),
-    Opcode.OP_LDRSB_LITERAL: lambda r: _fmt_ldst_lit(r, "ldrsb"),
+    Opcode.OP_LDRSB_LITERAL: lambda r, offset=0: _fmt_ldst_lit(
+        r, "ldrsb", offset=offset
+    ),
     Opcode.OP_LDRSB_REGISTER: lambda r: _fmt_ldst_reg(r, "ldrsb"),
     Opcode.OP_LDRSBT: lambda r: _fmt_unpriv_ldr(r, "ldrsbt"),
     Opcode.OP_LDRSH_IMMEDIATE: lambda r: _fmt_ldst_imm_t(r, "ldrsh"),
-    Opcode.OP_LDRSH_LITERAL: lambda r: _fmt_ldst_lit(r, "ldrsh"),
+    Opcode.OP_LDRSH_LITERAL: lambda r, offset=0: _fmt_ldst_lit(
+        r, "ldrsh", offset=offset
+    ),
     Opcode.OP_LDRSH_REGISTER: lambda r: _fmt_ldst_reg(r, "ldrsh"),
     Opcode.OP_LDRSHT: lambda r: _fmt_unpriv_ldr(r, "ldrsht"),
     Opcode.OP_LDRT: lambda r: _fmt_unpriv_ldr(r, "ldrt"),
