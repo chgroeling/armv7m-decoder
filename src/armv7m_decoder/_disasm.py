@@ -260,12 +260,15 @@ def _fmt_dp_imm(result: Any, mnemonic: str) -> str:
 
 def _fmt_mov_imm(result: Any) -> str:
     s = _flags(result.setflags)
-    return f"mov{s} {_reg(result.d)}, #{result.imm32}"
+    return f"mov{s} {_reg(result.d)}, #{result.imm32}\t@ 0x{result.imm32:x}"
 
 
 def _fmt_mvn_imm(result: Any, mnemonic: str = "mvn") -> str:
     s = _flags(result.setflags)
-    return f"{mnemonic}{s} {_reg(result.d)}, #{result.imm32}"
+    return (
+        f"{mnemonic}{s} {_reg(result.d)}, #{result.imm32}"
+        f"\t@ 0x{result.imm32:x}"
+    )
 
 
 def _fmt_and_imm(result: Any, mnemonic: str = "and") -> str:
@@ -748,7 +751,7 @@ def _fmt_pkhbt_pkhtb(result: Any) -> str:
 
 
 def _fmt_movt(result: Any) -> str:
-    return f"movt {_reg(result.d)}, #{result.imm16}"
+    return f"movt {_reg(result.d)}, #{result.imm16}\t@ 0x{result.imm16:x}"
 
 
 # --- USAD8 / USADA8 ---

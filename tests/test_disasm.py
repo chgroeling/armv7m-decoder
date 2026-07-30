@@ -10,7 +10,7 @@ class TestDisasmBasics:
 
     def test_mov_immediate(self, ctx) -> None:
         result, _ = decode(0x2000 << 16, ctx)
-        assert disassemble(result) == "movs\tr0, #0"
+        assert disassemble(result) == "movs\tr0, #0\t@ 0x0"
 
     def test_mov_register(self, ctx) -> None:
         result, _ = decode(0x0000 << 16, ctx)
