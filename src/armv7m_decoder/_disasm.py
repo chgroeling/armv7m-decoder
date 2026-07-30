@@ -372,9 +372,14 @@ def _fmt_ldst_imm(result: Any, mnemonic: str) -> str:
     return f"{mnemonic} {addr}"
 
 
-def _fmt_ldst_imm_t(result: Any, mnemonic: str) -> str:
+def _fmt_ldst_imm_t(result: Any, mnemonic: str, offset: int = 0) -> str:
     addr = _addr_imm(result.n, result.imm32, result.index, result.add, result.wback)
-    return f"{mnemonic} {_reg(result.t)}, {addr}\t@ 0x{result.imm32:x}"
+    asm = f"{mnemonic} {_reg(result.t)}, {addr}"
+    if result.n == 15:
+        base = ((offset + 4) & ~3) & 0xFFFFFFFF
+        target = base + (result.imm32 if result.add else -result.imm32)
+        asm += f"\t@ (0x{target:x})"
+    return asm
 
 
 def _fmt_ldst_imm_dual(result: Any, mnemonic: str) -> str:
@@ -387,7 +392,7 @@ def _fmt_ldst_imm_dual(result: Any, mnemonic: str) -> str:
         result.add,
         result.wback,
     )
-    return f"{mnemonic} {addr}\t@ 0x{result.imm32:x}"
+    return f"{mnemonic} {addr}"
 
 
 # --- Load/store register ---
@@ -1262,10 +1267,14 @@ _DISPATCH: dict[int, Any] = {
     Opcode.OP_LDC_LDC2_LITERAL: _fmt_ldc_ldc2_lit,
     Opcode.OP_LDM: lambda r: _fmt_multi_xfer(r, "ldmia"),
     Opcode.OP_LDMDB: lambda r: _fmt_multi_xfer(r, "ldmdb"),
-    Opcode.OP_LDR_IMMEDIATE: lambda r: _fmt_ldst_imm_t(r, "ldr"),
+    Opcode.OP_LDR_IMMEDIATE: lambda r, offset=0: _fmt_ldst_imm_t(
+        r, "ldr", offset=offset
+    ),
     Opcode.OP_LDR_LITERAL: lambda r, offset=0: _fmt_ldst_lit(r, "ldr", offset=offset),
     Opcode.OP_LDR_REGISTER: lambda r: _fmt_ldst_reg(r, "ldr"),
-    Opcode.OP_LDRB_IMMEDIATE: lambda r: _fmt_ldst_imm_t(r, "ldrb"),
+    Opcode.OP_LDRB_IMMEDIATE: lambda r, offset=0: _fmt_ldst_imm_t(
+        r, "ldrb", offset=offset
+    ),
     Opcode.OP_LDRB_LITERAL: lambda r, offset=0: _fmt_ldst_lit(r, "ldrb", offset=offset),
     Opcode.OP_LDRB_REGISTER: lambda r: _fmt_ldst_reg(r, "ldrb"),
     Opcode.OP_LDRBT: lambda r: _fmt_unpriv_ldr(r, "ldrbt"),
@@ -1274,17 +1283,23 @@ _DISPATCH: dict[int, Any] = {
     Opcode.OP_LDREX: _fmt_ldrex,
     Opcode.OP_LDREXB: _fmt_ldrexb,
     Opcode.OP_LDREXH: _fmt_ldrexh,
-    Opcode.OP_LDRH_IMMEDIATE: lambda r: _fmt_ldst_imm_t(r, "ldrh"),
+    Opcode.OP_LDRH_IMMEDIATE: lambda r, offset=0: _fmt_ldst_imm_t(
+        r, "ldrh", offset=offset
+    ),
     Opcode.OP_LDRH_LITERAL: lambda r, offset=0: _fmt_ldst_lit(r, "ldrh", offset=offset),
     Opcode.OP_LDRH_REGISTER: lambda r: _fmt_ldst_reg(r, "ldrh"),
     Opcode.OP_LDRHT: lambda r: _fmt_unpriv_ldr(r, "ldrht"),
-    Opcode.OP_LDRSB_IMMEDIATE: lambda r: _fmt_ldst_imm_t(r, "ldrsb"),
+    Opcode.OP_LDRSB_IMMEDIATE: lambda r, offset=0: _fmt_ldst_imm_t(
+        r, "ldrsb", offset=offset
+    ),
     Opcode.OP_LDRSB_LITERAL: lambda r, offset=0: _fmt_ldst_lit(
         r, "ldrsb", offset=offset
     ),
     Opcode.OP_LDRSB_REGISTER: lambda r: _fmt_ldst_reg(r, "ldrsb"),
     Opcode.OP_LDRSBT: lambda r: _fmt_unpriv_ldr(r, "ldrsbt"),
-    Opcode.OP_LDRSH_IMMEDIATE: lambda r: _fmt_ldst_imm_t(r, "ldrsh"),
+    Opcode.OP_LDRSH_IMMEDIATE: lambda r, offset=0: _fmt_ldst_imm_t(
+        r, "ldrsh", offset=offset
+    ),
     Opcode.OP_LDRSH_LITERAL: lambda r, offset=0: _fmt_ldst_lit(
         r, "ldrsh", offset=offset
     ),
@@ -1384,16 +1399,22 @@ _DISPATCH: dict[int, Any] = {
     Opcode.OP_STC_STC2: _fmt_stc_stc2,
     Opcode.OP_STM: lambda r: _fmt_multi_xfer(r, "stmia"),
     Opcode.OP_STMDB: lambda r: _fmt_multi_xfer(r, "stmdb"),
-    Opcode.OP_STR_IMMEDIATE: lambda r: _fmt_ldst_imm_t(r, "str"),
+    Opcode.OP_STR_IMMEDIATE: lambda r, offset=0: _fmt_ldst_imm_t(
+        r, "str", offset=offset
+    ),
     Opcode.OP_STR_REGISTER: lambda r: _fmt_ldst_reg(r, "str"),
-    Opcode.OP_STRB_IMMEDIATE: lambda r: _fmt_ldst_imm_t(r, "strb"),
+    Opcode.OP_STRB_IMMEDIATE: lambda r, offset=0: _fmt_ldst_imm_t(
+        r, "strb", offset=offset
+    ),
     Opcode.OP_STRB_REGISTER: lambda r: _fmt_ldst_reg(r, "strb"),
     Opcode.OP_STRBT: lambda r: _fmt_unpriv_str(r, "strbt"),
     Opcode.OP_STRD_IMMEDIATE: lambda r: _fmt_ldst_imm_dual(r, "strd"),
     Opcode.OP_STREX: _fmt_strex,
     Opcode.OP_STREXB: _fmt_strexb,
     Opcode.OP_STREXH: _fmt_strexh,
-    Opcode.OP_STRH_IMMEDIATE: lambda r: _fmt_ldst_imm_t(r, "strh"),
+    Opcode.OP_STRH_IMMEDIATE: lambda r, offset=0: _fmt_ldst_imm_t(
+        r, "strh", offset=offset
+    ),
     Opcode.OP_STRH_REGISTER: lambda r: _fmt_ldst_reg(r, "strh"),
     Opcode.OP_STRHT: lambda r: _fmt_unpriv_str(r, "strht"),
     Opcode.OP_STRT: lambda r: _fmt_unpriv_str(r, "strt"),
