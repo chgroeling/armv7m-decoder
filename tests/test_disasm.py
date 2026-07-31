@@ -89,6 +89,55 @@ class TestDisasmPseudoInstructions:
         assert disassemble(result).startswith("<undefined")
 
 
+class TestDisasmStackAndMultiTransfer:
+    """Only the 16-bit T1 forms are spelled push/pop, matching objdump."""
+
+    @pytest.mark.parametrize(
+        ("instr", "expected"),
+        [
+            (0xB401 << 16, "push\t{r0}"),
+            (0xB501 << 16, "push\t{r0, lr}"),
+            (0xBC01 << 16, "pop\t{r0}"),
+            (0xBD01 << 16, "pop\t{r0, pc}"),
+        ],
+    )
+    def test_narrow_push_pop(self, ctx, instr: int, expected: str) -> None:
+        result, _ = decode(instr, ctx)
+        assert disassemble(result) == expected
+
+    @pytest.mark.parametrize(
+        ("instr", "expected"),
+        [
+            (0xE8BD4091, "ldmia.w\tsp!, {r0, r4, r7, lr}"),
+            (0xE8BD8091, "ldmia.w\tsp!, {r0, r4, r7, pc}"),
+            (0xE92D4091, "stmdb\tsp!, {r0, r4, r7, lr}"),
+            (0xF85D0B04, "ldr.w\tr0, [sp], #4"),
+            (0xF85DFB04, "ldr.w\tpc, [sp], #4"),
+            (0xF84D0D04, "str.w\tr0, [sp, #-4]!"),
+        ],
+    )
+    def test_wide_push_pop(self, ctx, instr: int, expected: str) -> None:
+        result, _ = decode(instr, ctx)
+        assert disassemble(result) == expected
+
+    @pytest.mark.parametrize(
+        ("instr", "expected"),
+        [
+            (0xC901 << 16, "ldmia\tr1!, {r0}"),
+            (0xC101 << 16, "stmia\tr1!, {r0}"),
+            (0xE8B34091, "ldmia.w\tr3!, {r0, r4, r7, lr}"),
+            (0xE8930003, "ldmia.w\tr3, {r0, r1}"),
+            (0xE8A30003, "stmia.w\tr3!, {r0, r1}"),
+            # ldmdb/stmdb have no narrow form, so they take no .w suffix.
+            (0xE9130003, "ldmdb\tr3, {r0, r1}"),
+            (0xE9230003, "stmdb\tr3!, {r0, r1}"),
+        ],
+    )
+    def test_multi_transfer_width_suffix(self, ctx, instr: int, expected: str) -> None:
+        result, _ = decode(instr, ctx)
+        assert disassemble(result) == expected
+
+
 class TestDisasmCoprocessor:
     pass
 

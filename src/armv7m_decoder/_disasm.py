@@ -48,7 +48,7 @@ _MNEMONICS_WITH_BOTH_WIDTHS: frozenset[str] = frozenset({
     "cmn",
     "cmp",
     "eor",
-    "ldm",
+    "ldmia",
     "ldr",
     "ldrb",
     "ldrh",
@@ -61,8 +61,6 @@ _MNEMONICS_WITH_BOTH_WIDTHS: frozenset[str] = frozenset({
     "mvn",
     "nop",
     "orr",
-    "pop",
-    "push",
     "rev",
     "rev16",
     "revsh",
@@ -70,7 +68,7 @@ _MNEMONICS_WITH_BOTH_WIDTHS: frozenset[str] = frozenset({
     "rsb",
     "sbc",
     "sev",
-    "stm",
+    "stmia",
     "str",
     "strb",
     "strh",
@@ -604,11 +602,21 @@ def _fmt_multi_xfer(result: Any, mnemonic: str) -> str:
 
 
 def _fmt_pop(result: Any) -> str:
-    return f"pop {_reg_list(result.registers)}"
+    # Only the 16-bit T1 form is spelled "pop"; the wide forms render as the
+    # LDM/LDR they encode. UnalignedAllowed marks the single-register T3.
+    if result.decoder_state == DecoderState.DECODED_16BIT:
+        return f"pop {_reg_list(result.registers)}"
+    if result.UnalignedAllowed:
+        return f"ldr {_reg(result.t)}, [sp], #4"
+    return f"ldmia sp!, {_reg_list(result.registers)}"
 
 
 def _fmt_push(result: Any) -> str:
-    return f"push {_reg_list(result.registers)}"
+    if result.decoder_state == DecoderState.DECODED_16BIT:
+        return f"push {_reg_list(result.registers)}"
+    if result.UnalignedAllowed:
+        return f"str {_reg(result.t)}, [sp, #-4]!"
+    return f"stmdb sp!, {_reg_list(result.registers)}"
 
 
 # --- Branch ---
