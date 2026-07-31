@@ -872,11 +872,20 @@ def _fmt_it(result: Any) -> str:
     c = _COND_CODES[result.firstcond]
     mask = result.mask
     suffix = ""
-    for i in range(3, 0, -1):
-        if mask & (1 << i):
-            x = "t" if ((mask >> i) & 1) == ((result.firstcond >> 0) & 1) else "e"
-            suffix += x
+    if mask & 0x1:
+        suffix += _it_te(mask, 3)
+        suffix += _it_te(mask, 2)
+        suffix += _it_te(mask, 1)
+    elif mask & 0x2:
+        suffix += _it_te(mask, 3)
+        suffix += _it_te(mask, 2)
+    elif mask & 0x4:
+        suffix += _it_te(mask, 3)
     return f"it{suffix} {c}"
+
+
+def _it_te(mask: int, bit: int) -> str:
+    return "e" if (mask >> bit) & 1 == 0 else "t"
 
 
 # --- Misc zero-operand ---
