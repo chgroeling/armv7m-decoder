@@ -329,8 +329,10 @@ def _fmt_dp_imm(result: Any, mnemonic: str) -> str:
     )
 
 
-def _fmt_mov_imm(result: Any) -> str:
+def _fmt_mov_imm(result: Any, instr: int = 0) -> str:
     s = _flags(result.setflags)
+    if instr and (instr >> 20) & 0x3F == 0x24:
+        return f"movw {_reg(result.d)}, #{result.imm32}{_hex_comment(result.imm32)}"
     return f"mov{s} {_reg(result.d)}, #{result.imm32}{_hex_comment(result.imm32)}"
 
 
