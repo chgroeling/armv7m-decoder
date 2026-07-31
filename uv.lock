@@ -4,8 +4,8 @@ requires-python = ">=3.12"
 
 [[package]]
 name = "arm-transpiller"
-version = "1.1.1"
-source = { git = "https://github.com/chgroeling/arm-transpiller?tag=v1.1.1#89439506fdb5738e00d2957a8b3935e97c913dcd" }
+version = "2.0.0"
+source = { git = "https://github.com/chgroeling/arm-transpiller?tag=v2.0.0#72def0a880fbd71b415a04cb496fd92e32653245" }
 dependencies = [
     { name = "click" },
     { name = "lark" },
@@ -27,7 +27,7 @@ dev = [
 
 [package.metadata.requires-dev]
 dev = [
-    { name = "decoder-forge", git = "https://github.com/chgroeling/decoder-forge?tag=v1.2.0" },
+    { name = "decoder-forge", git = "https://github.com/chgroeling/decoder-forge?tag=v2.0.0" },
     { name = "pytest", specifier = ">=8" },
     { name = "ruff", specifier = ">=0.9" },
 ]
@@ -55,8 +55,8 @@ wheels = [
 
 [[package]]
 name = "decoder-forge"
-version = "1.2.0"
-source = { git = "https://github.com/chgroeling/decoder-forge?tag=v1.2.0#88dc2b8596c51e2ea6e91eb5ab689865dd3ac8b9" }
+version = "2.0.0"
+source = { git = "https://github.com/chgroeling/decoder-forge?tag=v2.0.0#8e0c0d998c2e00be0048ce2b6fa007b2a34332f2" }
 dependencies = [
     { name = "arm-transpiller" },
     { name = "click" },

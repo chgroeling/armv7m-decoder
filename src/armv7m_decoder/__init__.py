@@ -8,6 +8,7 @@ pseudo-instruction classes (:class:`NoMatch`, :class:`Undefined`,
 
 from armv7m_decoder._decoder import (  # noqa: F401
     Context,
+    DecoderState,
     NoMatch,
     Opcode,
     See,
@@ -21,6 +22,7 @@ from armv7m_decoder._disasm import disassemble  # noqa: F401
 
 __all__ = [
     "Context",
+    "DecoderState",
     "NoMatch",
     "Opcode",
     "See",

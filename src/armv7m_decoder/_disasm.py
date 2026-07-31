@@ -9,7 +9,7 @@ from __future__ import annotations
 import inspect as _inspect
 from typing import Any
 
-from armv7m_decoder._decoder import Opcode
+from armv7m_decoder._decoder import DecoderState, Opcode
 
 # Number of characters the mnemonic field is padded to (0 = no padding).
 # Set to e.g. 8 to right-pad mnemonics so operands align in columns.
@@ -254,9 +254,6 @@ def _addr_unpriv_ldr(t: int, n: int, imm32: int) -> str:
 def _branch_target(offset: int, imm32: int) -> str:
     return f"0x{((offset + 4 + imm32) & 0xFFFFFFFF):x}"
 
-
-def _is_wide(instr: int) -> bool:
-    return (instr >> 27) & 0x1F >= 0x1D
 
 
 def _hex_comment(imm: int) -> str:
@@ -614,7 +611,7 @@ def _fmt_push(result: Any) -> str:
 
 def _fmt_b(result: Any, offset: int = 0, instr: int = 0) -> str:
     c = _cond(result.cond)
-    narrow = ".n" if not _is_wide(instr) else ""
+    narrow = ".n" if result.decoder_state == DecoderState.DECODED_16BIT else ""
     return f"b{c}{narrow} {_branch_target(offset, result.imm32)}"
 
 
@@ -1634,13 +1631,13 @@ def disassemble(result: object, instr: int = 0, offset: int = 0) -> str:
     """
     opc = result.opcode
     if opc == Opcode.OP_NO_MATCH:
-        return f"<nomatch {hex(result.code)}>"
+        return "<nomatch>"
     if opc == Opcode.OP_UNDEFINED:
-        return f"<undefined {hex(result.code)}>"
+        return "<undefined>"
     if opc == Opcode.OP_UNPREDICTABLE:
-        return f"<unpredictable {hex(result.code)}>"
+        return "<unpredictable>"
     if opc == Opcode.OP_SEE:
-        return f"<see {hex(result.code)}>"
+        return "<see>"
 
     fmt_func = _DISPATCH.get(opc)
 
@@ -1658,7 +1655,7 @@ def disassemble(result: object, instr: int = 0, offset: int = 0) -> str:
     except (ValueError, TypeError):
         asm = fmt_func(result)
     asm = asm.replace(" ", "\t", 1)
-    if _is_wide(instr):
+    if result.decoder_state & DecoderState.DECODED_32BIT:
         mnemonic, sep, rest = asm.partition("\t")
         base = mnemonic.lower()
         if base.endswith(".n"):
