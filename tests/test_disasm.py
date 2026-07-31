@@ -89,6 +89,43 @@ class TestDisasmPseudoInstructions:
         assert disassemble(result).startswith("<undefined")
 
 
+class TestDisasmWidthSuffix:
+    @pytest.mark.parametrize(
+        ("instr", "expected"),
+        [
+            # S-forms whose spelling ends in something that reads like a
+            # condition code: movs/vs, bics/cs, adcs/cs, sbcs/cs, lsls/ls.
+            (0xEA5F0000, "movs.w\tr0, r0"),
+            (0xEA300000, "bics.w\tr0, r0"),
+            (0xEB500000, "adcs.w\tr0, r0"),
+            (0xEB700000, "sbcs.w\tr0, r0, r0"),
+            (0xF04F0000, "mov.w\tr0, #0"),
+            (0xF1100F00, "cmn.w\tr0, #0"),
+        ],
+    )
+    def test_wide_gets_suffix(self, ctx, instr: int, expected: str) -> None:
+        result, _ = decode(instr, ctx)
+        assert disassemble(result) == expected
+
+    @pytest.mark.parametrize(
+        ("instr", "expected"),
+        [
+            # 32-bit only, so there is no narrow form to disambiguate from.
+            (0xF3C00000, "ubfx\tr0, r0, #0, #1"),
+            (0xEA900F00, "teq\tr0, r0"),
+            (0xE9130003, "ldmdb\tr3, {r0, r1}"),
+            (0xFB000000, "mla\tr0, r0, r0, r0"),
+        ],
+    )
+    def test_wide_only_gets_no_suffix(self, ctx, instr: int, expected: str) -> None:
+        result, _ = decode(instr, ctx)
+        assert disassemble(result) == expected
+
+    def test_narrow_gets_no_suffix(self, ctx) -> None:
+        result, _ = decode(0x4140 << 16, ctx)
+        assert disassemble(result) == "adcs\tr0, r0"
+
+
 class TestDisasmStackAndMultiTransfer:
     """Only the 16-bit T1 forms are spelled push/pop, matching objdump."""
 

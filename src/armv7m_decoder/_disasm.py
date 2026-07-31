@@ -162,6 +162,20 @@ def _flags(setflags: bool) -> str:
     return "s" if setflags else ""
 
 
+def _width(result: Any, mnemonic: str) -> str:
+    """Width suffix for `mnemonic`, appended after any `s`/condition suffix.
+
+    A 32-bit encoding takes `.w` only where the same mnemonic also has a
+    16-bit encoding and the suffix is what tells the two apart. Mnemonics
+    that exist in one width only (`ubfx`, `stmdb`, `teq`, ...) take nothing.
+    """
+    if mnemonic in _MNEMONICS_WITH_BOTH_WIDTHS and (
+        result.decoder_state & DecoderState.DECODED_32BIT
+    ):
+        return ".w"
+    return ""
+
+
 def _barrier(opt: int) -> str:
     return _BARRIER_OPTIONS.get(opt, f"#{opt}")
 
@@ -309,7 +323,7 @@ def _round_mnemonic(base: str, round_val: bool) -> str:
 
 
 def _fmt_dp_imm(result: Any, mnemonic: str) -> str:
-    s = _flags(result.setflags)
+    s = _flags(result.setflags) + _width(result, mnemonic)
     if result.d == result.n:
         return (
             f"{mnemonic}{s} {_reg(result.d)}, #{result.imm32}"
@@ -322,21 +336,21 @@ def _fmt_dp_imm(result: Any, mnemonic: str) -> str:
 
 
 def _fmt_mov_imm(result: Any, instr: int = 0) -> str:
-    s = _flags(result.setflags)
+    s = _flags(result.setflags) + _width(result, "mov")
     if instr and (instr >> 20) & 0x3F == 0x24:
         return f"movw {_reg(result.d)}, #{result.imm32}{_hex_comment(result.imm32)}"
     return f"mov{s} {_reg(result.d)}, #{result.imm32}{_hex_comment(result.imm32)}"
 
 
 def _fmt_mvn_imm(result: Any, mnemonic: str = "mvn") -> str:
-    s = _flags(result.setflags)
+    s = _flags(result.setflags) + _width(result, mnemonic)
     return (
         f"{mnemonic}{s} {_reg(result.d)}, #{result.imm32}{_hex_comment(result.imm32)}"
     )
 
 
 def _fmt_and_imm(result: Any, mnemonic: str = "and") -> str:
-    s = _flags(getattr(result, "setflags", False))
+    s = _flags(getattr(result, "setflags", False)) + _width(result, mnemonic)
     return (
         f"{mnemonic}{s} {_reg(result.d)}, {_reg(result.n)}, #{result.imm32}"
         f"{_hex_comment(result.imm32)}"
@@ -347,24 +361,24 @@ def _fmt_and_imm(result: Any, mnemonic: str = "and") -> str:
 
 
 def _fmt_dp_reg_abbrev(result: Any, mnemonic: str) -> str:
-    s = _flags(result.setflags)
+    s = _flags(result.setflags) + _width(result, mnemonic)
     sh = _shift(result.shift_t, result.shift_n)
     if result.d == result.n:
         return f"{mnemonic}{s} {_reg(result.d)}, {_reg(result.m)}{sh}"
     return f"{mnemonic}{s} {_reg(result.d)}, {_reg(result.n)}, {_reg(result.m)}{sh}"
 
 def _fmt_dp_reg(result: Any, mnemonic: str) -> str:
-    s = _flags(result.setflags)
+    s = _flags(result.setflags) + _width(result, mnemonic)
     sh = _shift(result.shift_t, result.shift_n)
     return f"{mnemonic}{s} {_reg(result.d)}, {_reg(result.n)}, {_reg(result.m)}{sh}"
 
 def _fmt_mov_reg(result: Any) -> str:
-    s = _flags(result.setflags)
+    s = _flags(result.setflags) + _width(result, "mov")
     return f"mov{s} {_reg(result.d)}, {_reg(result.m)}"
 
 
 def _fmt_mvn_reg(result: Any) -> str:
-    s = _flags(result.setflags)
+    s = _flags(result.setflags) + _width(result, "mvn")
     sh = _shift(result.shift_t, result.shift_n)
     return f"mvn{s} {_reg(result.d)}, {_reg(result.m)}{sh}"
 
@@ -378,24 +392,28 @@ def _fmt_rrx(result: Any) -> str:
 
 
 def _fmt_test_imm(result: Any, mnemonic: str) -> str:
-    return f"{mnemonic} {_reg(result.n)}, #{result.imm32}{_hex_comment(result.imm32)}"
+    w = _width(result, mnemonic)
+    return (
+        f"{mnemonic}{w} {_reg(result.n)}, #{result.imm32}{_hex_comment(result.imm32)}"
+    )
 
 
 def _fmt_test_reg(result: Any, mnemonic: str) -> str:
     sh = _shift(result.shift_t, result.shift_n)
-    return f"{mnemonic} {_reg(result.n)}, {_reg(result.m)}{sh}"
+    m = mnemonic + _width(result, mnemonic)
+    return f"{m} {_reg(result.n)}, {_reg(result.m)}{sh}"
 
 
 # --- Shift immediate ---
 
 
 def _fmt_shift_imm(result: Any, mnemonic: str) -> str:
-    s = _flags(result.setflags)
+    s = _flags(result.setflags) + _width(result, mnemonic)
     return f"{mnemonic}{s} {_reg(result.d)}, {_reg(result.m)}, #{result.shift_n}"
 
 
 def _fmt_ror_imm(result: Any) -> str:
-    s = _flags(result.setflags)
+    s = _flags(result.setflags) + _width(result, "ror")
     return f"ror{s} {_reg(result.d)}, {_reg(result.m)}, #{result.shift_n}"
 
 
@@ -403,7 +421,7 @@ def _fmt_ror_imm(result: Any) -> str:
 
 
 def _fmt_shift_reg(result: Any, mnemonic: str) -> str:
-    s = _flags(result.setflags)
+    s = _flags(result.setflags) + _width(result, mnemonic)
     if result.d == result.n:
         return f"{mnemonic}{s} {_reg(result.d)}, {_reg(result.m)}"
     return f"{mnemonic}{s} {_reg(result.d)}, {_reg(result.n)}, {_reg(result.m)}"
@@ -413,14 +431,14 @@ def _fmt_shift_reg(result: Any, mnemonic: str) -> str:
 
 
 def _fmt_add_sp_imm(result: Any) -> str:
-    s = _flags(result.setflags)
+    s = _flags(result.setflags) + _width(result, "add")
     if result.d == 13:
         return f"add{s} sp, #{result.imm32}{_hex_comment(result.imm32)}"
     return f"add{s} {_reg(result.d)}, sp, #{result.imm32}{_hex_comment(result.imm32)}"
 
 
 def _fmt_add_sp_reg(result: Any) -> str:
-    s = _flags(result.setflags)
+    s = _flags(result.setflags) + _width(result, "add")
     sh = _shift(result.shift_t, result.shift_n)
     if result.d == 13:
         return f"add{s} sp, {_reg(result.m)}{sh}"
@@ -430,14 +448,14 @@ def _fmt_add_sp_reg(result: Any) -> str:
 
 
 def _fmt_sub_sp_imm(result: Any) -> str:
-    s = _flags(result.setflags)
+    s = _flags(result.setflags) + _width(result, "sub")
     if result.d == 13:
         return f"sub{s} sp, #{result.imm32}{_hex_comment(result.imm32)}"
     return f"sub{s} {_reg(result.d)}, sp, #{result.imm32}{_hex_comment(result.imm32)}"
 
 
 def _fmt_sub_sp_reg(result: Any) -> str:
-    s = _flags(result.setflags)
+    s = _flags(result.setflags) + _width(result, "sub")
     sh = _shift(result.shift_t, result.shift_n)
     if result.d == 13:
         return f"sub{s} sp, {_reg(result.m)}{sh}"
@@ -451,7 +469,8 @@ def _fmt_sub_sp_reg(result: Any) -> str:
 
 def _fmt_adr(result: Any) -> str:
     sign = "" if result.add else "-"
-    return f"adr {_reg(result.d)}, #{sign}{result.imm32}{_hex_comment(result.imm32)}"
+    w = _width(result, "adr")
+    return f"adr{w} {_reg(result.d)}, #{sign}{result.imm32}{_hex_comment(result.imm32)}"
 
 
 # --- Load/store immediate ---
@@ -459,12 +478,12 @@ def _fmt_adr(result: Any) -> str:
 
 def _fmt_ldst_imm(result: Any, mnemonic: str) -> str:
     addr = _addr_imm(result.n, result.imm32, result.index, result.add, result.wback)
-    return f"{mnemonic} {addr}"
+    return f"{mnemonic}{_width(result, mnemonic)} {addr}"
 
 
 def _fmt_ldst_imm_t(result: Any, mnemonic: str, offset: int = 0) -> str:
     addr = _addr_imm(result.n, result.imm32, result.index, result.add, result.wback)
-    asm = f"{mnemonic} {_reg(result.t)}, {addr}"
+    asm = f"{mnemonic}{_width(result, mnemonic)} {_reg(result.t)}, {addr}"
     if result.n == 15:
         asm += _hex_target(offset, result.imm32, result.add)
     return asm
@@ -480,7 +499,7 @@ def _fmt_ldst_imm_dual(result: Any, mnemonic: str) -> str:
         result.add,
         result.wback,
     )
-    return f"{mnemonic} {addr}"
+    return f"{mnemonic}{_width(result, mnemonic)} {addr}"
 
 
 # --- Load/store register ---
@@ -488,19 +507,20 @@ def _fmt_ldst_imm_dual(result: Any, mnemonic: str) -> str:
 
 def _fmt_ldst_reg(result: Any, mnemonic: str) -> str:
     addr = _addr_reg(result.t, result.n, result.m, result.shift_t, result.shift_n)
-    return f"{mnemonic} {addr}"
+    return f"{mnemonic}{_width(result, mnemonic)} {addr}"
 
 
 def _fmt_ldst_reg_rt(result: Any, mnemonic: str) -> str:
     addr = _addr_reg(result.t, result.n, result.m, result.shift_t, result.shift_n)
-    return f"{mnemonic} {addr}"
+    return f"{mnemonic}{_width(result, mnemonic)} {addr}"
 
 
 # --- Load/store literal ---
 
 
 def _fmt_ldst_lit(result: Any, mnemonic: str, offset: int = 0) -> str:
-    asm = f"{mnemonic} {_addr_literal(result.t, result.imm32, result.add)}"
+    m = mnemonic + _width(result, mnemonic)
+    asm = f"{m} {_addr_literal(result.t, result.imm32, result.add)}"
     return f"{asm}{_hex_target(offset, result.imm32, result.add)}"
 
 
@@ -595,7 +615,8 @@ def _fmt_unpriv_str(result: Any, mnemonic: str) -> str:
 
 def _fmt_multi_xfer(result: Any, mnemonic: str) -> str:
     wb = "!" if result.wback else ""
-    return f"{mnemonic} {_reg(result.n)}{wb}, {_reg_list(result.registers)}"
+    m = mnemonic + _width(result, mnemonic)
+    return f"{m} {_reg(result.n)}{wb}, {_reg_list(result.registers)}"
 
 
 # --- Stack ---
@@ -607,15 +628,15 @@ def _fmt_pop(result: Any) -> str:
     if result.decoder_state == DecoderState.DECODED_16BIT:
         return f"pop {_reg_list(result.registers)}"
     if result.UnalignedAllowed:
-        return f"ldr {_reg(result.t)}, [sp], #4"
-    return f"ldmia sp!, {_reg_list(result.registers)}"
+        return f"ldr{_width(result, 'ldr')} {_reg(result.t)}, [sp], #4"
+    return f"ldmia{_width(result, 'ldmia')} sp!, {_reg_list(result.registers)}"
 
 
 def _fmt_push(result: Any) -> str:
     if result.decoder_state == DecoderState.DECODED_16BIT:
         return f"push {_reg_list(result.registers)}"
     if result.UnalignedAllowed:
-        return f"str {_reg(result.t)}, [sp, #-4]!"
+        return f"str{_width(result, 'str')} {_reg(result.t)}, [sp, #-4]!"
     return f"stmdb sp!, {_reg_list(result.registers)}"
 
 
@@ -624,8 +645,12 @@ def _fmt_push(result: Any) -> str:
 
 def _fmt_b(result: Any, offset: int = 0, instr: int = 0) -> str:
     c = _cond(result.cond)
-    narrow = ".n" if result.decoder_state == DecoderState.DECODED_16BIT else ""
-    return f"b{c}{narrow} {_branch_target(offset, result.imm32)}"
+    # .n and .w occupy the same slot; B is the only mnemonic that spells both.
+    if result.decoder_state == DecoderState.DECODED_16BIT:
+        width = ".n"
+    else:
+        width = _width(result, "b")
+    return f"b{c}{width} {_branch_target(offset, result.imm32)}"
 
 
 def _fmt_bl(result: Any, offset: int = 0) -> str:
@@ -696,10 +721,11 @@ def _fmt_sbfx(result: Any) -> str:
 
 
 def _fmt_extend(result: Any, mnemonic: str) -> str:
+    m = mnemonic + _width(result, mnemonic)
     if result.rotation == 0:
-        return f"{mnemonic} {_reg(result.d)}, {_reg(result.m)}"
+        return f"{m} {_reg(result.d)}, {_reg(result.m)}"
     rot = f"ror #{result.rotation}"
-    return f"{mnemonic} {_reg(result.d)}, {_reg(result.m)}, {rot}"
+    return f"{m} {_reg(result.d)}, {_reg(result.m)}, {rot}"
 
 
 def _fmt_extab(result: Any, mnemonic: str) -> str:
@@ -794,7 +820,7 @@ def _fmt_umaal(result: Any) -> str:
 
 
 def _fmt_mul(result: Any, setflags: bool = False) -> str:
-    s = _flags(setflags)
+    s = _flags(setflags) + _width(result, "mul")
     return f"mul{s} {_reg(result.d)}, {_reg(result.n)}, {_reg(result.m)}"
 
 
@@ -825,15 +851,18 @@ def _fmt_clz(result: Any) -> str:
 
 
 def _fmt_rev(result: Any) -> str:
-    return f"rev {_reg(result.d)}, {_reg(result.m)}"
+    w = _width(result, "rev")
+    return f"rev{w} {_reg(result.d)}, {_reg(result.m)}"
 
 
 def _fmt_rev16(result: Any) -> str:
-    return f"rev16 {_reg(result.d)}, {_reg(result.m)}"
+    w = _width(result, "rev16")
+    return f"rev16{w} {_reg(result.d)}, {_reg(result.m)}"
 
 
 def _fmt_revsh(result: Any) -> str:
-    return f"revsh {_reg(result.d)}, {_reg(result.m)}"
+    w = _width(result, "revsh")
+    return f"revsh{w} {_reg(result.d)}, {_reg(result.m)}"
 
 
 def _fmt_rbit(result: Any) -> str:
@@ -925,8 +954,8 @@ def _it_te(mask: int, bit: int) -> str:
 # --- Misc zero-operand ---
 
 
-def _fmt_noargs(mnemonic: str) -> str:
-    return mnemonic
+def _fmt_noargs(result: Any, mnemonic: str) -> str:
+    return f"{mnemonic}{_width(result, mnemonic)}"
 
 
 def _fmt_bkpt(result: Any) -> str:
@@ -938,7 +967,8 @@ def _fmt_svc(result: Any) -> str:
 
 
 def _fmt_udf(result: Any) -> str:
-    return f"udf #{result.imm32}{_hex_comment(result.imm32)}"
+    w = _width(result, "udf")
+    return f"udf{w} #{result.imm32}{_hex_comment(result.imm32)}"
 
 
 def _fmt_dbg(result: Any) -> str:
@@ -1340,7 +1370,7 @@ def _fmt_neg(result: Any) -> str:
 
 
 def _fmt_mov_shifted(result: Any) -> str:
-    s = _flags(result.setflags)
+    s = _flags(result.setflags) + _width(result, "mov")
     sh = _shift(result.shift_t, result.shift_n)
     return f"mov{s} {_reg(result.d)}, {_reg(result.m)}{sh}"
 
@@ -1372,7 +1402,7 @@ _DISPATCH: dict[int, Any] = {
     Opcode.OP_BX: _fmt_bx,
     Opcode.OP_CBNZ_CBZ: _fmt_cbnz_cbz,
     Opcode.OP_CDP_CDP2: _fmt_cdp_cdp2,
-    Opcode.OP_CLREX: lambda r: "clrex",
+    Opcode.OP_CLREX: lambda r: _fmt_noargs(r, "clrex"),
     Opcode.OP_CLZ: _fmt_clz,
     Opcode.OP_CMN_IMMEDIATE: lambda r: _fmt_test_imm(r, "cmn"),
     Opcode.OP_CMN_REGISTER: lambda r: _fmt_test_reg(r, "cmn"),
@@ -1380,7 +1410,7 @@ _DISPATCH: dict[int, Any] = {
     Opcode.OP_CMP_REGISTER: lambda r: _fmt_test_reg(r, "cmp"),
     Opcode.OP_CPS: _fmt_cps,
     "CPY": _fmt_cpy,
-    Opcode.OP_CSDB: lambda r: "csdb",
+    Opcode.OP_CSDB: lambda r: _fmt_noargs(r, "csdb"),
     Opcode.OP_DBG: _fmt_dbg,
     Opcode.OP_DMB: _fmt_dmb,
     Opcode.OP_DSB: _fmt_dsb,
@@ -1451,7 +1481,7 @@ _DISPATCH: dict[int, Any] = {
     Opcode.OP_MVN_IMMEDIATE: _fmt_mvn_imm,
     Opcode.OP_MVN_REGISTER: _fmt_mvn_reg,
     "NEG": _fmt_neg,
-    Opcode.OP_NOP: lambda r: "nop",
+    Opcode.OP_NOP: lambda r: _fmt_noargs(r, "nop"),
     Opcode.OP_ORN_IMMEDIATE: lambda r: _fmt_and_imm(r, "orn"),
     Opcode.OP_ORN_REGISTER: lambda r: _fmt_dp_reg(r, "orn"),
     Opcode.OP_ORR_IMMEDIATE: lambda r: _fmt_and_imm(r, "orr"),
@@ -1463,7 +1493,7 @@ _DISPATCH: dict[int, Any] = {
     Opcode.OP_PLI_IMMEDIATE_LITERAL: _fmt_pli_imm_lit,
     Opcode.OP_PLI_REGISTER: _fmt_pli_reg,
     Opcode.OP_POP: _fmt_pop,
-    Opcode.OP_PSSBB: lambda r: "pssbb",
+    Opcode.OP_PSSBB: lambda r: _fmt_noargs(r, "pssbb"),
     Opcode.OP_PUSH: _fmt_push,
     Opcode.OP_QADD: lambda r: _fmt_simd3(r, "qadd"),
     Opcode.OP_QADD16: lambda r: _fmt_simd3(r, "qadd16"),
@@ -1492,7 +1522,7 @@ _DISPATCH: dict[int, Any] = {
     Opcode.OP_SBFX: _fmt_sbfx,
     Opcode.OP_SDIV: _fmt_sdiv,
     Opcode.OP_SEL: _fmt_sel,
-    Opcode.OP_SEV: lambda r: "sev",
+    Opcode.OP_SEV: lambda r: _fmt_noargs(r, "sev"),
     Opcode.OP_SHADD16: lambda r: _fmt_simd3(r, "shadd16"),
     Opcode.OP_SHADD8: lambda r: _fmt_simd3(r, "shadd8"),
     Opcode.OP_SHASX: lambda r: _fmt_simd3(r, "shasx"),
@@ -1518,7 +1548,7 @@ _DISPATCH: dict[int, Any] = {
     Opcode.OP_SSAT: _fmt_ssat,
     Opcode.OP_SSAT16: _fmt_ssat16,
     Opcode.OP_SSAX: lambda r: _fmt_simd3(r, "ssax"),
-    Opcode.OP_SSBB: lambda r: "ssbb",
+    Opcode.OP_SSBB: lambda r: _fmt_noargs(r, "ssbb"),
     Opcode.OP_SSUB16: lambda r: _fmt_simd3(r, "ssub16"),
     Opcode.OP_SSUB8: lambda r: _fmt_simd3(r, "ssub8"),
     Opcode.OP_STC_STC2: _fmt_stc_stc2,
@@ -1630,9 +1660,9 @@ _DISPATCH: dict[int, Any] = {
     Opcode.OP_VSTM: lambda r: _fmt_vldm_vstm(r, "vstm"),
     Opcode.OP_VSTR: lambda r: _fmt_vldr_vstr(r, "vstr"),
     Opcode.OP_VSUB: lambda r: _fmt_vfp_dp3(r, "vsub"),
-    Opcode.OP_WFE: lambda r: "wfe",
-    Opcode.OP_WFI: lambda r: "wfi",
-    Opcode.OP_YIELD: lambda r: "yield",
+    Opcode.OP_WFE: lambda r: _fmt_noargs(r, "wfe"),
+    Opcode.OP_WFI: lambda r: _fmt_noargs(r, "wfi"),
+    Opcode.OP_YIELD: lambda r: _fmt_noargs(r, "yield"),
 }
 
 
@@ -1679,21 +1709,4 @@ def disassemble(result: object, instr: int = 0, offset: int = 0) -> str:
         asm = fmt_func(result, **kwargs)
     except (ValueError, TypeError):
         asm = fmt_func(result)
-    asm = asm.replace(" ", "\t", 1)
-    if result.decoder_state & DecoderState.DECODED_32BIT:
-        mnemonic, sep, rest = asm.partition("\t")
-        base = mnemonic.lower()
-        if base.endswith(".n"):
-            base = base[:-2]
-        for cc in _COND_CODES:
-            if cc and base.endswith(cc):
-                base = base[: -len(cc)]
-                break
-        if base in _MNEMONICS_WITH_BOTH_WIDTHS or (
-            base.endswith("s") and base[:-1] in _MNEMONICS_WITH_BOTH_WIDTHS
-        ):
-            if sep:
-                asm = f"{mnemonic}.w{sep}{rest}"
-            else:
-                asm = f"{mnemonic}.w"
-    return asm
+    return asm.replace(" ", "\t", 1)
