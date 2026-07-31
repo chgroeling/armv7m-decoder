@@ -1,5 +1,7 @@
 """Disassembly formatting tests for the ARMv7-M instruction decoder."""
 
+import pytest
+
 from armv7m_decoder import decode, disassemble
 
 
@@ -103,6 +105,55 @@ class TestDisasmDMB:
     def test_isb(self, ctx) -> None:
         result, _ = decode(0xF3BF8F6F, ctx)
         assert "isb" in disassemble(result)
+
+    @pytest.mark.parametrize(
+        ("option", "expected"),
+        [
+            (0x0, "dmb\t#0"),
+            (0x1, "dmb\toshld"),
+            (0x2, "dmb\toshst"),
+            (0x3, "dmb\tosh"),
+            (0x4, "dmb\t#4"),
+            (0x5, "dmb\tnshld"),
+            (0x6, "dmb\tunst"),
+            (0x7, "dmb\tun"),
+            (0x8, "dmb\t#8"),
+            (0x9, "dmb\tishld"),
+            (0xA, "dmb\tishst"),
+            (0xB, "dmb\tish"),
+            (0xC, "dmb\t#12"),
+            (0xD, "dmb\tld"),
+            (0xE, "dmb\tst"),
+            (0xF, "dmb\tsy"),
+        ],
+    )
+    def test_dmb_options(self, ctx, option: int, expected: str) -> None:
+        result, _ = decode(0xF3BF8F50 | option, ctx)
+        assert disassemble(result) == expected
+
+    @pytest.mark.parametrize(
+        ("option", "expected"),
+        [
+            (0x3, "dsb\tosh"),
+            (0xB, "dsb\tish"),
+            (0xC, "dfb"),
+            (0xF, "dsb\tsy"),
+        ],
+    )
+    def test_dsb_options(self, ctx, option: int, expected: str) -> None:
+        result, _ = decode(0xF3BF8F40 | option, ctx)
+        assert disassemble(result) == expected
+
+    def test_isb_only_names_sy(self, ctx) -> None:
+        # ISB leaves every option but SY numeric, matching objdump.
+        result, _ = decode(0xF3BF8F6B, ctx)
+        assert disassemble(result) == "isb\t#11"
+        result, _ = decode(0xF3BF8F6F, ctx)
+        assert disassemble(result) == "isb\tsy"
+
+    def test_dbg(self, ctx) -> None:
+        result, _ = decode(0xF3AF80F5, ctx)
+        assert disassemble(result) == "dbg\t#5"
 
 
 class TestDisasmVFP:

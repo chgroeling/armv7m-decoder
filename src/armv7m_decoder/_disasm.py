@@ -86,13 +86,18 @@ _MNEMONICS_WITH_BOTH_WIDTHS: frozenset[str] = frozenset({
     "yield",
 })
 _BARRIER_OPTIONS: dict[int, str] = {
-    0x2: "osh",
-    0x3: "nsh",
-    0x4: "ish",
-    0x5: "un",
-    0x6: "sy",
-    0x7: "st",
-    0x8: "ld",
+    0x1: "oshld",
+    0x2: "oshst",
+    0x3: "osh",
+    0x5: "nshld",
+    0x6: "unst",
+    0x7: "un",
+    0x9: "ishld",
+    0xA: "ishst",
+    0xB: "ish",
+    0xD: "ld",
+    0xE: "st",
+    0xF: "sy",
 }
 _SPEC_REGS: dict[int, str] = {
     0x00: "APSR",
@@ -644,6 +649,18 @@ def _fmt_barrier(result: Any, mnemonic: str) -> str:
     return f"{mnemonic} {_barrier(result.option)}"
 
 
+def _fmt_dsb(result: Any) -> str:
+    if result.option == 0xC:
+        return "dfb"
+    return f"dsb {_barrier(result.option)}"
+
+
+def _fmt_isb(result: Any) -> str:
+    # ISB names only the full-system option; everything else stays numeric.
+    option = "sy" if result.option == 0xF else f"#{result.option}"
+    return f"isb {option}"
+
+
 # --- Bitfield ---
 
 
@@ -916,8 +933,8 @@ def _fmt_udf(result: Any) -> str:
     return f"udf #{result.imm32}{_hex_comment(result.imm32)}"
 
 
-def _fmt_db(result: Any) -> str:
-    return f"db {_barrier(result.option)}"
+def _fmt_dbg(result: Any) -> str:
+    return f"dbg #{result.option}"
 
 
 # --- VFP data-processing 3-reg ---
@@ -1356,12 +1373,12 @@ _DISPATCH: dict[int, Any] = {
     Opcode.OP_CPS: _fmt_cps,
     "CPY": _fmt_cpy,
     Opcode.OP_CSDB: lambda r: "csdb",
-    Opcode.OP_DBG: _fmt_db,
+    Opcode.OP_DBG: _fmt_dbg,
     Opcode.OP_DMB: lambda r: _fmt_barrier(r, "dmb"),
-    Opcode.OP_DSB: lambda r: _fmt_barrier(r, "dsb"),
+    Opcode.OP_DSB: _fmt_dsb,
     Opcode.OP_EOR_IMMEDIATE: lambda r: _fmt_and_imm(r, "eor"),
     Opcode.OP_EOR_REGISTER: lambda r: _fmt_dp_reg_abbrev(r, "eor"),
-    Opcode.OP_ISB: lambda r: _fmt_barrier(r, "isb"),
+    Opcode.OP_ISB: _fmt_isb,
     Opcode.OP_IT: _fmt_it,
     Opcode.OP_LDC_LDC2_IMMEDIATE: _fmt_ldc_ldc2_imm,
     Opcode.OP_LDC_LDC2_LITERAL: _fmt_ldc_ldc2_lit,
