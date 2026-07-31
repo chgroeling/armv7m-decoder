@@ -40,7 +40,6 @@ _COND_CODES = [
 _MNEMONICS_WITH_BOTH_WIDTHS: frozenset[str] = frozenset({
     "adc",
     "add",
-    "adr",
     "and",
     "asr",
     "b",
@@ -467,10 +466,20 @@ def _fmt_sub_sp_reg(result: Any) -> str:
 # --- ADR ---
 
 
-def _fmt_adr(result: Any) -> str:
-    sign = "" if result.add else "-"
-    w = _width(result, "adr")
-    return f"adr{w} {_reg(result.d)}, #{sign}{result.imm32}{_hex_comment(result.imm32)}"
+def _fmt_adr(result: Any, offset: int = 0) -> str:
+    """ADR renders as the PC-relative add/sub it encodes, never as `adr`.
+
+    The wide encodings are the unshifted-immediate `addw`/`subw` forms; the
+    narrow one is `add Rd, pc, #imm` and carries the resolved target as a
+    comment, since the immediate is relative to Align(PC, 4).
+    """
+    d = _reg(result.d)
+    if result.decoder_state & DecoderState.DECODED_32BIT:
+        mnemonic = "addw" if result.add else "subw"
+        return f"{mnemonic} {d}, pc, #{result.imm32}{_hex_comment(result.imm32)}"
+    base = ((offset + 4) & ~3) & 0xFFFFFFFF
+    target = (base + (result.imm32 if result.add else -result.imm32)) & 0xFFFFFFFF
+    return f"add {d}, pc, #{result.imm32}\t@ (adr {d}, 0x{target:x})"
 
 
 # --- Load/store immediate ---

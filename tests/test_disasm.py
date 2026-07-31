@@ -89,6 +89,36 @@ class TestDisasmPseudoInstructions:
         assert disassemble(result).startswith("<undefined")
 
 
+class TestDisasmAdr:
+    """ADR prints as the PC-relative add/sub it encodes, matching objdump."""
+
+    def test_narrow_resolves_target(self, ctx) -> None:
+        result, _ = decode(0xA5D8 << 16, ctx)
+        assert (
+            disassemble(result, 0xA5D8 << 16, 0x60)
+            == "add\tr5, pc, #864\t@ (adr r5, 0x3c4)"
+        )
+
+    def test_narrow_target_aligns_pc(self, ctx) -> None:
+        # PC is offset + 4, then rounded down to a word boundary.
+        instr = 0xA000 << 16
+        result, _ = decode(instr, ctx)
+        assert disassemble(result, instr, 0x62) == "add\tr0, pc, #0\t@ (adr r0, 0x64)"
+
+    @pytest.mark.parametrize(
+        ("instr", "expected"),
+        [
+            (0xF20F0508, "addw\tr5, pc, #8"),
+            (0xF2AF0508, "subw\tr5, pc, #8"),
+            (0xF60F70FF, "addw\tr0, pc, #4095\t@ 0xfff"),
+            (0xF6AF70FF, "subw\tr0, pc, #4095\t@ 0xfff"),
+        ],
+    )
+    def test_wide_is_addw_subw(self, ctx, instr: int, expected: str) -> None:
+        result, _ = decode(instr, ctx)
+        assert disassemble(result, instr, 0x64) == expected
+
+
 class TestDisasmWidthSuffix:
     @pytest.mark.parametrize(
         ("instr", "expected"),
