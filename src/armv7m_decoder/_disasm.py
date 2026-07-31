@@ -343,11 +343,6 @@ def _fmt_mvn_imm(result: Any, mnemonic: str = "mvn") -> str:
 
 def _fmt_and_imm(result: Any, mnemonic: str = "and") -> str:
     s = _flags(getattr(result, "setflags", False))
-    if result.d == result.n:
-        return (
-            f"{mnemonic}{s} {_reg(result.d)}, #{result.imm32}"
-            f"{_hex_comment(result.imm32)}"
-        )
     return (
         f"{mnemonic}{s} {_reg(result.d)}, {_reg(result.n)}, #{result.imm32}"
         f"{_hex_comment(result.imm32)}"
@@ -360,8 +355,6 @@ def _fmt_and_imm(result: Any, mnemonic: str = "and") -> str:
 def _fmt_dp_reg(result: Any, mnemonic: str) -> str:
     s = _flags(result.setflags)
     sh = _shift(result.shift_t, result.shift_n)
-    if result.d == result.n:
-        return f"{mnemonic}{s} {_reg(result.d)}, {_reg(result.m)}{sh}"
     return f"{mnemonic}{s} {_reg(result.d)}, {_reg(result.n)}, {_reg(result.m)}{sh}"
 
 
