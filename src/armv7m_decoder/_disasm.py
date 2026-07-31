@@ -117,7 +117,6 @@ _SPEC_REGS: dict[int, str] = {
 
 
 def _reg(r: int) -> str:
-    
     if r == 10:
         return "sl"
     if r == 11:
@@ -188,7 +187,7 @@ def _vfp_reg(dp_operation: bool, r: int) -> str:
 # ---------------------------------------------------------------------------
 
 
-def _addr_imm_1(n: int, imm32: int, index: bool, add: bool, wback: bool) -> str:
+def _addr_imm(n: int, imm32: int, index: bool, add: bool, wback: bool) -> str:
     sign = "" if add else "-"
     offset_text = f", #{sign}{imm32}"
     hc = "" if n == 15 else _hex_comment(imm32)
@@ -198,7 +197,7 @@ def _addr_imm_1(n: int, imm32: int, index: bool, add: bool, wback: bool) -> str:
         return f"[{_reg(n)}{offset_text}]{hc}"
     return f"[{_reg(n)}], #{sign}{imm32}{hc}"
 
-def _addr_imm_2(n: int, imm32: int, index: bool, add: bool, wback: bool) -> str:
+def _addr_imm_nozero(n: int, imm32: int, index: bool, add: bool, wback: bool) -> str:
     sign = "" if add else "-"
     offset_text = "" if imm32==0 else f", #{sign}{imm32}"
     hc = "" if n == 15 else _hex_comment(imm32)
@@ -212,7 +211,7 @@ def _addr_imm_2(n: int, imm32: int, index: bool, add: bool, wback: bool) -> str:
 def _addr_imm_dual(
     t: int, t2: int, n: int, imm32: int, index: bool, add: bool, wback: bool
 ) -> str:
-    return f"{_reg(t)}, {_reg(t2)}, {_addr_imm_2(n, imm32, index, add, wback)}"
+    return f"{_reg(t)}, {_reg(t2)}, {_addr_imm_nozero(n, imm32, index, add, wback)}"
 
 
 def _addr_reg(t: int, n: int, m: int, shift_t: int, shift_n: int) -> str:
@@ -459,12 +458,12 @@ def _fmt_adr(result: Any) -> str:
 
 
 def _fmt_ldst_imm(result: Any, mnemonic: str) -> str:
-    addr = _addr_imm_1(result.n, result.imm32, result.index, result.add, result.wback)
+    addr = _addr_imm(result.n, result.imm32, result.index, result.add, result.wback)
     return f"{mnemonic} {addr}"
 
 
 def _fmt_ldst_imm_t(result: Any, mnemonic: str, offset: int = 0) -> str:
-    addr = _addr_imm_1(result.n, result.imm32, result.index, result.add, result.wback)
+    addr = _addr_imm(result.n, result.imm32, result.index, result.add, result.wback)
     asm = f"{mnemonic} {_reg(result.t)}, {addr}"
     if result.n == 15:
         asm += _hex_target(offset, result.imm32, result.add)
@@ -1286,13 +1285,13 @@ def _fmt_mrrc_mrrc2(result: Any, instr: int = 0) -> str:
 
 def _fmt_stc_stc2(result: Any, instr: int = 0) -> str:
     suffix = "2" if _is_coproc2(instr) else ""
-    addr = _addr_imm_1(result.n, result.imm32, result.index, result.add, result.wback)
+    addr = _addr_imm(result.n, result.imm32, result.index, result.add, result.wback)
     return f"stc{suffix} {result.cp}, cr{result.CRd}, {addr}"
 
 
 def _fmt_ldc_ldc2_imm(result: Any, instr: int = 0) -> str:
     suffix = "2" if _is_coproc2(instr) else ""
-    addr = _addr_imm_1(result.n, result.imm32, result.index, result.add, result.wback)
+    addr = _addr_imm(result.n, result.imm32, result.index, result.add, result.wback)
     return f"ldc{suffix} p{result.cp}, c{result.CRd}, {addr}"
 
 
