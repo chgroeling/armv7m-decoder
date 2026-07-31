@@ -110,13 +110,6 @@ _SPEC_REGS: dict[int, str] = {
     0x13: "faultmask",
     0x14: "control",
 }
-_REG_NUMBERS: dict[str, int] = {
-    **{f"r{i}": i for i in range(13)},
-    "sp": 13,
-    "lr": 14,
-    "pc": 15,
-}
-
 
 # ---------------------------------------------------------------------------
 # Core helpers
@@ -168,24 +161,7 @@ def _reg_list(registers: int) -> str:
     names = [_reg(i) for i in range(16) if registers & (1 << i)]
     if not names:
         return "{}"
-    parts: list[str] = []
-    i = 0
-    while i < len(names):
-        j = i
-        while (
-            j + 1 < len(names)
-            and _REG_NUMBERS.get(names[j + 1], -1) == _REG_NUMBERS.get(names[j], -2) + 1
-        ):
-            j += 1
-        if i == j:
-            parts.append(names[i])
-        elif j == i + 1:
-            parts.append(names[i])
-            parts.append(names[j])
-        else:
-            parts.append(f"{names[i]}-{names[j]}")
-        i = j + 1
-    return "{" + ", ".join(parts) + "}"
+    return "{" + ", ".join(names) + "}"
 
 
 def _vfp_reg_list(single_regs: bool, d: int, count: int) -> str:
