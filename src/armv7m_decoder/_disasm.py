@@ -160,11 +160,12 @@ def _vfp_reg(dp_operation: bool, r: int) -> str:
 def _addr_imm(n: int, imm32: int, index: bool, add: bool, wback: bool) -> str:
     sign = "" if add else "-"
     offset_text = f", #{sign}{imm32}"
+    hc = "" if n == 15 else _hex_comment(imm32)
     if index and wback:
-        return f"[{_reg(n)}{offset_text}]!"
+        return f"[{_reg(n)}{offset_text}]!{hc}"
     if index and not wback:
-        return f"[{_reg(n)}{offset_text}]"
-    return f"[{_reg(n)}], #{sign}{imm32}"
+        return f"[{_reg(n)}{offset_text}]{hc}"
+    return f"[{_reg(n)}], #{sign}{imm32}{hc}"
 
 
 def _addr_imm_dual(
@@ -182,13 +183,13 @@ def _addr_reg(t: int, n: int, m: int, shift_t: int, shift_n: int) -> str:
 def _addr_excl(d: int, t: int, n: int, imm32: int) -> str:
     if imm32 == 0:
         return f"{_reg(d)}, {_reg(t)}, [{_reg(n)}]"
-    return f"{_reg(d)}, {_reg(t)}, [{_reg(n)}, #{imm32}]"
+    return f"{_reg(d)}, {_reg(t)}, [{_reg(n)}, #{imm32}]{_hex_comment(imm32)}"
 
 
 def _addr_excl_single(t: int, n: int, imm32: int) -> str:
     if imm32 == 0:
         return f"{_reg(t)}, [{_reg(n)}]"
-    return f"{_reg(t)}, [{_reg(n)}, #{imm32}]"
+    return f"{_reg(t)}, [{_reg(n)}, #{imm32}]{_hex_comment(imm32)}"
 
 
 def _addr_literal(t: int, imm32: int, add: bool) -> str:
@@ -201,13 +202,13 @@ def _addr_unpriv(t: int, n: int, imm32: int, register_form: bool) -> str:
         return f"{_reg(t)}, [{_reg(n)}], {_reg(imm32)}"
     if imm32 == 0:
         return f"{_reg(t)}, [{_reg(n)}]"
-    return f"{_reg(t)}, [{_reg(n)}, #{imm32}]"
+    return f"{_reg(t)}, [{_reg(n)}, #{imm32}]{_hex_comment(imm32)}"
 
 
 def _addr_unpriv_ldr(t: int, n: int, imm32: int) -> str:
     if imm32 == 0:
         return f"{_reg(t)}, [{_reg(n)}]"
-    return f"{_reg(t)}, [{_reg(n)}, #{imm32}]"
+    return f"{_reg(t)}, [{_reg(n)}, #{imm32}]{_hex_comment(imm32)}"
 
 
 def _branch_target(offset: int, imm32: int) -> str:
@@ -215,7 +216,13 @@ def _branch_target(offset: int, imm32: int) -> str:
 
 
 def _hex_comment(imm: int) -> str:
-    return f"\t@ 0x{imm:x}" if imm > 16 or imm < -16 else ""
+    return f"\t@ 0x{imm:x}" if imm > 32 or imm < -16 else ""
+
+
+def _hex_target(offset: int, imm32: int, add: bool = True) -> str:
+    base = ((offset + 4) & ~3) & 0xFFFFFFFF
+    target = (base + (imm32 if add else -imm32)) & 0xFFFFFFFF
+    return f"\t@ (0x{target:x})"
 
 
 # ---------------------------------------------------------------------------
@@ -270,16 +277,16 @@ def _fmt_dp_imm(result: Any, mnemonic: str) -> str:
     )
 
 
-def _fmt_mov_imm(result: Any) -> str:
+def _fmt_mov_imm(result: Any, instr: int = 0) -> str:
     s = _flags(result.setflags)
-    return f"mov{s} {_reg(result.d)}, #{result.imm32}{_hex_comment(result.imm32)}"
+    w = ".w" if (instr & 0xFFFF) != 0 else ""
+    return f"mov{s}{w} {_reg(result.d)}, #{result.imm32}{_hex_comment(result.imm32)}"
 
 
 def _fmt_mvn_imm(result: Any, mnemonic: str = "mvn") -> str:
     s = _flags(result.setflags)
     return (
-        f"{mnemonic}{s} {_reg(result.d)}, #{result.imm32}"
-        f"{_hex_comment(result.imm32)}"
+        f"{mnemonic}{s} {_reg(result.d)}, #{result.imm32}{_hex_comment(result.imm32)}"
     )
 
 
@@ -305,9 +312,10 @@ def _fmt_dp_reg(result: Any, mnemonic: str) -> str:
     return f"{mnemonic}{s} {_reg(result.d)}, {_reg(result.n)}, {_reg(result.m)}{sh}"
 
 
-def _fmt_mov_reg(result: Any) -> str:
+def _fmt_mov_reg(result: Any, instr: int = 0) -> str:
     s = _flags(result.setflags)
-    return f"mov{s} {_reg(result.d)}, {_reg(result.m)}"
+    w = ".w" if (instr & 0xFFFF) != 0 else ""
+    return f"mov{s}{w} {_reg(result.d)}, {_reg(result.m)}"
 
 
 def _fmt_mvn_reg(result: Any) -> str:
@@ -384,7 +392,7 @@ def _fmt_sub_sp_reg(result: Any) -> str:
 
 def _fmt_adr(result: Any) -> str:
     sign = "" if result.add else "-"
-    return f"adr {_reg(result.d)}, #{sign}{result.imm32}"
+    return f"adr {_reg(result.d)}, #{sign}{result.imm32}{_hex_comment(result.imm32)}"
 
 
 # --- Load/store immediate ---
@@ -399,9 +407,7 @@ def _fmt_ldst_imm_t(result: Any, mnemonic: str, offset: int = 0) -> str:
     addr = _addr_imm(result.n, result.imm32, result.index, result.add, result.wback)
     asm = f"{mnemonic} {_reg(result.t)}, {addr}"
     if result.n == 15:
-        base = ((offset + 4) & ~3) & 0xFFFFFFFF
-        target = base + (result.imm32 if result.add else -result.imm32)
-        asm += f"\t@ (0x{target:x})"
+        asm += _hex_target(offset, result.imm32, result.add)
     return asm
 
 
@@ -436,19 +442,15 @@ def _fmt_ldst_reg_rt(result: Any, mnemonic: str) -> str:
 
 def _fmt_ldst_lit(result: Any, mnemonic: str, offset: int = 0) -> str:
     asm = f"{mnemonic} {_addr_literal(result.t, result.imm32, result.add)}"
-    base = ((offset + 4) & ~3) & 0xFFFFFFFF
-    target = base + (result.imm32 if result.add else -result.imm32)
-    return f"{asm}\t@ (0x{target:x})"
+    return f"{asm}{_hex_target(offset, result.imm32, result.add)}"
 
 
 def _fmt_ldst_lit_dual(result: Any, mnemonic: str = "ldrd", offset: int = 0) -> str:
     sign = "" if result.add else "-"
-    asm = (
-        f"{mnemonic} {_reg(result.t)}, {_reg(result.t2)}, [pc, #{sign}{result.imm32}]"
+    return (
+        f"{mnemonic} {_reg(result.t)}, {_reg(result.t2)},"
+        f" [pc, #{sign}{result.imm32}]{_hex_target(offset, result.imm32, result.add)}"
     )
-    base = ((offset + 4) & ~3) & 0xFFFFFFFF
-    target = base + (result.imm32 if result.add else -result.imm32)
-    return f"{asm}\t@ (0x{target:x})"
 
 
 # --- Preload (PLD / PLI) ---
@@ -456,15 +458,15 @@ def _fmt_ldst_lit_dual(result: Any, mnemonic: str = "ldrd", offset: int = 0) -> 
 
 def _fmt_pld_imm(result: Any) -> str:
     sign = "" if result.add else "-"
-    return f"pld [{_reg(result.n)}, #{sign}{result.imm32}]"
+    return f"pld [{_reg(result.n)}, #{sign}{result.imm32}]{_hex_comment(result.imm32)}"
 
 
 def _fmt_pld_lit(result: Any, offset: int = 0) -> str:
     sign = "" if result.add else "-"
-    asm = f"pld [pc, #{sign}{result.imm32}]"
-    base = ((offset + 4) & ~3) & 0xFFFFFFFF
-    target = base + (result.imm32 if result.add else -result.imm32)
-    return f"{asm}\t@ (0x{target:x})"
+    return (
+        f"pld [pc, #{sign}{result.imm32}]"
+        f"{_hex_target(offset, result.imm32, result.add)}"
+    )
 
 
 def _fmt_pld_reg(result: Any) -> str:
@@ -475,7 +477,7 @@ def _fmt_pld_reg(result: Any) -> str:
 
 def _fmt_pli_imm_lit(result: Any) -> str:
     sign = "" if result.add else "-"
-    return f"pli [{_reg(result.n)}, #{sign}{result.imm32}]"
+    return f"pli [{_reg(result.n)}, #{sign}{result.imm32}]{_hex_comment(result.imm32)}"
 
 
 def _fmt_pli_reg(result: Any) -> str:
@@ -519,7 +521,10 @@ def _fmt_unpriv_ldr(result: Any, mnemonic: str) -> str:
         return f"{mnemonic} {_reg(result.t)}, [{_reg(result.n)}], {_reg(result.imm32)}"
     if result.imm32 == 0:
         return f"{mnemonic} {_reg(result.t)}, [{_reg(result.n)}]"
-    return f"{mnemonic} {_reg(result.t)}, [{_reg(result.n)}, #{result.imm32}]"
+    return (
+        f"{mnemonic} {_reg(result.t)}, [{_reg(result.n)}, #{result.imm32}]"
+        f"{_hex_comment(result.imm32)}"
+    )
 
 
 def _fmt_unpriv_str(result: Any, mnemonic: str) -> str:
@@ -839,11 +844,11 @@ def _fmt_bkpt(result: Any) -> str:
 
 
 def _fmt_svc(result: Any) -> str:
-    return f"svc #{result.imm32}"
+    return f"svc #{result.imm32}{_hex_comment(result.imm32)}"
 
 
 def _fmt_udf(result: Any) -> str:
-    return f"udf #{result.imm32}"
+    return f"udf #{result.imm32}{_hex_comment(result.imm32)}"
 
 
 def _fmt_db(result: Any) -> str:
@@ -972,7 +977,10 @@ def _fmt_vcvtb_vcvtt(result: Any) -> str:
 
 
 def _fmt_vmov_imm(result: Any) -> str:
-    return f"vmov {_vfp_reg(result.dp_operation, result.d)}, #{result.imm32}"
+    return (
+        f"vmov {_vfp_reg(result.dp_operation, result.d)}, #{result.imm32}"
+        f"{_hex_comment(result.imm32)}"
+    )
 
 
 def _fmt_vmov_reg(result: Any) -> str:
@@ -1077,6 +1085,7 @@ def _fmt_vldr_vstr(result: Any, mnemonic: str) -> str:
     reg_name_fn = _sreg if single_reg else _dreg
     return (
         f"{mnemonic} {reg_name_fn(result.d)}, [{_reg(result.n)}, #{sign}{result.imm32}]"
+        f"{_hex_comment(result.imm32)}"
     )
 
 
@@ -1218,10 +1227,13 @@ def _fmt_ldc_ldc2_imm(result: Any, instr: int = 0) -> str:
     return f"ldc{suffix} p{result.cp}, c{result.CRd}, {addr}"
 
 
-def _fmt_ldc_ldc2_lit(result: Any, instr: int = 0) -> str:
+def _fmt_ldc_ldc2_lit(result: Any, instr: int = 0, offset: int = 0) -> str:
     suffix = "2" if _is_coproc2(instr) else ""
     sign = "" if result.add else "-"
-    return f"ldc{suffix} p{result.cp}, c{result.CRd}, [pc, #{sign}{result.imm32}]"
+    return (
+        f"ldc{suffix} p{result.cp}, c{result.CRd},"
+        f" [pc, #{sign}{result.imm32}]{_hex_target(offset, result.imm32, result.add)}"
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -1349,7 +1361,7 @@ _DISPATCH: dict[int, Any] = {
     Opcode.OP_MVN_IMMEDIATE: _fmt_mvn_imm,
     Opcode.OP_MVN_REGISTER: _fmt_mvn_reg,
     "NEG": _fmt_neg,
-    Opcode.OP_NOP: lambda r: "nop",
+    Opcode.OP_NOP: lambda r, instr=0: f"nop{'.w' if (instr & 0xFFFF) != 0 else ''}",
     Opcode.OP_ORN_IMMEDIATE: lambda r: _fmt_and_imm(r, "orn"),
     Opcode.OP_ORN_REGISTER: lambda r: _fmt_dp_reg(r, "orn"),
     Opcode.OP_ORR_IMMEDIATE: lambda r: _fmt_and_imm(r, "orr"),
