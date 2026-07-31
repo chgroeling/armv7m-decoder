@@ -37,6 +37,54 @@ _COND_CODES = [
     "le",
     "",
 ]
+_MNEMONICS_WITH_BOTH_WIDTHS: frozenset[str] = frozenset({
+    "adc",
+    "add",
+    "adr",
+    "and",
+    "asr",
+    "b",
+    "bic",
+    "cmn",
+    "cmp",
+    "eor",
+    "ldm",
+    "ldr",
+    "ldrb",
+    "ldrh",
+    "ldrsb",
+    "ldrsh",
+    "lsl",
+    "lsr",
+    "mov",
+    "mul",
+    "mvn",
+    "nop",
+    "orr",
+    "pop",
+    "push",
+    "rev",
+    "rev16",
+    "revsh",
+    "ror",
+    "rsb",
+    "sbc",
+    "sev",
+    "stm",
+    "str",
+    "strb",
+    "strh",
+    "sub",
+    "sxtb",
+    "sxth",
+    "tst",
+    "udf",
+    "uxtb",
+    "uxth",
+    "wfe",
+    "wfi",
+    "yield",
+})
 _BARRIER_OPTIONS: dict[int, str] = {
     0x2: "osh",
     0x3: "nsh",
@@ -215,6 +263,10 @@ def _branch_target(offset: int, imm32: int) -> str:
     return f"0x{((offset + 4 + imm32) & 0xFFFFFFFF):x}"
 
 
+def _is_wide(instr: int) -> bool:
+    return (instr >> 27) & 0x1F >= 0x1D
+
+
 def _hex_comment(imm: int) -> str:
     return f"\t@ 0x{imm:x}" if imm > 32 or imm < -16 else ""
 
@@ -277,10 +329,9 @@ def _fmt_dp_imm(result: Any, mnemonic: str) -> str:
     )
 
 
-def _fmt_mov_imm(result: Any, instr: int = 0) -> str:
+def _fmt_mov_imm(result: Any) -> str:
     s = _flags(result.setflags)
-    w = ".w" if (instr & 0xFFFF) != 0 else ""
-    return f"mov{s}{w} {_reg(result.d)}, #{result.imm32}{_hex_comment(result.imm32)}"
+    return f"mov{s} {_reg(result.d)}, #{result.imm32}{_hex_comment(result.imm32)}"
 
 
 def _fmt_mvn_imm(result: Any, mnemonic: str = "mvn") -> str:
@@ -309,13 +360,14 @@ def _fmt_and_imm(result: Any, mnemonic: str = "and") -> str:
 def _fmt_dp_reg(result: Any, mnemonic: str) -> str:
     s = _flags(result.setflags)
     sh = _shift(result.shift_t, result.shift_n)
+    if result.d == result.n:
+        return f"{mnemonic}{s} {_reg(result.d)}, {_reg(result.m)}{sh}"
     return f"{mnemonic}{s} {_reg(result.d)}, {_reg(result.n)}, {_reg(result.m)}{sh}"
 
 
-def _fmt_mov_reg(result: Any, instr: int = 0) -> str:
+def _fmt_mov_reg(result: Any) -> str:
     s = _flags(result.setflags)
-    w = ".w" if (instr & 0xFFFF) != 0 else ""
-    return f"mov{s}{w} {_reg(result.d)}, {_reg(result.m)}"
+    return f"mov{s} {_reg(result.d)}, {_reg(result.m)}"
 
 
 def _fmt_mvn_reg(result: Any) -> str:
@@ -359,6 +411,8 @@ def _fmt_ror_imm(result: Any) -> str:
 
 def _fmt_shift_reg(result: Any, mnemonic: str) -> str:
     s = _flags(result.setflags)
+    if result.d == result.n:
+        return f"{mnemonic}{s} {_reg(result.d)}, {_reg(result.m)}"
     return f"{mnemonic}{s} {_reg(result.d)}, {_reg(result.n)}, {_reg(result.m)}"
 
 
@@ -367,23 +421,35 @@ def _fmt_shift_reg(result: Any, mnemonic: str) -> str:
 
 def _fmt_add_sp_imm(result: Any) -> str:
     s = _flags(result.setflags)
+    if result.d == 13:
+        return f"add{s} sp, #{result.imm32}{_hex_comment(result.imm32)}"
     return f"add{s} {_reg(result.d)}, sp, #{result.imm32}{_hex_comment(result.imm32)}"
 
 
 def _fmt_add_sp_reg(result: Any) -> str:
     s = _flags(result.setflags)
     sh = _shift(result.shift_t, result.shift_n)
+    if result.d == 13:
+        return f"add{s} sp, {_reg(result.m)}{sh}"
+    if result.d == result.m:
+        return f"add{s} {_reg(result.d)}, sp{sh}"
     return f"add{s} {_reg(result.d)}, sp, {_reg(result.m)}{sh}"
 
 
 def _fmt_sub_sp_imm(result: Any) -> str:
     s = _flags(result.setflags)
+    if result.d == 13:
+        return f"sub{s} sp, #{result.imm32}{_hex_comment(result.imm32)}"
     return f"sub{s} {_reg(result.d)}, sp, #{result.imm32}{_hex_comment(result.imm32)}"
 
 
 def _fmt_sub_sp_reg(result: Any) -> str:
     s = _flags(result.setflags)
     sh = _shift(result.shift_t, result.shift_n)
+    if result.d == 13:
+        return f"sub{s} sp, {_reg(result.m)}{sh}"
+    if result.d == result.m:
+        return f"sub{s} {_reg(result.d)}, sp{sh}"
     return f"sub{s} {_reg(result.d)}, sp, {_reg(result.m)}{sh}"
 
 
@@ -555,7 +621,7 @@ def _fmt_push(result: Any) -> str:
 
 def _fmt_b(result: Any, offset: int = 0, instr: int = 0) -> str:
     c = _cond(result.cond)
-    narrow = ".n" if (instr & 0xFFFF) == 0 else ""
+    narrow = ".n" if not _is_wide(instr) else ""
     return f"b{c}{narrow} {_branch_target(offset, result.imm32)}"
 
 
@@ -1361,7 +1427,7 @@ _DISPATCH: dict[int, Any] = {
     Opcode.OP_MVN_IMMEDIATE: _fmt_mvn_imm,
     Opcode.OP_MVN_REGISTER: _fmt_mvn_reg,
     "NEG": _fmt_neg,
-    Opcode.OP_NOP: lambda r, instr=0: f"nop{'.w' if (instr & 0xFFFF) != 0 else ''}",
+    Opcode.OP_NOP: lambda r: "nop",
     Opcode.OP_ORN_IMMEDIATE: lambda r: _fmt_and_imm(r, "orn"),
     Opcode.OP_ORN_REGISTER: lambda r: _fmt_dp_reg(r, "orn"),
     Opcode.OP_ORR_IMMEDIATE: lambda r: _fmt_and_imm(r, "orr"),
@@ -1590,4 +1656,20 @@ def disassemble(result: object, instr: int = 0, offset: int = 0) -> str:
     except (ValueError, TypeError):
         asm = fmt_func(result)
     asm = asm.replace(" ", "\t", 1)
+    if _is_wide(instr):
+        mnemonic, sep, rest = asm.partition("\t")
+        base = mnemonic.lower()
+        if base.endswith(".n"):
+            base = base[:-2]
+        for cc in _COND_CODES:
+            if cc and base.endswith(cc):
+                base = base[: -len(cc)]
+                break
+        if base in _MNEMONICS_WITH_BOTH_WIDTHS or (
+            base.endswith("s") and base[:-1] in _MNEMONICS_WITH_BOTH_WIDTHS
+        ):
+            if sep:
+                asm = f"{mnemonic}.w{sep}{rest}"
+            else:
+                asm = f"{mnemonic}.w"
     return asm

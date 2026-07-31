@@ -26,7 +26,7 @@ class TestDisasmBasics:
 
     def test_adc_register(self, ctx) -> None:
         result, _ = decode(0x4140 << 16, ctx)
-        assert disassemble(result) == "adcs\tr0, r0, r0"
+        assert disassemble(result) == "adcs\tr0, r0"
 
     def test_bkpt(self, ctx) -> None:
         result, _ = decode(0xBE00 << 16, ctx)
