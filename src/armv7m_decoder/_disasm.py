@@ -223,7 +223,7 @@ def _addr_imm_dual(
 
 
 def _addr_reg(t: int, n: int, m: int, shift_t: int, shift_n: int) -> str:
-    if shift_t == 0 and shift_n == 0:
+    if shift_n == 0:
         return f"{_reg(t)}, [{_reg(n)}, {_reg(m)}]"
     return f"{_reg(t)}, [{_reg(n)}, {_reg(m)}, lsl #{shift_n}]"
 
@@ -535,7 +535,7 @@ def _fmt_pld_lit(result: Any, offset: int = 0) -> str:
 
 
 def _fmt_pld_reg(result: Any) -> str:
-    if result.shift_t == 0 and result.shift_n == 0:
+    if result.shift_n == 0:
         return f"pld [{_reg(result.n)}, {_reg(result.m)}]"
     return f"pld [{_reg(result.n)}, {_reg(result.m)}, lsl #{result.shift_n}]"
 
@@ -546,7 +546,7 @@ def _fmt_pli_imm_lit(result: Any) -> str:
 
 
 def _fmt_pli_reg(result: Any) -> str:
-    if result.shift_t == 0 and result.shift_n == 0:
+    if result.shift_n == 0:
         return f"pli [{_reg(result.n)}, {_reg(result.m)}]"
     return f"pli [{_reg(result.n)}, {_reg(result.m)}, lsl #{result.shift_n}]"
 
@@ -1326,7 +1326,7 @@ def _fmt_mov_shifted(result: Any) -> str:
 
 _DISPATCH: dict[int, Any] = {
     Opcode.OP_ADC_IMMEDIATE: lambda r: _fmt_dp_imm(r, "adc"),
-    Opcode.OP_ADC_REGISTER: lambda r: _fmt_dp_reg(r, "adc"),
+    Opcode.OP_ADC_REGISTER: lambda r: _fmt_dp_reg_abbrev(r, "adc"),
     Opcode.OP_ADD_IMMEDIATE: lambda r: _fmt_dp_imm(r, "add"),
     Opcode.OP_ADD_REGISTER: lambda r: _fmt_dp_reg_abbrev(r, "add"),
     Opcode.OP_ADD_SP_PLUS_IMMEDIATE: _fmt_add_sp_imm,
