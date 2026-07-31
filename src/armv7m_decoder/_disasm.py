@@ -11,10 +11,6 @@ from typing import Any
 
 from armv7m_decoder._decoder import DecoderState, Opcode
 
-# Number of characters the mnemonic field is padded to (0 = no padding).
-# Set to e.g. 8 to right-pad mnemonics so operands align in columns.
-MNEMONIC_PAD: int = 0
-
 # Separates the mnemonic from its operands. Formatters emit it directly, so a
 # formatted instruction never has to be re-parsed to find the mnemonic boundary.
 _SEP: str = "\t"
