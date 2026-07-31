@@ -653,8 +653,8 @@ def _fmt_tbb_tbh(result: Any, offset: int = 0) -> str:
 # --- Barrier ---
 
 
-def _fmt_barrier(result: Any, mnemonic: str) -> str:
-    return f"{mnemonic} {_barrier(result.option)}"
+def _fmt_dmb(result: Any) -> str:
+    return f"dmb {_barrier(result.option)}"
 
 
 def _fmt_dsb(result: Any) -> str:
@@ -1382,7 +1382,7 @@ _DISPATCH: dict[int, Any] = {
     "CPY": _fmt_cpy,
     Opcode.OP_CSDB: lambda r: "csdb",
     Opcode.OP_DBG: _fmt_dbg,
-    Opcode.OP_DMB: lambda r: _fmt_barrier(r, "dmb"),
+    Opcode.OP_DMB: _fmt_dmb,
     Opcode.OP_DSB: _fmt_dsb,
     Opcode.OP_EOR_IMMEDIATE: lambda r: _fmt_and_imm(r, "eor"),
     Opcode.OP_EOR_REGISTER: lambda r: _fmt_dp_reg_abbrev(r, "eor"),
