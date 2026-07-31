@@ -117,6 +117,10 @@ _SPEC_REGS: dict[int, str] = {
 
 
 def _reg(r: int) -> str:
+    if r == 11:
+        return "fp"
+    if r == 12:
+        return "ip"
     if r == 13:
         return "sp"
     if r == 14:
@@ -887,7 +891,7 @@ def _fmt_bkpt(result: Any) -> str:
 
 
 def _fmt_svc(result: Any) -> str:
-    return f"svc #{result.imm32}{_hex_comment(result.imm32)}"
+    return f"svc {result.imm32}{_hex_comment(result.imm32)}"
 
 
 def _fmt_udf(result: Any) -> str:
@@ -1318,7 +1322,7 @@ _DISPATCH: dict[int, Any] = {
     Opcode.OP_BFC: _fmt_bfc,
     Opcode.OP_BFI: _fmt_bfi,
     Opcode.OP_BIC_IMMEDIATE: lambda r: _fmt_and_imm(r, "bic"),
-    Opcode.OP_BIC_REGISTER: lambda r: _fmt_dp_reg(r, "bic"),
+    Opcode.OP_BIC_REGISTER: lambda r: _fmt_dp_reg_abbrev(r, "bic"),
     Opcode.OP_BKPT: _fmt_bkpt,
     Opcode.OP_BL: _fmt_bl,
     Opcode.OP_BLX_REGISTER: _fmt_blx_reg,
