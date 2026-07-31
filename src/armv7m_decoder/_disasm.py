@@ -352,11 +352,17 @@ def _fmt_and_imm(result: Any, mnemonic: str = "and") -> str:
 # --- Data-processing register ---
 
 
+def _fmt_dp_reg_abbrev(result: Any, mnemonic: str) -> str:
+    s = _flags(result.setflags)
+    sh = _shift(result.shift_t, result.shift_n)
+    if result.d == result.n:
+        return f"{mnemonic}{s} {_reg(result.d)}, {_reg(result.m)}{sh}"
+    return f"{mnemonic}{s} {_reg(result.d)}, {_reg(result.n)}, {_reg(result.m)}{sh}"
+
 def _fmt_dp_reg(result: Any, mnemonic: str) -> str:
     s = _flags(result.setflags)
     sh = _shift(result.shift_t, result.shift_n)
     return f"{mnemonic}{s} {_reg(result.d)}, {_reg(result.n)}, {_reg(result.m)}{sh}"
-
 
 def _fmt_mov_reg(result: Any) -> str:
     s = _flags(result.setflags)
@@ -1322,7 +1328,7 @@ _DISPATCH: dict[int, Any] = {
     Opcode.OP_ADC_IMMEDIATE: lambda r: _fmt_dp_imm(r, "adc"),
     Opcode.OP_ADC_REGISTER: lambda r: _fmt_dp_reg(r, "adc"),
     Opcode.OP_ADD_IMMEDIATE: lambda r: _fmt_dp_imm(r, "add"),
-    Opcode.OP_ADD_REGISTER: lambda r: _fmt_dp_reg(r, "add"),
+    Opcode.OP_ADD_REGISTER: lambda r: _fmt_dp_reg_abbrev(r, "add"),
     Opcode.OP_ADD_SP_PLUS_IMMEDIATE: _fmt_add_sp_imm,
     Opcode.OP_ADD_SP_PLUS_REGISTER: _fmt_add_sp_reg,
     Opcode.OP_ADR: _fmt_adr,
@@ -1354,7 +1360,7 @@ _DISPATCH: dict[int, Any] = {
     Opcode.OP_DMB: lambda r: _fmt_barrier(r, "dmb"),
     Opcode.OP_DSB: lambda r: _fmt_barrier(r, "dsb"),
     Opcode.OP_EOR_IMMEDIATE: lambda r: _fmt_and_imm(r, "eor"),
-    Opcode.OP_EOR_REGISTER: lambda r: _fmt_dp_reg(r, "eor"),
+    Opcode.OP_EOR_REGISTER: lambda r: _fmt_dp_reg_abbrev(r, "eor"),
     Opcode.OP_ISB: lambda r: _fmt_barrier(r, "isb"),
     Opcode.OP_IT: _fmt_it,
     Opcode.OP_LDC_LDC2_IMMEDIATE: _fmt_ldc_ldc2_imm,
