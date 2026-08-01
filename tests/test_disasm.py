@@ -1,8 +1,26 @@
 """Disassembly formatting tests for the ARMv7-M instruction decoder."""
 
+import struct
+
 import pytest
 
-from armv7m_decoder import decode, disassemble
+from armv7m_decoder import Context, decode, disassemble, next_itstate
+
+
+def disassemble_stream(ctx: Context, halfwords: list[int]) -> list[str]:
+    """Disassemble a Thumb stream, carrying ITSTATE across it like the CLI."""
+    data = b"".join(struct.pack("<H", hw) for hw in halfwords)
+    asm: list[str] = []
+    offset = 0
+    while offset < len(data):
+        hw1, hw2 = struct.unpack("<HH", (data[offset : offset + 4] + b"\0\0")[:4])
+        istate = ctx.istate
+        result, n_bytes = decode((hw1 << 16) | hw2, ctx)
+        instr = hw1 << 16 if n_bytes == 2 else (hw1 << 16) | hw2
+        asm.append(disassemble(result, instr, offset, istate))
+        ctx.istate = next_itstate(istate, result)
+        offset += n_bytes
+    return asm
 
 
 class TestDisasmBasics:
@@ -270,6 +288,99 @@ class TestDisasmDMB:
     def test_dbg(self, ctx) -> None:
         result, _ = decode(0xF3AF80F5, ctx)
         assert disassemble(result) == "dbg\t#5"
+
+
+class TestDisasmIT:
+    @pytest.mark.parametrize(
+        ("word", "expected"),
+        [
+            (0xBF08, "it\teq"),
+            (0xBFB8, "it\tlt"),
+            (0xBFE8, "it\tal"),
+            # A set mask bit repeats firstcond<0>, so the same bit pattern is
+            # "then" for an odd firstcond and "else" for an even one.
+            (0xBF0C, "ite\teq"),
+            (0xBF1C, "itt\tne"),
+            (0xBF04, "itt\teq"),
+            (0xBF14, "ite\tne"),
+            (0xBF42, "ittt\tmi"),
+            (0xBF2B, "itete\tcs"),
+            (0xBFC7, "ittee\tgt"),
+            (0xBFDF, "itttt\tle"),
+        ],
+    )
+    def test_it_mnemonic(self, ctx, word: int, expected: str) -> None:
+        result, _ = decode(word << 16, ctx)
+        assert disassemble(result) == expected
+
+    def test_block_conditions_alternate(self, ctx) -> None:
+        assert disassemble_stream(ctx, [0xBF0C, 0x2001, 0x2102]) == [
+            "ite\teq",
+            "moveq\tr0, #1",
+            "movne\tr1, #2",
+        ]
+
+    def test_condition_precedes_width(self, ctx) -> None:
+        # ADD (immediate) T3 and LDR (immediate) T3: cond before the .w.
+        assert disassemble_stream(ctx, [0xBF1C, 0x2001, 0xF103, 0x0204]) == [
+            "itt\tne",
+            "movne\tr0, #1",
+            "addne.w\tr2, r3, #4",
+        ]
+        assert disassemble_stream(ctx, [0xBF44, 0xEB11, 0x0002, 0xF8D1, 0x0004]) == [
+            "itt\tmi",
+            "addsmi.w\tr0, r1, r2",
+            "ldrmi.w\tr0, [r1, #4]",
+        ]
+
+    def test_condition_precedes_data_type(self, ctx) -> None:
+        assert disassemble_stream(ctx, [0xBF08, 0xEEB0, 0x0A60]) == [
+            "it\teq",
+            "vmoveq.f32\ts0, s1",
+        ]
+
+    def test_block_covers_four_slots_then_ends(self, ctx) -> None:
+        assert disassemble_stream(ctx, [0xBF2B, 0xBF00, 0xBF00, 0xBF00, 0xBF00]) == [
+            "itete\tcs",
+            "nopcs",
+            "nopcc",
+            "nopcs",
+            "nopcc",
+        ]
+        assert disassemble_stream(ctx, [0xBF08, 0xBF00, 0xBF00]) == [
+            "it\teq",
+            "nopeq",
+            "nop",
+        ]
+
+    def test_al_block_spells_its_condition(self, ctx) -> None:
+        # "al" is the one condition an encoding of its own leaves unspelled --
+        # an IT block writes it out, as objdump does.
+        assert disassemble_stream(ctx, [0xBFE8, 0xBF00, 0xBF00]) == [
+            "it\tal",
+            "nopal",
+            "nop",
+        ]
+
+    def test_16bit_data_processing_drops_s_in_block(self, ctx) -> None:
+        # ADD (register) T1 decodes with setflags = !InITBlock(), so the
+        # running ITSTATE has to reach the decoder, not just the formatter.
+        assert disassemble_stream(ctx, [0x1800]) == ["adds\tr0, r0"]
+        assert disassemble_stream(ctx, [0xBF2C, 0x1800, 0x1800]) == [
+            "ite\tcs",
+            "addcs\tr0, r0",
+            "addcc\tr0, r0",
+        ]
+
+    def test_unconditional_branch_takes_the_block_condition(self, ctx) -> None:
+        # B T2 encodes cond = AL, so the block's condition applies.
+        assert disassemble_stream(ctx, [0xBF08, 0xE7FF]) == ["it\teq", "beq.n\t0x4"]
+
+    def test_branch_keeps_its_own_condition(self, ctx) -> None:
+        # B T1 carries the condition CurrentCond reports, so a block's
+        # condition is never appended on top of it.
+        result, _ = decode(0xD0FE << 16, ctx)
+        assert disassemble(result, istate=0x18) == "beq.n\t0x0"
 
 
 class TestDisasmVFP:

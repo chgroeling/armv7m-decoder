@@ -10,6 +10,7 @@ import inspect as _inspect
 from typing import Any
 
 from armv7m_decoder._decoder import DecoderState, Opcode
+from armv7m_decoder._itstate import COND_AL, current_cond, in_it_block
 
 # Separates the mnemonic from its operands. Formatters emit it directly, so a
 # formatted instruction never has to be re-parsed to find the mnemonic boundary.
@@ -35,7 +36,7 @@ _COND_CODES = [
     "lt",
     "gt",
     "le",
-    "",
+    "al",
 ]
 _MNEMONICS_WITH_BOTH_WIDTHS: frozenset[str] = frozenset({
     "adc",
@@ -152,7 +153,9 @@ def _shift(shift_t: int, shift_n: int) -> str:
 
 
 def _cond(cond: int) -> str:
-    if cond >= 14:
+    # A cond field of 0b1110 in an encoding of its own marks the instruction
+    # unconditional and goes unspelled; only an IT block writes out "al".
+    if cond >= COND_AL:
         return ""
     return _COND_CODES[cond]
 
@@ -974,23 +977,26 @@ def _fmt_cps(result: Any) -> str:
 
 
 def _fmt_it(result: Any) -> str:
-    c = _COND_CODES[result.firstcond]
-    mask = result.mask
-    suffix = ""
+    # The lowest set bit of the mask terminates the block; the bits above it
+    # are the conditions of the second, third and fourth slot, one bit each.
+    mask = result.mask & 0xF
     if mask & 0x1:
-        suffix += _it_te(mask, 3)
-        suffix += _it_te(mask, 2)
-        suffix += _it_te(mask, 1)
+        slots = 3
     elif mask & 0x2:
-        suffix += _it_te(mask, 3)
-        suffix += _it_te(mask, 2)
+        slots = 2
     elif mask & 0x4:
-        suffix += _it_te(mask, 3)
-    return f"it{suffix}{_SEP}{c}"
+        slots = 1
+    else:
+        slots = 0
+    suffix = "".join(_it_te(mask, 3 - i, result.firstcond) for i in range(slots))
+    return f"it{suffix}{_SEP}{_COND_CODES[result.firstcond]}"
 
 
-def _it_te(mask: int, bit: int) -> str:
-    return "e" if (mask >> bit) & 1 == 0 else "t"
+def _it_te(mask: int, bit: int, firstcond: int) -> str:
+    # A slot runs on `firstcond` ("then") when its mask bit repeats
+    # firstcond<0>, and on the inverse condition ("else") when it flips it --
+    # ITAdvance shifts the bit into ITSTATE<4>, which is cond<0>.
+    return "t" if (mask >> bit) & 1 == firstcond & 1 else "e"
 
 
 # --- Misc zero-operand ---
@@ -1714,7 +1720,27 @@ _DISPATCH: dict[int, Any] = {
 # ---------------------------------------------------------------------------
 
 
-def disassemble(result: object, instr: int = 0, offset: int = 0) -> str:
+def _in_cond_block(asm: str, istate: int) -> str:
+    """Re-spell `asm` as the conditional instruction an IT block makes of it.
+
+    The condition goes between the mnemonic and any dotted qualifier it
+    carries -- `add` becomes `addeq`, `adds.w` `addseq.w`, `vmov.f32`
+    `vmoveq.f32`. `_SEP` bounds the mnemonic, so the operands are never
+    searched.
+    """
+    if not in_it_block(istate):
+        return asm
+    cond = current_cond(istate)
+    if cond > COND_AL:
+        return asm  # UNPREDICTABLE ITSTATE; nothing sensible to spell
+    mnemonic, sep, operands = asm.partition(_SEP)
+    base, dot, qualifier = mnemonic.partition(".")
+    return f"{base}{_COND_CODES[cond]}{dot}{qualifier}{sep}{operands}"
+
+
+def disassemble(
+    result: object, instr: int = 0, offset: int = 0, istate: int = 0
+) -> str:
     """Convert a decoded instruction dataclass to an assembler mnemonic string.
 
     Args:
@@ -1723,6 +1749,9 @@ def disassemble(result: object, instr: int = 0, offset: int = 0) -> str:
                variants like MCR vs MCR2).
         offset: Address of the instruction in memory (for computing absolute
                 branch targets).
+        istate: ITSTATE in force for this instruction, as tracked across the
+                stream by :func:`armv7m_decoder.next_itstate`. Zero (the
+                default) means no IT block is open, so no condition suffix.
 
     Returns:
         UAL assembler syntax string, e.g. ``"adds r0, r1, #42"``.
@@ -1752,4 +1781,10 @@ def disassemble(result: object, instr: int = 0, offset: int = 0) -> str:
         asm = fmt_func(result, **kwargs)
     except (ValueError, TypeError):
         asm = fmt_func(result)
+
+    # B (T1/T3) and VSEL carry their own condition, which is what the
+    # architecture reports as CurrentCond -- they never take the block's. (Both
+    # are UNPREDICTABLE in a block, so the decoder rarely lets one through.)
+    if getattr(result, "cond", COND_AL) == COND_AL:
+        asm = _in_cond_block(asm, istate)
     return asm

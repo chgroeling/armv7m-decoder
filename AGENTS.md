@@ -19,7 +19,9 @@ uv run ruff format                         # Format
 ### Layering
 
 - **`src/armv7m_decoder/_decoder.py`** — Generated decoder module (committed artifact). Contains embedded armtranspiller runtime, instruction dataclasses, `decode(instr, ctx)` entry point, and pseudo-instruction classes (`NoMatch`, `Undefined`, `Unpredictable`, `See`).
-- **`src/armv7m_decoder/__init__.py`** — Public API: re-exports `decode`, `Context`, `NoMatch`, `Undefined`, `Unpredictable`, `See`, `get_decoder_eval_bytes`, `get_min_instr_bytes`, and all instruction dataclasses from `_decoder`.
+- **`src/armv7m_decoder/_disasm.py`** — Disassembler: `disassemble(result, instr, offset, istate)` turns a decoded dataclass into a UAL string.
+- **`src/armv7m_decoder/_itstate.py`** — ITSTATE tracking (`next_itstate`, `current_cond`, `in_it_block`) for carrying an IT block's condition across a stream.
+- **`src/armv7m_decoder/__init__.py`** — Public API: re-exports `decode`, `Context`, `disassemble`, the ITSTATE helpers, `NoMatch`, `Undefined`, `Unpredictable`, `See`, `get_decoder_eval_bytes`, `get_min_instr_bytes`, and all instruction dataclasses from `_decoder`.
 - **`src/armv7m_decoder/_generate.py`** — Regeneration script: reads `formats/armv7-m.yaml` and calls `decoder_forge.generate_code` to produce `_decoder.py`.
 - **`src/armv7m_decoder/cli.py`** — Click CLI with `decode` subcommand for decoding binary files.
 
@@ -28,6 +30,22 @@ uv run ruff format                         # Format
 The generated `_decoder.py` is fully self-contained: Jinja2 template `python_decoder.py.jinja` in decoder-forge embeds armtranspiller's runtime verbatim via `get_runtime_source("python")`. No runtime dependency on decoder-forge or armtranspiller is needed.
 
 `decode(instr, ctx)` returns `(result, n_bytes)`. The number of bytes the matched instruction occupies is a literal known from each encoding's pattern, so variable-length (16/32-bit Thumb) decoding needs no separate size pass: the caller reads up to `get_decoder_eval_bytes()` (4 bytes), decodes once, and advances by the reported length.
+
+### IT blocks
+
+`IT` makes up to four following instructions conditional, and neither their
+condition nor their `S` bit is in their own encoding — both come from ITSTATE.
+Decoding a stream is therefore stateful: keep ITSTATE in `Context.istate` (the
+decoder reads it via `InITBlock` / `LastInITBlock`, which is what turns 16-bit
+`adds` into `add` inside a block), hand the same value to `disassemble` so it
+can spell `moveq`, and advance it after every instruction:
+
+```python
+istate = ctx.istate
+result, n_bytes = decode(instr, ctx)
+asm = disassemble(result, instr, offset, istate)
+ctx.istate = next_itstate(istate, result)
+```
 
 ### Re-generation
 
@@ -53,6 +71,8 @@ This overwrites `_decoder.py` with fresh output from decoder-forge. The generate
 src/armv7m_decoder/         # Source package
   __init__.py               # Public API re-exports
   _decoder.py               # Generated decoder (committed)
+  _disasm.py                # Decoded instruction -> UAL assembler text
+  _itstate.py               # ITSTATE tracking across a stream (IT blocks)
   _generate.py              # Regeneration script
   cli.py                    # CLI entry point
 formats/                    # YAML format / instruction-set definitions

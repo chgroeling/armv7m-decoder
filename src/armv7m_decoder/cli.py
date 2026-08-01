@@ -18,6 +18,7 @@ from armv7m_decoder import (
     disassemble,
     get_decoder_eval_bytes,
     get_min_instr_bytes,
+    next_itstate,
 )
 
 
@@ -87,6 +88,10 @@ def decode_cmd(
         hw2 = struct.unpack("<H", buf[2:4])[0]
         instr = (hw1 << 16) | hw2
 
+        # ITSTATE reaches the decoder through ``ctx`` -- 16-bit data processing
+        # inside an IT block decodes without the S bit -- and tells the
+        # disassembler to spell ``moveq`` rather than ``mov``.
+        istate = ctx.istate
         result, n_bytes = decode(instr, ctx)
 
         if result is not None:
@@ -96,8 +101,9 @@ def decode_cmd(
             else:
                 hex_bytes = f"{hw1:04x} {hw2:04x}"
                 instr_clean = instr
-            asm = disassemble(result, instr_clean, offset)
+            asm = disassemble(result, instr_clean, offset, istate)
             out.write(f"{offset:8x}:\t{hex_bytes:<10}\t{asm}\n")
+            ctx.istate = next_itstate(istate, result)
 
         offset += n_bytes
         total += 1
