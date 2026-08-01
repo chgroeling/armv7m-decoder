@@ -4,6 +4,7 @@ Provides the :func:`decode` entry point, the :class:`Context` for threading runt
 state, the :func:`disassemble` function for assembler formatting, the ITSTATE
 helpers that carry an IT block's condition across a stream
 (:func:`next_itstate`, :func:`current_cond`, :func:`in_it_block`), the
+instruction-length helpers (:func:`decoded_bytes`, :func:`instr_bytes`), the
 pseudo-instruction classes (:class:`NoMatch`, :class:`Undefined`,
 :class:`Unpredictable`, :class:`See`), and all instruction dataclasses.
 """
@@ -27,6 +28,7 @@ from armv7m_decoder._itstate import (  # noqa: F401
     in_it_block,
     next_itstate,
 )
+from armv7m_decoder._length import decoded_bytes, instr_bytes  # noqa: F401
 
 __all__ = [
     "COND_AL",
@@ -39,10 +41,12 @@ __all__ = [
     "Unpredictable",
     "current_cond",
     "decode",
+    "decoded_bytes",
     "disassemble",
     "get_decoder_eval_bytes",
     "get_min_instr_bytes",
     "in_it_block",
+    "instr_bytes",
     "next_itstate",
 ]
 

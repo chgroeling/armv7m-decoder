@@ -4,7 +4,13 @@ import struct
 
 import pytest
 
-from armv7m_decoder import Context, decode, disassemble, next_itstate
+from armv7m_decoder import (
+    Context,
+    decode,
+    decoded_bytes,
+    disassemble,
+    next_itstate,
+)
 
 
 def disassemble_stream(ctx: Context, halfwords: list[int]) -> list[str]:
@@ -16,6 +22,7 @@ def disassemble_stream(ctx: Context, halfwords: list[int]) -> list[str]:
         hw1, hw2 = struct.unpack("<HH", (data[offset : offset + 4] + b"\0\0")[:4])
         istate = ctx.istate
         result, n_bytes = decode((hw1 << 16) | hw2, ctx)
+        n_bytes = decoded_bytes((hw1 << 16) | hw2, result, n_bytes)
         instr = hw1 << 16 if n_bytes == 2 else (hw1 << 16) | hw2
         asm.append(disassemble(result, instr, offset, istate))
         ctx.istate = next_itstate(istate, result)

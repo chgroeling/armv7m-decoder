@@ -15,6 +15,7 @@ import click
 from armv7m_decoder import (
     Context,
     decode,
+    decoded_bytes,
     disassemble,
     get_decoder_eval_bytes,
     get_min_instr_bytes,
@@ -93,6 +94,10 @@ def decode_cmd(
         # disassembler to spell ``moveq`` rather than ``mov``.
         istate = ctx.istate
         result, n_bytes = decode(instr, ctx)
+        # A word the decoder matched nothing for still has the length Thumb
+        # gives it -- skipping only half of a 32-bit one would disassemble its
+        # second halfword as an instruction.
+        n_bytes = decoded_bytes(instr, result, n_bytes)
 
         if result is not None:
             if n_bytes == 2:
