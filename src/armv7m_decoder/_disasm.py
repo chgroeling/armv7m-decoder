@@ -65,7 +65,6 @@ _MNEMONICS_WITH_BOTH_WIDTHS: frozenset[str] = frozenset({
     "rev16",
     "revsh",
     "ror",
-    "rsb",
     "sbc",
     "sev",
     "stmia",
@@ -211,26 +210,63 @@ def _vfp_reg(dp_operation: bool, r: int) -> str:
 # ---------------------------------------------------------------------------
 
 
-def _addr_imm(result: Any) -> str:
-    """`[Rn, #imm]` in the shape the encoding calls for.
+# How a transfer renders its immediate. The core single-word forms (LDR/STR)
+# drop the sign of a zero offset and gloss only the plain positive offset --
+# the encodings holding an imm12 -- saying nothing about an imm8 however it is
+# indexed. The dual (LDRD/STRD) and coprocessor-class forms (LDC/STC,
+# VLDR/VSTR) keep `#-0` and gloss either sign, the coprocessor ones showing a
+# subtracted offset as the 32-bit value it adds.
+_XFER_CORE, _XFER_DUAL, _XFER_COPROC = range(3)
 
-    A 32-bit encoding leaves a zero offset out of the offset and pre-indexed
-    forms -- `[ip]`, `[ip]!` -- because it has room to encode one and nothing
-    else can be meant. The 16-bit forms spell it (`[r0, #0]`), as does every
-    post-indexed form (`[r0], #0`), where the offset is what advances Rn.
+
+def _xfer_comment(result: Any, style: int) -> str:
+    """The `@ 0x..` gloss on a transfer's immediate, where objdump prints one."""
+    if result.n == 15:
+        return ""  # a literal is glossed with its target instead
+    if style == _XFER_CORE and not (result.index and result.add and not result.wback):
+        return ""
+    if style == _XFER_COPROC and not result.add:
+        return _hex_comment_signed(-result.imm32)
+    return _hex_comment(result.imm32)
+
+
+def _offset_text(
+    imm32: int, add: bool, *, spell_zero: bool, negative_zero: bool
+) -> str:
+    """The `, #imm` of an addressing mode, or "" where it goes unwritten.
+
+    A zero offset is left out of the wide offset and pre-indexed forms --
+    `[ip]` -- because nothing else can be meant. It survives where it still
+    says something: `spell_zero` for the 16-bit forms and the post-indexed
+    ones, where the offset is what advances Rn, and `negative_zero` for the
+    coprocessor, VFP and dual transfers, whose syntax carries the U bit into
+    `[r0, #-0]` and would otherwise lose it.
     """
+    if imm32 != 0 or spell_zero:
+        return f", #{'' if add else '-'}{imm32}"
+    return "" if add or not negative_zero else ", #-0"
+
+
+def _addr_imm(result: Any, style: int = _XFER_CORE) -> str:
+    """`[Rn, #imm]` in the shape the encoding calls for."""
     n, imm32 = result.n, result.imm32
     sign = "" if result.add else "-"
-    hc = "" if n == 15 else _hex_comment(imm32)
+    hc = _xfer_comment(result, style)
     if not result.index:
         return f"[{_reg(n)}], #{sign}{imm32}{hc}"
-    offset_text = "" if imm32 == 0 and not _is_narrow(result) else f", #{sign}{imm32}"
+    offset_text = _offset_text(
+        imm32,
+        result.add,
+        spell_zero=_is_narrow(result),
+        negative_zero=style != _XFER_CORE,
+    )
     wb = "!" if result.wback else ""
     return f"[{_reg(n)}{offset_text}]{wb}{hc}"
 
 
 def _addr_imm_dual(result: Any) -> str:
-    return f"{_reg(result.t)}, {_reg(result.t2)}, {_addr_imm(result)}"
+    addr = _addr_imm(result, _XFER_DUAL)
+    return f"{_reg(result.t)}, {_reg(result.t2)}, {addr}"
 
 
 def _addr_reg(t: int, n: int, m: int, shift_t: int, shift_n: int) -> str:
@@ -252,9 +288,9 @@ def _addr_excl_single(t: int, n: int, imm32: int) -> str:
 
 
 def _addr_literal(result: Any) -> str:
-    sign = "" if result.add else "-"
-    imm32 = result.imm32
-    offset_text = "" if imm32 == 0 and not _is_narrow(result) else f", #{sign}{imm32}"
+    offset_text = _offset_text(
+        result.imm32, result.add, spell_zero=_is_narrow(result), negative_zero=False
+    )
     return f"{_reg(result.t)}, [pc{offset_text}]"
 
 
@@ -277,14 +313,22 @@ def _branch_target(offset: int, imm32: int) -> str:
 
 
 
+def _hex_comment_signed(value: int) -> str:
+    """`_hex_comment` for a value objdump glosses as a 32-bit word."""
+    if not (value > 32 or value < -16):
+        return ""
+    return f"\t@ 0x{value & 0xFFFFFFFF:x}"
+
+
 def _hex_comment(imm: int) -> str:
     return f"\t@ 0x{imm:x}" if imm > 32 or imm < -16 else ""
 
 
-def _hex_target(offset: int, imm32: int, add: bool = True) -> str:
+def _hex_target(offset: int, imm32: int, add: bool = True, narrow: bool = True) -> str:
     base = ((offset + 4) & ~3) & 0xFFFFFFFF
     target = (base + (imm32 if add else -imm32)) & 0xFFFFFFFF
-    return f"\t@ (0x{target:x})"
+    # Only the narrow PC-relative loads have their target parenthesised.
+    return f"\t@ (0x{target:x})" if narrow else f"\t@ 0x{target:x}"
 
 
 # ---------------------------------------------------------------------------
@@ -370,6 +414,14 @@ def _fmt_mov_imm(result: Any, instr: int = 0) -> str:
     return f"mov{s}{_SEP}{_reg(result.d)}, #{result.imm32}{_hex_comment(result.imm32)}"
 
 
+def _fmt_rsb_imm(result: Any, instr: int = 0) -> str:
+    # T1 subtracts from a literal zero it has no room to encode, and is spelled
+    # as the negate it performs: "negs r2, r2".
+    if _is_narrow(result):
+        return f"neg{_flags(result.setflags)}{_SEP}{_reg(result.d)}, {_reg(result.n)}"
+    return _fmt_dp_imm(result, "rsb", instr)
+
+
 def _fmt_mvn_imm(result: Any, mnemonic: str = "mvn") -> str:
     s = _flags(result.setflags) + _width(result, mnemonic)
     return (
@@ -411,8 +463,9 @@ def _fmt_mvn_reg(result: Any) -> str:
 
 
 def _fmt_rrx(result: Any) -> str:
-    s = _flags(result.setflags)
-    return f"rrx{s}{_SEP}{_reg(result.d)}, {_reg(result.m)}"
+    # RRX is a ROR by one bit through carry, and 32-bit only, so it too is
+    # spelled as the MOV that encodes it.
+    return _fmt_mov_shifted(result, "rrx")
 
 
 # --- Test/compare ---
@@ -436,13 +489,23 @@ def _fmt_test_reg(result: Any, mnemonic: str) -> str:
 
 
 def _fmt_shift_imm(result: Any, mnemonic: str) -> str:
+    # A wide shift by an immediate is MOV (register) T3 with its shift filled
+    # in -- one encoding, and objdump spells it that way: "mov.w r7, r7,
+    # lsl #2". Only the narrow encodings are shifts in their own right.
+    if not _is_narrow(result):
+        return _fmt_mov_shifted(result, f"{mnemonic} #{result.shift_n}")
     s = _flags(result.setflags) + _width(result, mnemonic)
     return f"{mnemonic}{s}{_SEP}{_reg(result.d)}, {_reg(result.m)}, #{result.shift_n}"
 
 
+def _fmt_mov_shifted(result: Any, shift: str) -> str:
+    """MOV (register) T3 carrying `shift`, e.g. `lsl #2` or `rrx`."""
+    s = _flags(result.setflags) + _width(result, "mov")
+    return f"mov{s}{_SEP}{_reg(result.d)}, {_reg(result.m)}, {shift}"
+
+
 def _fmt_ror_imm(result: Any) -> str:
-    s = _flags(result.setflags) + _width(result, "ror")
-    return f"ror{s}{_SEP}{_reg(result.d)}, {_reg(result.m)}, #{result.shift_n}"
+    return _fmt_shift_imm(result, "ror")
 
 
 # --- Shift register ---
@@ -534,7 +597,7 @@ def _fmt_ldst_imm_t(result: Any, mnemonic: str, offset: int = 0) -> str:
     addr = _addr_imm(result)
     asm = f"{mnemonic}{_width(result, mnemonic)}{_SEP}{_reg(result.t)}, {addr}"
     if result.n == 15:
-        asm += _hex_target(offset, result.imm32, result.add)
+        asm += _hex_target(offset, result.imm32, result.add, _is_narrow(result))
     return asm
 
 
@@ -562,14 +625,16 @@ def _fmt_ldst_reg_rt(result: Any, mnemonic: str) -> str:
 def _fmt_ldst_lit(result: Any, mnemonic: str, offset: int = 0) -> str:
     m = mnemonic + _width(result, mnemonic)
     asm = f"{m}{_SEP}{_addr_literal(result)}"
-    return f"{asm}{_hex_target(offset, result.imm32, result.add)}"
+    return f"{asm}{_hex_target(offset, result.imm32, result.add, _is_narrow(result))}"
 
 
 def _fmt_ldst_lit_dual(result: Any, mnemonic: str = "ldrd", offset: int = 0) -> str:
-    sign = "" if result.add else "-"
+    offset_text = _offset_text(
+        result.imm32, result.add, spell_zero=False, negative_zero=True
+    )
     return (
         f"{mnemonic}{_SEP}{_reg(result.t)}, {_reg(result.t2)},"
-        f" [pc, #{sign}{result.imm32}]{_hex_target(offset, result.imm32, result.add)}"
+        f" [pc{offset_text}]{_hex_target(offset, result.imm32, result.add)}"
     )
 
 
@@ -650,10 +715,8 @@ def _fmt_unpriv_ldr(result: Any, mnemonic: str) -> str:
         )
     if result.imm32 == 0:
         return f"{mnemonic}{_SEP}{_reg(result.t)}, [{_reg(result.n)}]"
-    return (
-        f"{mnemonic}{_SEP}{_reg(result.t)}, [{_reg(result.n)}, #{result.imm32}]"
-        f"{_hex_comment(result.imm32)}"
-    )
+    # An imm8 offset, so no gloss -- as with the other core imm8 forms.
+    return f"{mnemonic}{_SEP}{_reg(result.t)}, [{_reg(result.n)}, #{result.imm32}]"
 
 
 def _fmt_unpriv_str(result: Any, mnemonic: str) -> str:
@@ -721,8 +784,11 @@ def _fmt_cbnz_cbz(result: Any, offset: int = 0) -> str:
 
 
 def _fmt_tbb_tbh(result: Any, offset: int = 0) -> str:
+    # TBH indexes a table of halfwords, so its index register is doubled --
+    # the shift is part of the syntax, not an operand of its own.
     mnemonic = "tbh" if result.is_tbh else "tbb"
-    return f"{mnemonic}{_SEP}[{_reg(result.n)}, {_reg(result.m)}]"
+    shift = ", lsl #1" if result.is_tbh else ""
+    return f"{mnemonic}{_SEP}[{_reg(result.n)}, {_reg(result.m)}{shift}]"
 
 
 # --- Barrier ---
@@ -1263,16 +1329,22 @@ def _fmt_vrintx(result: Any) -> str:
 # --- VFP load/store ---
 
 
-def _fmt_vldr_vstr(result: Any, mnemonic: str) -> str:
-    sign = "" if result.add else "-"
+def _fmt_vldr_vstr(result: Any, mnemonic: str, offset: int = 0) -> str:
     single_reg = result.single_reg
     reg_name_fn = _sreg if single_reg else _dreg
-    # 32-bit only, and an offset form throughout: a zero offset goes unwritten.
-    offset_text = "" if result.imm32 == 0 else f", #{sign}{result.imm32}"
+    # 32-bit only, and an offset form throughout.
+    offset_text = _offset_text(
+        result.imm32, result.add, spell_zero=False, negative_zero=True
+    )
+    if result.n == 15:
+        # PC-relative: glossed with the address it loads from, like LDR.
+        hc = _hex_target(offset, result.imm32, result.add, narrow=False)
+    elif result.add:
+        hc = _hex_comment(result.imm32)
+    else:
+        hc = _hex_comment_signed(-result.imm32)
     return (
-        f"{mnemonic}{_SEP}{reg_name_fn(result.d)},"
-        f" [{_reg(result.n)}{offset_text}]"
-        f"{_hex_comment(result.imm32)}"
+        f"{mnemonic}{_SEP}{reg_name_fn(result.d)}, [{_reg(result.n)}{offset_text}]{hc}"
     )
 
 
@@ -1404,13 +1476,13 @@ def _fmt_mrrc_mrrc2(result: Any, instr: int = 0) -> str:
 
 def _fmt_stc_stc2(result: Any, instr: int = 0) -> str:
     suffix = "2" if _is_coproc2(instr) else ""
-    addr = _addr_imm(result)
+    addr = _addr_imm(result, _XFER_COPROC)
     return f"stc{suffix}{_SEP}{result.cp}, cr{result.CRd}, {addr}"
 
 
 def _fmt_ldc_ldc2_imm(result: Any, instr: int = 0) -> str:
     suffix = "2" if _is_coproc2(instr) else ""
-    addr = _addr_imm(result)
+    addr = _addr_imm(result, _XFER_COPROC)
     return f"ldc{suffix}{_SEP}p{result.cp}, c{result.CRd}, {addr}"
 
 
@@ -1434,12 +1506,6 @@ def _fmt_cpy(result: Any) -> str:
 
 def _fmt_neg(result: Any) -> str:
     return f"neg{_SEP}{_reg(result.d)}, {_reg(result.m)}"
-
-
-def _fmt_mov_shifted(result: Any) -> str:
-    s = _flags(result.setflags) + _width(result, "mov")
-    sh = _shift(result.shift_t, result.shift_n)
-    return f"mov{s}{_SEP}{_reg(result.d)}, {_reg(result.m)}{sh}"
 
 
 # ---------------------------------------------------------------------------
@@ -1577,7 +1643,7 @@ _DISPATCH: dict[int, Any] = {
     Opcode.OP_ROR_IMMEDIATE: _fmt_ror_imm,
     Opcode.OP_ROR_REGISTER: lambda r, instr=0: _fmt_shift_reg(r, "ror", instr),
     Opcode.OP_RRX: _fmt_rrx,
-    Opcode.OP_RSB_IMMEDIATE: lambda r, instr=0: _fmt_dp_imm(r, "rsb", instr),
+    Opcode.OP_RSB_IMMEDIATE: _fmt_rsb_imm,
     Opcode.OP_RSB_REGISTER: lambda r, instr=0: _fmt_dp_reg(r, "rsb", instr),
     Opcode.OP_SADD16: lambda r: _fmt_simd3(r, "sadd16"),
     Opcode.OP_SADD8: lambda r: _fmt_simd3(r, "sadd8"),
@@ -1700,7 +1766,7 @@ _DISPATCH: dict[int, Any] = {
     Opcode.OP_VFMA_VFMS: _fmt_vfma_vfms,
     Opcode.OP_VFNMA_VFNMS: _fmt_vfnma_vfnms,
     Opcode.OP_VLDM: lambda r: _fmt_vldm_vstm(r, "vldm"),
-    Opcode.OP_VLDR: lambda r: _fmt_vldr_vstr(r, "vldr"),
+    Opcode.OP_VLDR: lambda r, offset=0: _fmt_vldr_vstr(r, "vldr", offset),
     Opcode.OP_VMAXNM_VMINNM: _fmt_vmaxnm_vminnm,
     Opcode.OP_VMLA_VMLS: _fmt_vmla_vmls,
     Opcode.OP_VMOV_IMMEDIATE: _fmt_vmov_imm,
@@ -1723,7 +1789,7 @@ _DISPATCH: dict[int, Any] = {
     Opcode.OP_VSEL: _fmt_vsel,
     Opcode.OP_VSQRT: lambda r: _fmt_vfp_dp2(r, "vsqrt"),
     Opcode.OP_VSTM: lambda r: _fmt_vldm_vstm(r, "vstm"),
-    Opcode.OP_VSTR: lambda r: _fmt_vldr_vstr(r, "vstr"),
+    Opcode.OP_VSTR: lambda r, offset=0: _fmt_vldr_vstr(r, "vstr", offset),
     Opcode.OP_VSUB: lambda r: _fmt_vfp_dp3(r, "vsub"),
     Opcode.OP_WFE: lambda r: _fmt_noargs(r, "wfe"),
     Opcode.OP_WFI: lambda r: _fmt_noargs(r, "wfi"),

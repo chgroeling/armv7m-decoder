@@ -343,6 +343,77 @@ class TestDisasmOperandForm:
         assert disassemble(result, instr) == expected
 
 
+class TestDisasmShiftImmediate:
+    """A wide shift by an immediate is MOV (register) T3 with its shift filled
+    in, and objdump spells it that way."""
+
+    @pytest.mark.parametrize(
+        ("instr", "expected"),
+        [
+            (0xEA4F0787, "mov.w\tr7, r7, lsl #2"),
+            (0xEA4F0797, "mov.w\tr7, r7, lsr #2"),
+            (0xEA4F07A7, "mov.w\tr7, r7, asr #2"),
+            (0xEA4F07B7, "mov.w\tr7, r7, ror #2"),
+            (0xEA4F0017, "mov.w\tr0, r7, lsr #32"),
+            (0xEA5F0787, "movs.w\tr7, r7, lsl #2"),
+            # RRX is a rotate by one through carry, 32-bit only.
+            (0xEA4F0037, "mov.w\tr0, r7, rrx"),
+            (0xEA5F0037, "movs.w\tr0, r7, rrx"),
+            # No shift at all, and the narrow encodings, keep their own name.
+            (0xEA4F0007, "mov.w\tr0, r7"),
+            (0x0087 << 16, "lsls\tr7, r0, #2"),
+            (0x0887 << 16, "lsrs\tr7, r0, #2"),
+            (0x1087 << 16, "asrs\tr7, r0, #2"),
+            # A shift by a register is a shift in its own right at any width.
+            (0xFA07F006, "lsl.w\tr0, r7, r6"),
+        ],
+    )
+    def test_shift_immediate(self, ctx, instr: int, expected: str) -> None:
+        result, _ = decode(instr, ctx)
+        assert disassemble(result, instr) == expected
+
+
+class TestDisasmTableBranch:
+    @pytest.mark.parametrize(
+        ("instr", "expected"),
+        [
+            # TBH indexes halfwords, so its index register is doubled.
+            (0xE8DFF013, "tbh\t[pc, r3, lsl #1]"),
+            (0xE8D1F012, "tbh\t[r1, r2, lsl #1]"),
+            (0xE8DFF003, "tbb\t[pc, r3]"),
+            (0xE8D1F002, "tbb\t[r1, r2]"),
+        ],
+    )
+    def test_table_branch(self, ctx, instr: int, expected: str) -> None:
+        result, _ = decode(instr, ctx)
+        assert disassemble(result, instr) == expected
+
+
+class TestDisasmNeg:
+    """RSB (immediate) T1 is spelled as the negate it performs."""
+
+    @pytest.mark.parametrize(
+        ("instr", "expected"),
+        [
+            (0x4252 << 16, "negs\tr2, r2"),
+            (0x4241 << 16, "negs\tr1, r0"),
+            # The wide forms keep the rsb spelling -- and take no .w, having no
+            # narrow form of that name to be told apart from.
+            (0xF1C10200, "rsb\tr2, r1, #0"),
+            (0xF1D10200, "rsbs\tr2, r1, #0"),
+            (0xEBC10200, "rsb\tr2, r1, r0"),
+        ],
+    )
+    def test_neg(self, ctx, instr: int, expected: str) -> None:
+        result, _ = decode(instr, ctx)
+        assert disassemble(result, instr) == expected
+
+    def test_neg_in_it_block(self, ctx) -> None:
+        # T1 sets flags only outside an IT block, so the s gives way to the
+        # block's condition.
+        assert disassemble_stream(ctx, [0xBF08, 0x4252]) == ["it\teq", "negeq\tr2, r2"]
+
+
 class TestDisasmZeroOffset:
     """A wide encoding drops a zero offset; a narrow one spells it out."""
 
@@ -350,9 +421,8 @@ class TestDisasmZeroOffset:
         ("instr", "expected"),
         [
             (0xF8DC3000, "ldr.w\tr3, [ip]"),
-            (0xF8500C00, "ldr.w\tr0, [r0]"),  # negative zero reads the same
+            (0xF8500C00, "ldr.w\tr0, [r0]"),  # single-word: the sign goes too
             (0xF8510F00, "ldr.w\tr0, [r1]!"),
-            (0xED900A00, "vldr\ts0, [r0]"),
             # Post-indexed: the offset is what advances Rn, so it stays.
             (0xF8510B00, "ldr.w\tr0, [r1], #0"),
             # 16-bit forms always spell it.
@@ -363,6 +433,66 @@ class TestDisasmZeroOffset:
     def test_zero_offset(self, ctx, instr: int, expected: str) -> None:
         result, _ = decode(instr, ctx)
         assert disassemble(result, instr) == expected
+
+    @pytest.mark.parametrize(
+        ("instr", "expected"),
+        [
+            # Coprocessor, VFP and dual transfers carry the U bit into the
+            # syntax, so a subtracted zero stays visible as #-0.
+            (0xED00E000, "stc\t0, cr14, [r0, #-0]"),
+            (0xED80E000, "stc\t0, cr14, [r0]"),
+            (0xED100A00, "vldr\ts0, [r0, #-0]"),
+            (0xED900A00, "vldr\ts0, [r0]"),
+            (0xED000A00, "vstr\ts0, [r0, #-0]"),
+            (0xE9400000, "strd\tr0, r0, [r0, #-0]"),
+            (0xE9C00000, "strd\tr0, r0, [r0]"),
+        ],
+    )
+    def test_negative_zero_offset(self, ctx, instr: int, expected: str) -> None:
+        result, _ = decode(instr, ctx)
+        assert disassemble(result, instr) == expected
+
+    @pytest.mark.parametrize(
+        ("instr", "expected"),
+        [
+            # The core forms gloss the plain positive offset -- the encodings
+            # holding an imm12 -- and say nothing about an imm8, however
+            # indexed and whichever way it goes.
+            (0xF8841021, "strb.w\tr1, [r4, #33]\t@ 0x21"),
+            (0x6B00 << 16, "ldr\tr0, [r0, #48]\t@ 0x30"),
+            (0xF8041C58, "strb.w\tr1, [r4, #-88]"),
+            (0xF8041F21, "strb.w\tr1, [r4, #33]!"),
+            (0xF8041B21, "strb.w\tr1, [r4], #33"),
+            (0xF8541E21, "ldrt\tr1, [r4, #33]"),
+            # Dual transfers gloss the magnitude whichever way it goes.
+            (0xE9440110, "strd\tr0, r1, [r4, #-64]\t@ 0x40"),
+            # Coprocessor-class ones gloss a subtracted offset as the 32-bit
+            # value it adds.
+            (0xED04E010, "stc\t0, cr14, [r4, #-64]\t@ 0xffffffc0"),
+            (0xED040A10, "vstr\ts0, [r4, #-64]\t@ 0xffffffc0"),
+        ],
+    )
+    def test_offset_gloss(self, ctx, instr: int, expected: str) -> None:
+        result, _ = decode(instr, ctx)
+        assert disassemble(result, instr) == expected
+
+    @pytest.mark.parametrize(
+        ("instr", "expected"),
+        [
+            # A PC-relative load is glossed with the address it reads, in
+            # brackets for the narrow form only.
+            (0x4A06 << 16, "ldr\tr2, [pc, #24]\t@ (0x3c)"),
+            (0xF85F1C21, "ldr.w\tr1, [pc, #-3105]\t@ 0xfffff403"),
+            (0xED1F0A10, "vldr\ts0, [pc, #-64]\t@ 0xffffffe4"),
+        ],
+    )
+    def test_literal_gloss(self, ctx, instr: int, expected: str) -> None:
+        result, _ = decode(instr, ctx)
+        assert disassemble(result, instr, 0x20) == expected
+
+    def test_dual_literal_drops_zero(self, ctx) -> None:
+        result, _ = decode(0xE9DF0B00, ctx)
+        assert disassemble(result, 0xE9DF0B00).startswith("ldrd\tr0, fp, [pc]")
 
     def test_wide_literal_drops_zero(self, ctx) -> None:
         result, _ = decode(0xF8DF0000, ctx)
