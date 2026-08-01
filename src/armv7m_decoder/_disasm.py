@@ -1859,7 +1859,9 @@ def disassemble(
     """
     opc = result.opcode
     if opc == Opcode.OP_NO_MATCH:
-        return "<nomatch>"
+        # A word no encoding matches has no mnemonic to spell, so the whole
+        # field is a comment carrying the word itself, as objdump writes it.
+        return f"\t\t@ <UNDEFINED> instruction: 0x{instr:0{size // 4}x}"
     if opc == Opcode.OP_UNDEFINED:
         return "<undefined>"
     if opc == Opcode.OP_UNPREDICTABLE:

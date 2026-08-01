@@ -68,8 +68,13 @@ class TestDisasmRegisterNames:
 
 
 class TestDisasmPseudoInstructions:
-    def test_nomatch(self, ctx) -> None:
-        assert disasm(ctx, 0xFFFF0000).startswith("<nomatch")
+    def test_nomatch_comments_the_word(self, ctx) -> None:
+        # No encoding matches, so there is no mnemonic to spell -- objdump
+        # writes the word itself as a comment, and so do we.
+        assert disasm(ctx, 0xF2E53EFF) == "@ <UNDEFINED> instruction: 0xf2e53eff"
+
+    def test_narrow_nomatch_is_a_halfword_wide(self, ctx) -> None:
+        assert disasm(ctx, 0xB717) == "@ <UNDEFINED> instruction: 0xb717"
 
     def test_undefined(self, ctx) -> None:
         assert disasm(ctx, 0xF81DBAA1).startswith("<undefined")
