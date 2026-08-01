@@ -230,10 +230,6 @@ class TestDisasmStackAndMultiTransfer:
         assert disassemble(result) == expected
 
 
-class TestDisasmCoprocessor:
-    pass
-
-
 class TestDisasmDMB:
     def test_dmb(self, ctx) -> None:
         result, _ = decode(0xF3BF8F5F, ctx)
@@ -346,6 +342,45 @@ class TestDisasmOperandForm:
         ],
     )
     def test_sp_operand_form(self, ctx, instr: int, expected: str) -> None:
+        result, _ = decode(instr, ctx)
+        assert disassemble(result, instr) == expected
+
+
+class TestDisasmCoprocessor:
+    """The coprocessor instructions spell their operands their own way."""
+
+    @pytest.mark.parametrize(
+        ("instr", "expected"),
+        [
+            # The D bit is the long form, spelled after the 2 of the variant.
+            (0xECF00102, "ldcl\t1, cr0, [r0], #8"),
+            (0xECE00102, "stcl\t1, cr0, [r0], #8"),
+            (0xECF08102, "ldcl\t1, cr8, [r0], #8"),
+            (0xFCF50E02, "ldc2l\t14, cr0, [r5], #8"),
+            (0xEDD50E02, "ldcl\t14, cr0, [r5, #8]"),
+            (0xED850E02, "stc\t14, cr0, [r5, #8]"),
+            # The unindexed form has no offset: its imm8 is an option code.
+            (0xEC950E05, "ldc\t14, cr0, [r5], {5}"),
+            # A post-indexed zero goes unwritten unless it is subtracted.
+            (0xECB50E00, "ldc\t14, cr0, [r5]"),
+            (0xEC350E00, "ldc\t14, cr0, [r5], #-0"),
+        ],
+    )
+    def test_transfer(self, ctx, instr: int, expected: str) -> None:
+        result, _ = decode(instr, ctx)
+        assert disassemble(result, instr) == expected
+
+    @pytest.mark.parametrize(
+        ("instr", "expected"),
+        [
+            (0xEE210E13, "mcr\t14, 1, r0, cr1, cr3, {0}"),
+            (0xEE310E13, "mrc\t14, 1, r0, cr1, cr3, {0}"),
+            (0xEE210E03, "cdp\t14, 2, cr0, cr1, cr3, {0}"),
+            (0xEC450E12, "mcrr\t14, 1, r0, r5, cr2"),
+            (0xEC550E12, "mrrc\t14, 1, r0, r5, cr2"),
+        ],
+    )
+    def test_register_transfer(self, ctx, instr: int, expected: str) -> None:
         result, _ = decode(instr, ctx)
         assert disassemble(result, instr) == expected
 

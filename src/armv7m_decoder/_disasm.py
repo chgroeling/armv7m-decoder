@@ -253,6 +253,9 @@ def _addr_imm(result: Any, style: int = _XFER_CORE) -> str:
     sign = "" if result.add else "-"
     hc = _xfer_comment(result, style)
     if not result.index:
+        if style == _XFER_COPROC:
+            post = _offset_text(imm32, result.add, spell_zero=False, negative_zero=True)
+            return f"[{_reg(n)}]{post}{hc}"
         return f"[{_reg(n)}], #{sign}{imm32}{hc}"
     offset_text = _offset_text(
         imm32,
@@ -1449,50 +1452,79 @@ def _fmt_smusd_variants(result: Any) -> str:
 # ---------------------------------------------------------------------------
 
 
+# The coprocessor instructions spell their operands their own way: the
+# coprocessor and its opcodes as bare numbers, its registers as crN, and the
+# trailing opc2 in braces.
+
+
 def _fmt_cdp_cdp2(result: Any, instr: int = 0) -> str:
     suffix = "2" if _is_coproc2(instr) else ""
-    return f"cdp{suffix}{_SEP}p{result.cp}, #{result.opc1}, {_reg(result.CRd)}, c{result.CRn}, c{result.CRm}, #{result.opc2}"  # noqa: E501
+    return (
+        f"cdp{suffix}{_SEP}{result.cp}, {result.opc1}, cr{result.CRd},"
+        f" cr{result.CRn}, cr{result.CRm}, {{{result.opc2}}}"
+    )
 
 
 def _fmt_mcr_mcr2(result: Any, instr: int = 0) -> str:
-    suffix = "2" if _is_coproc2(instr) else ""
-    return f"mcr{suffix}{_SEP}p{result.cp}, #{result.opc1}, {_reg(result.t)}, c{result.CRn}, c{result.CRm}, #{result.opc2}"  # noqa: E501
+    return _fmt_mcr_mrc(result, "mcr", instr)
 
 
 def _fmt_mrc_mrc2(result: Any, instr: int = 0) -> str:
+    return _fmt_mcr_mrc(result, "mrc", instr)
+
+
+def _fmt_mcr_mrc(result: Any, base: str, instr: int) -> str:
     suffix = "2" if _is_coproc2(instr) else ""
-    return f"mrc{suffix}{_SEP}p{result.cp}, #{result.opc1}, {_reg(result.t)}, c{result.CRn}, c{result.CRm}, #{result.opc2}"  # noqa: E501
+    return (
+        f"{base}{suffix}{_SEP}{result.cp}, {result.opc1}, {_reg(result.t)},"
+        f" cr{result.CRn}, cr{result.CRm}, {{{result.opc2}}}"
+    )
 
 
 def _fmt_mcrr_mcrr2(result: Any, instr: int = 0) -> str:
-    suffix = "2" if _is_coproc2(instr) else ""
-    return f"mcrr{suffix}{_SEP}p{result.cp}, #{result.opc1}, {_reg(result.t)}, {_reg(result.t2)}, c{result.CRm}"  # noqa: E501
+    return _fmt_mcrr_mrrc(result, "mcrr", instr)
 
 
 def _fmt_mrrc_mrrc2(result: Any, instr: int = 0) -> str:
+    return _fmt_mcrr_mrrc(result, "mrrc", instr)
+
+
+def _fmt_mcrr_mrrc(result: Any, base: str, instr: int) -> str:
     suffix = "2" if _is_coproc2(instr) else ""
-    return f"mrrc{suffix}{_SEP}p{result.cp}, #{result.opc1}, {_reg(result.t)}, {_reg(result.t2)}, c{result.CRm}"  # noqa: E501
+    return (
+        f"{base}{suffix}{_SEP}{result.cp}, {result.opc1},"
+        f" {_reg(result.t)}, {_reg(result.t2)}, cr{result.CRm}"
+    )
+
+
+def _coproc_mnemonic(base: str, result: Any, instr: int) -> str:
+    """`ldc`/`stc` with the variant and the long bit it carries: `ldc2l`."""
+    return f"{base}{'2' if _is_coproc2(instr) else ''}{'l' if result.D else ''}"
+
+
+def _addr_coproc(result: Any) -> str:
+    # The unindexed form has no offset at all: its imm8 is an option code for
+    # the coprocessor, written in braces and unscaled.
+    if not result.index and not result.wback:
+        return f"[{_reg(result.n)}], {{{result.imm32 >> 2}}}"
+    return _addr_imm(result, _XFER_COPROC)
 
 
 def _fmt_stc_stc2(result: Any, instr: int = 0) -> str:
-    suffix = "2" if _is_coproc2(instr) else ""
-    addr = _addr_imm(result, _XFER_COPROC)
-    return f"stc{suffix}{_SEP}{result.cp}, cr{result.CRd}, {addr}"
+    m = _coproc_mnemonic("stc", result, instr)
+    return f"{m}{_SEP}{result.cp}, cr{result.CRd}, {_addr_coproc(result)}"
 
 
 def _fmt_ldc_ldc2_imm(result: Any, instr: int = 0) -> str:
-    suffix = "2" if _is_coproc2(instr) else ""
-    addr = _addr_imm(result, _XFER_COPROC)
-    return f"ldc{suffix}{_SEP}p{result.cp}, c{result.CRd}, {addr}"
+    m = _coproc_mnemonic("ldc", result, instr)
+    return f"{m}{_SEP}{result.cp}, cr{result.CRd}, {_addr_coproc(result)}"
 
 
 def _fmt_ldc_ldc2_lit(result: Any, instr: int = 0, offset: int = 0) -> str:
-    suffix = "2" if _is_coproc2(instr) else ""
+    m = _coproc_mnemonic("ldc", result, instr)
     sign = "" if result.add else "-"
-    return (
-        f"ldc{suffix}{_SEP}p{result.cp}, c{result.CRd},"
-        f" [pc, #{sign}{result.imm32}]{_hex_target(offset, result.imm32, result.add)}"
-    )
+    target = _hex_target(offset, result.imm32, result.add, narrow=False)
+    return f"{m}{_SEP}{result.cp}, cr{result.CRd}, [pc, #{sign}{result.imm32}]{target}"
 
 
 # ---------------------------------------------------------------------------
