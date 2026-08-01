@@ -178,6 +178,11 @@ def _width(result: Any, mnemonic: str) -> str:
     return ""
 
 
+def _is_narrow(result: Any) -> bool:
+    """Whether `result` came from a 16-bit encoding."""
+    return bool(result.decoder_state & DecoderState.DECODED_16BIT)
+
+
 def _barrier(opt: int) -> str:
     return _BARRIER_OPTIONS.get(opt, f"#{opt}")
 
@@ -206,31 +211,26 @@ def _vfp_reg(dp_operation: bool, r: int) -> str:
 # ---------------------------------------------------------------------------
 
 
-def _addr_imm(n: int, imm32: int, index: bool, add: bool, wback: bool) -> str:
-    sign = "" if add else "-"
-    offset_text = f", #{sign}{imm32}"
+def _addr_imm(result: Any) -> str:
+    """`[Rn, #imm]` in the shape the encoding calls for.
+
+    A 32-bit encoding leaves a zero offset out of the offset and pre-indexed
+    forms -- `[ip]`, `[ip]!` -- because it has room to encode one and nothing
+    else can be meant. The 16-bit forms spell it (`[r0, #0]`), as does every
+    post-indexed form (`[r0], #0`), where the offset is what advances Rn.
+    """
+    n, imm32 = result.n, result.imm32
+    sign = "" if result.add else "-"
     hc = "" if n == 15 else _hex_comment(imm32)
-    if index and wback:
-        return f"[{_reg(n)}{offset_text}]!{hc}"
-    if index and not wback:
-        return f"[{_reg(n)}{offset_text}]{hc}"
-    return f"[{_reg(n)}], #{sign}{imm32}{hc}"
-
-def _addr_imm_nozero(n: int, imm32: int, index: bool, add: bool, wback: bool) -> str:
-    sign = "" if add else "-"
-    offset_text = "" if imm32==0 else f", #{sign}{imm32}"
-    hc = "" if n == 15 else _hex_comment(imm32)
-    if index and wback:
-        return f"[{_reg(n)}{offset_text}]!{hc}"
-    if index and not wback:
-        return f"[{_reg(n)}{offset_text}]{hc}"
-    return f"[{_reg(n)}], #{sign}{imm32}{hc}"
+    if not result.index:
+        return f"[{_reg(n)}], #{sign}{imm32}{hc}"
+    offset_text = "" if imm32 == 0 and not _is_narrow(result) else f", #{sign}{imm32}"
+    wb = "!" if result.wback else ""
+    return f"[{_reg(n)}{offset_text}]{wb}{hc}"
 
 
-def _addr_imm_dual(
-    t: int, t2: int, n: int, imm32: int, index: bool, add: bool, wback: bool
-) -> str:
-    return f"{_reg(t)}, {_reg(t2)}, {_addr_imm_nozero(n, imm32, index, add, wback)}"
+def _addr_imm_dual(result: Any) -> str:
+    return f"{_reg(result.t)}, {_reg(result.t2)}, {_addr_imm(result)}"
 
 
 def _addr_reg(t: int, n: int, m: int, shift_t: int, shift_n: int) -> str:
@@ -251,9 +251,11 @@ def _addr_excl_single(t: int, n: int, imm32: int) -> str:
     return f"{_reg(t)}, [{_reg(n)}, #{imm32}]{_hex_comment(imm32)}"
 
 
-def _addr_literal(t: int, imm32: int, add: bool) -> str:
-    sign = "" if add else "-"
-    return f"{_reg(t)}, [pc, #{sign}{imm32}]"
+def _addr_literal(result: Any) -> str:
+    sign = "" if result.add else "-"
+    imm32 = result.imm32
+    offset_text = "" if imm32 == 0 and not _is_narrow(result) else f", #{sign}{imm32}"
+    return f"{_reg(result.t)}, [pc{offset_text}]"
 
 
 def _addr_unpriv(t: int, n: int, imm32: int, register_form: bool) -> str:
@@ -294,6 +296,23 @@ def _is_coproc2(instr: int) -> bool:
     return bool(instr & 0x10000000)
 
 
+def _is_rdn_encoding(result: Any, instr: int) -> bool:
+    """Whether the encoding names its destination once, as `<Rdn>`.
+
+    Three 16-bit groups do, and write two operands where the wide forms
+    write three: ADD/SUB (immediate) T2 (0x3000), the data-processing group
+    (0x4000) and ADD (register) T2 (0x4400). Nothing else does -- `d == n`
+    is not the test, because the 16-bit T1 forms take three registers and
+    two of them may well be the same one: 18ad is `adds r5, r5, r2`.
+
+    Which encoding produced `result` is not in `result`, so this needs the
+    instruction word; without one the wide, always-valid form is used.
+    """
+    if not _is_narrow(result):
+        return False
+    return 0x3000 <= (instr >> 16) & 0xFFFF < 0x4700
+
+
 def _nhigh_mhigh_mnemonic(base: str, n_high: bool, m_high: bool) -> str:
     if not n_high and not m_high:
         return base + "bb"
@@ -324,9 +343,9 @@ def _round_mnemonic(base: str, round_val: bool) -> str:
 # --- Data-processing immediate ---
 
 
-def _fmt_dp_imm(result: Any, mnemonic: str) -> str:
+def _fmt_dp_imm(result: Any, mnemonic: str, instr: int = 0) -> str:
     s = _flags(result.setflags) + _width(result, mnemonic)
-    if result.d == result.n:
+    if _is_rdn_encoding(result, instr):
         return (
             f"{mnemonic}{s}{_SEP}{_reg(result.d)}, #{result.imm32}"
             f"{_hex_comment(result.imm32)}"
@@ -370,21 +389,15 @@ def _fmt_and_imm(result: Any, mnemonic: str = "and") -> str:
 # --- Data-processing register ---
 
 
-def _fmt_dp_reg_abbrev(result: Any, mnemonic: str) -> str:
+def _fmt_dp_reg(result: Any, mnemonic: str, instr: int = 0) -> str:
     s = _flags(result.setflags) + _width(result, mnemonic)
     sh = _shift(result.shift_t, result.shift_n)
-    if result.d == result.n:
+    if _is_rdn_encoding(result, instr):
         return f"{mnemonic}{s}{_SEP}{_reg(result.d)}, {_reg(result.m)}{sh}"
     return (
         f"{mnemonic}{s}{_SEP}{_reg(result.d)}, {_reg(result.n)}, {_reg(result.m)}{sh}"
     )
 
-def _fmt_dp_reg(result: Any, mnemonic: str) -> str:
-    s = _flags(result.setflags) + _width(result, mnemonic)
-    sh = _shift(result.shift_t, result.shift_n)
-    return (
-        f"{mnemonic}{s}{_SEP}{_reg(result.d)}, {_reg(result.n)}, {_reg(result.m)}{sh}"
-    )
 
 def _fmt_mov_reg(result: Any) -> str:
     s = _flags(result.setflags) + _width(result, "mov")
@@ -435,9 +448,9 @@ def _fmt_ror_imm(result: Any) -> str:
 # --- Shift register ---
 
 
-def _fmt_shift_reg(result: Any, mnemonic: str) -> str:
+def _fmt_shift_reg(result: Any, mnemonic: str, instr: int = 0) -> str:
     s = _flags(result.setflags) + _width(result, mnemonic)
-    if result.d == result.n:
+    if _is_rdn_encoding(result, instr):
         return f"{mnemonic}{s}{_SEP}{_reg(result.d)}, {_reg(result.m)}"
     return f"{mnemonic}{s}{_SEP}{_reg(result.d)}, {_reg(result.n)}, {_reg(result.m)}"
 
@@ -445,9 +458,14 @@ def _fmt_shift_reg(result: Any, mnemonic: str) -> str:
 # --- SP arithmetic ---
 
 
+# Only the 16-bit encodings of SP arithmetic leave SP out of the operands
+# ("add sp, #4", "add r0, sp"); the wide forms spell it as the second operand
+# even when that repeats the destination.
+
+
 def _fmt_add_sp_imm(result: Any) -> str:
     s = _flags(result.setflags) + _width(result, "add")
-    if result.d == 13:
+    if result.d == 13 and _is_narrow(result):
         return f"add{s}{_SEP}sp, #{result.imm32}{_hex_comment(result.imm32)}"
     return (
         f"add{s}{_SEP}{_reg(result.d)}, sp, #{result.imm32}{_hex_comment(result.imm32)}"
@@ -457,16 +475,17 @@ def _fmt_add_sp_imm(result: Any) -> str:
 def _fmt_add_sp_reg(result: Any) -> str:
     s = _flags(result.setflags) + _width(result, "add")
     sh = _shift(result.shift_t, result.shift_n)
-    if result.d == 13:
-        return f"add{s}{_SEP}sp, {_reg(result.m)}{sh}"
-    if result.d == result.m:
-        return f"add{s}{_SEP}{_reg(result.d)}, sp{sh}"
+    if _is_narrow(result):
+        if result.d == 13:
+            return f"add{s}{_SEP}sp, {_reg(result.m)}{sh}"
+        if result.d == result.m:
+            return f"add{s}{_SEP}{_reg(result.d)}, sp{sh}"
     return f"add{s}{_SEP}{_reg(result.d)}, sp, {_reg(result.m)}{sh}"
 
 
 def _fmt_sub_sp_imm(result: Any) -> str:
     s = _flags(result.setflags) + _width(result, "sub")
-    if result.d == 13:
+    if result.d == 13 and _is_narrow(result):
         return f"sub{s}{_SEP}sp, #{result.imm32}{_hex_comment(result.imm32)}"
     return (
         f"sub{s}{_SEP}{_reg(result.d)}, sp, #{result.imm32}{_hex_comment(result.imm32)}"
@@ -476,10 +495,11 @@ def _fmt_sub_sp_imm(result: Any) -> str:
 def _fmt_sub_sp_reg(result: Any) -> str:
     s = _flags(result.setflags) + _width(result, "sub")
     sh = _shift(result.shift_t, result.shift_n)
-    if result.d == 13:
-        return f"sub{s}{_SEP}sp, {_reg(result.m)}{sh}"
-    if result.d == result.m:
-        return f"sub{s}{_SEP}{_reg(result.d)}, sp{sh}"
+    if _is_narrow(result):
+        if result.d == 13:
+            return f"sub{s}{_SEP}sp, {_reg(result.m)}{sh}"
+        if result.d == result.m:
+            return f"sub{s}{_SEP}{_reg(result.d)}, sp{sh}"
     return f"sub{s}{_SEP}{_reg(result.d)}, sp, {_reg(result.m)}{sh}"
 
 
@@ -506,12 +526,12 @@ def _fmt_adr(result: Any, offset: int = 0) -> str:
 
 
 def _fmt_ldst_imm(result: Any, mnemonic: str) -> str:
-    addr = _addr_imm(result.n, result.imm32, result.index, result.add, result.wback)
+    addr = _addr_imm(result)
     return f"{mnemonic}{_width(result, mnemonic)}{_SEP}{addr}"
 
 
 def _fmt_ldst_imm_t(result: Any, mnemonic: str, offset: int = 0) -> str:
-    addr = _addr_imm(result.n, result.imm32, result.index, result.add, result.wback)
+    addr = _addr_imm(result)
     asm = f"{mnemonic}{_width(result, mnemonic)}{_SEP}{_reg(result.t)}, {addr}"
     if result.n == 15:
         asm += _hex_target(offset, result.imm32, result.add)
@@ -519,15 +539,7 @@ def _fmt_ldst_imm_t(result: Any, mnemonic: str, offset: int = 0) -> str:
 
 
 def _fmt_ldst_imm_dual(result: Any, mnemonic: str) -> str:
-    addr = _addr_imm_dual(
-        result.t,
-        result.t2,
-        result.n,
-        result.imm32,
-        result.index,
-        result.add,
-        result.wback,
-    )
+    addr = _addr_imm_dual(result)
     return f"{mnemonic}{_width(result, mnemonic)}{_SEP}{addr}"
 
 
@@ -549,7 +561,7 @@ def _fmt_ldst_reg_rt(result: Any, mnemonic: str) -> str:
 
 def _fmt_ldst_lit(result: Any, mnemonic: str, offset: int = 0) -> str:
     m = mnemonic + _width(result, mnemonic)
-    asm = f"{m}{_SEP}{_addr_literal(result.t, result.imm32, result.add)}"
+    asm = f"{m}{_SEP}{_addr_literal(result)}"
     return f"{asm}{_hex_target(offset, result.imm32, result.add)}"
 
 
@@ -859,8 +871,12 @@ def _fmt_umaal(result: Any) -> str:
 # --- Multiply ---
 
 
-def _fmt_mul(result: Any, setflags: bool = False) -> str:
+def _fmt_mul(result: Any, setflags: bool = False, instr: int = 0) -> str:
     s = _flags(setflags) + _width(result, "mul")
+    # T1 spells the destination as <Rdm>, so it is the multiplicand that goes
+    # unwritten here, not the multiplier the other Rdn encodings drop.
+    if _is_rdn_encoding(result, instr):
+        return f"mul{s}{_SEP}{_reg(result.d)}, {_reg(result.n)}"
     return f"mul{s}{_SEP}{_reg(result.d)}, {_reg(result.n)}, {_reg(result.m)}"
 
 
@@ -1251,9 +1267,11 @@ def _fmt_vldr_vstr(result: Any, mnemonic: str) -> str:
     sign = "" if result.add else "-"
     single_reg = result.single_reg
     reg_name_fn = _sreg if single_reg else _dreg
+    # 32-bit only, and an offset form throughout: a zero offset goes unwritten.
+    offset_text = "" if result.imm32 == 0 else f", #{sign}{result.imm32}"
     return (
         f"{mnemonic}{_SEP}{reg_name_fn(result.d)},"
-        f" [{_reg(result.n)}, #{sign}{result.imm32}]"
+        f" [{_reg(result.n)}{offset_text}]"
         f"{_hex_comment(result.imm32)}"
     )
 
@@ -1386,13 +1404,13 @@ def _fmt_mrrc_mrrc2(result: Any, instr: int = 0) -> str:
 
 def _fmt_stc_stc2(result: Any, instr: int = 0) -> str:
     suffix = "2" if _is_coproc2(instr) else ""
-    addr = _addr_imm(result.n, result.imm32, result.index, result.add, result.wback)
+    addr = _addr_imm(result)
     return f"stc{suffix}{_SEP}{result.cp}, cr{result.CRd}, {addr}"
 
 
 def _fmt_ldc_ldc2_imm(result: Any, instr: int = 0) -> str:
     suffix = "2" if _is_coproc2(instr) else ""
-    addr = _addr_imm(result.n, result.imm32, result.index, result.add, result.wback)
+    addr = _addr_imm(result)
     return f"ldc{suffix}{_SEP}p{result.cp}, c{result.CRd}, {addr}"
 
 
@@ -1429,22 +1447,22 @@ def _fmt_mov_shifted(result: Any) -> str:
 # ---------------------------------------------------------------------------
 
 _DISPATCH: dict[int, Any] = {
-    Opcode.OP_ADC_IMMEDIATE: lambda r: _fmt_dp_imm(r, "adc"),
-    Opcode.OP_ADC_REGISTER: lambda r: _fmt_dp_reg_abbrev(r, "adc"),
-    Opcode.OP_ADD_IMMEDIATE: lambda r: _fmt_dp_imm(r, "add"),
-    Opcode.OP_ADD_REGISTER: lambda r: _fmt_dp_reg_abbrev(r, "add"),
+    Opcode.OP_ADC_IMMEDIATE: lambda r, instr=0: _fmt_dp_imm(r, "adc", instr),
+    Opcode.OP_ADC_REGISTER: lambda r, instr=0: _fmt_dp_reg(r, "adc", instr),
+    Opcode.OP_ADD_IMMEDIATE: lambda r, instr=0: _fmt_dp_imm(r, "add", instr),
+    Opcode.OP_ADD_REGISTER: lambda r, instr=0: _fmt_dp_reg(r, "add", instr),
     Opcode.OP_ADD_SP_PLUS_IMMEDIATE: _fmt_add_sp_imm,
     Opcode.OP_ADD_SP_PLUS_REGISTER: _fmt_add_sp_reg,
     Opcode.OP_ADR: _fmt_adr,
     Opcode.OP_AND_IMMEDIATE: _fmt_and_imm,
-    Opcode.OP_AND_REGISTER: lambda r: _fmt_dp_reg_abbrev(r, "and"),
+    Opcode.OP_AND_REGISTER: lambda r, instr=0: _fmt_dp_reg(r, "and", instr),
     Opcode.OP_ASR_IMMEDIATE: lambda r: _fmt_shift_imm(r, "asr"),
-    Opcode.OP_ASR_REGISTER: lambda r: _fmt_shift_reg(r, "asr"),
+    Opcode.OP_ASR_REGISTER: lambda r, instr=0: _fmt_shift_reg(r, "asr", instr),
     Opcode.OP_B: _fmt_b,
     Opcode.OP_BFC: _fmt_bfc,
     Opcode.OP_BFI: _fmt_bfi,
     Opcode.OP_BIC_IMMEDIATE: lambda r: _fmt_and_imm(r, "bic"),
-    Opcode.OP_BIC_REGISTER: lambda r: _fmt_dp_reg_abbrev(r, "bic"),
+    Opcode.OP_BIC_REGISTER: lambda r, instr=0: _fmt_dp_reg(r, "bic", instr),
     Opcode.OP_BKPT: _fmt_bkpt,
     Opcode.OP_BL: _fmt_bl,
     Opcode.OP_BLX_REGISTER: _fmt_blx_reg,
@@ -1464,7 +1482,7 @@ _DISPATCH: dict[int, Any] = {
     Opcode.OP_DMB: _fmt_dmb,
     Opcode.OP_DSB: _fmt_dsb,
     Opcode.OP_EOR_IMMEDIATE: lambda r: _fmt_and_imm(r, "eor"),
-    Opcode.OP_EOR_REGISTER: lambda r: _fmt_dp_reg_abbrev(r, "eor"),
+    Opcode.OP_EOR_REGISTER: lambda r, instr=0: _fmt_dp_reg(r, "eor", instr),
     Opcode.OP_ISB: _fmt_isb,
     Opcode.OP_IT: _fmt_it,
     Opcode.OP_LDC_LDC2_IMMEDIATE: _fmt_ldc_ldc2_imm,
@@ -1511,9 +1529,9 @@ _DISPATCH: dict[int, Any] = {
     Opcode.OP_LDRSHT: lambda r: _fmt_unpriv_ldr(r, "ldrsht"),
     Opcode.OP_LDRT: lambda r: _fmt_unpriv_ldr(r, "ldrt"),
     Opcode.OP_LSL_IMMEDIATE: lambda r: _fmt_shift_imm(r, "lsl"),
-    Opcode.OP_LSL_REGISTER: lambda r: _fmt_shift_reg(r, "lsl"),
+    Opcode.OP_LSL_REGISTER: lambda r, instr=0: _fmt_shift_reg(r, "lsl", instr),
     Opcode.OP_LSR_IMMEDIATE: lambda r: _fmt_shift_imm(r, "lsr"),
-    Opcode.OP_LSR_REGISTER: lambda r: _fmt_shift_reg(r, "lsr"),
+    Opcode.OP_LSR_REGISTER: lambda r, instr=0: _fmt_shift_reg(r, "lsr", instr),
     Opcode.OP_MCR_MCR2: _fmt_mcr_mcr2,
     Opcode.OP_MCRR_MCRR2: _fmt_mcrr_mcrr2,
     Opcode.OP_MLA: lambda r: _fmt_mla(r, getattr(r, "setflags", False)),
@@ -1525,14 +1543,14 @@ _DISPATCH: dict[int, Any] = {
     Opcode.OP_MRRC_MRRC2: _fmt_mrrc_mrrc2,
     Opcode.OP_MRS: _fmt_mrs,
     Opcode.OP_MSR: _fmt_msr,
-    Opcode.OP_MUL: lambda r: _fmt_mul(r, getattr(r, "setflags", False)),
+    Opcode.OP_MUL: lambda r, instr=0: _fmt_mul(r, getattr(r, "setflags", False), instr),
     Opcode.OP_MVN_IMMEDIATE: _fmt_mvn_imm,
     Opcode.OP_MVN_REGISTER: _fmt_mvn_reg,
     Opcode.OP_NOP: lambda r: _fmt_noargs(r, "nop"),
     Opcode.OP_ORN_IMMEDIATE: lambda r: _fmt_and_imm(r, "orn"),
-    Opcode.OP_ORN_REGISTER: lambda r: _fmt_dp_reg(r, "orn"),
+    Opcode.OP_ORN_REGISTER: lambda r, instr=0: _fmt_dp_reg(r, "orn", instr),
     Opcode.OP_ORR_IMMEDIATE: lambda r: _fmt_and_imm(r, "orr"),
-    Opcode.OP_ORR_REGISTER: lambda r: _fmt_dp_reg(r, "orr"),
+    Opcode.OP_ORR_REGISTER: lambda r, instr=0: _fmt_dp_reg(r, "orr", instr),
     Opcode.OP_PKHBT_PKHTB: _fmt_pkhbt_pkhtb,
     Opcode.OP_PLD_IMMEDIATE: _fmt_pld_imm,
     Opcode.OP_PLD_LITERAL: _fmt_pld_lit,
@@ -1557,15 +1575,15 @@ _DISPATCH: dict[int, Any] = {
     Opcode.OP_REV16: _fmt_rev16,
     Opcode.OP_REVSH: _fmt_revsh,
     Opcode.OP_ROR_IMMEDIATE: _fmt_ror_imm,
-    Opcode.OP_ROR_REGISTER: lambda r: _fmt_shift_reg(r, "ror"),
+    Opcode.OP_ROR_REGISTER: lambda r, instr=0: _fmt_shift_reg(r, "ror", instr),
     Opcode.OP_RRX: _fmt_rrx,
-    Opcode.OP_RSB_IMMEDIATE: lambda r: _fmt_dp_imm(r, "rsb"),
-    Opcode.OP_RSB_REGISTER: lambda r: _fmt_dp_reg(r, "rsb"),
+    Opcode.OP_RSB_IMMEDIATE: lambda r, instr=0: _fmt_dp_imm(r, "rsb", instr),
+    Opcode.OP_RSB_REGISTER: lambda r, instr=0: _fmt_dp_reg(r, "rsb", instr),
     Opcode.OP_SADD16: lambda r: _fmt_simd3(r, "sadd16"),
     Opcode.OP_SADD8: lambda r: _fmt_simd3(r, "sadd8"),
     Opcode.OP_SASX: lambda r: _fmt_simd3(r, "sasx"),
-    Opcode.OP_SBC_IMMEDIATE: lambda r: _fmt_dp_imm(r, "sbc"),
-    Opcode.OP_SBC_REGISTER: lambda r: _fmt_dp_reg(r, "sbc"),
+    Opcode.OP_SBC_IMMEDIATE: lambda r, instr=0: _fmt_dp_imm(r, "sbc", instr),
+    Opcode.OP_SBC_REGISTER: lambda r, instr=0: _fmt_dp_reg(r, "sbc", instr),
     Opcode.OP_SBFX: _fmt_sbfx,
     Opcode.OP_SDIV: _fmt_sdiv,
     Opcode.OP_SEL: _fmt_sel,
@@ -1620,8 +1638,8 @@ _DISPATCH: dict[int, Any] = {
     Opcode.OP_STRH_REGISTER: lambda r: _fmt_ldst_reg(r, "strh"),
     Opcode.OP_STRHT: lambda r: _fmt_unpriv_str(r, "strht"),
     Opcode.OP_STRT: lambda r: _fmt_unpriv_str(r, "strt"),
-    Opcode.OP_SUB_IMMEDIATE: lambda r: _fmt_dp_imm(r, "sub"),
-    Opcode.OP_SUB_REGISTER: lambda r: _fmt_dp_reg(r, "sub"),
+    Opcode.OP_SUB_IMMEDIATE: lambda r, instr=0: _fmt_dp_imm(r, "sub", instr),
+    Opcode.OP_SUB_REGISTER: lambda r, instr=0: _fmt_dp_reg(r, "sub", instr),
     Opcode.OP_SUB_SP_MINUS_IMMEDIATE: _fmt_sub_sp_imm,
     Opcode.OP_SUB_SP_MINUS_REGISTER: _fmt_sub_sp_reg,
     Opcode.OP_SVC: _fmt_svc,

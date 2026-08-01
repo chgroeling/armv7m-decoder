@@ -38,15 +38,15 @@ class TestDisasmBasics:
 
     def test_add_immediate(self, ctx) -> None:
         result, _ = decode(0x1C00 << 16, ctx)
-        assert disassemble(result) == "adds\tr0, #0"
+        assert disassemble(result, 0x1C00 << 16) == "adds\tr0, r0, #0"
 
     def test_sub_immediate(self, ctx) -> None:
         result, _ = decode(0x1E00 << 16, ctx)
-        assert disassemble(result) == "subs\tr0, #0"
+        assert disassemble(result, 0x1E00 << 16) == "subs\tr0, r0, #0"
 
     def test_adc_register(self, ctx) -> None:
         result, _ = decode(0x4140 << 16, ctx)
-        assert disassemble(result) == "adcs\tr0, r0"
+        assert disassemble(result, 0x4140 << 16) == "adcs\tr0, r0"
 
     def test_bkpt(self, ctx) -> None:
         result, _ = decode(0xBE00 << 16, ctx)
@@ -66,7 +66,7 @@ class TestDisasmBasics:
 
     def test_mul(self, ctx) -> None:
         result, _ = decode(0x4340 << 16, ctx)
-        assert disassemble(result) == "muls\tr0, r0, r0"
+        assert disassemble(result, 0x4340 << 16) == "muls\tr0, r0"
 
 
 class TestDisasmBranch:
@@ -144,8 +144,8 @@ class TestDisasmWidthSuffix:
             # S-forms whose spelling ends in something that reads like a
             # condition code: movs/vs, bics/cs, adcs/cs, sbcs/cs, lsls/ls.
             (0xEA5F0000, "movs.w\tr0, r0"),
-            (0xEA300000, "bics.w\tr0, r0"),
-            (0xEB500000, "adcs.w\tr0, r0"),
+            (0xEA300000, "bics.w\tr0, r0, r0"),
+            (0xEB500000, "adcs.w\tr0, r0, r0"),
             (0xEB700000, "sbcs.w\tr0, r0, r0"),
             (0xF04F0000, "mov.w\tr0, #0"),
             (0xF1100F00, "cmn.w\tr0, #0"),
@@ -171,7 +171,7 @@ class TestDisasmWidthSuffix:
 
     def test_narrow_gets_no_suffix(self, ctx) -> None:
         result, _ = decode(0x4140 << 16, ctx)
-        assert disassemble(result) == "adcs\tr0, r0"
+        assert disassemble(result, 0x4140 << 16) == "adcs\tr0, r0"
 
 
 class TestDisasmStackAndMultiTransfer:
@@ -290,6 +290,85 @@ class TestDisasmDMB:
         assert disassemble(result) == "dbg\t#5"
 
 
+class TestDisasmOperandForm:
+    """How many operands an instruction writes is a property of its encoding,
+    not of whether two of its register fields happen to hold the same number."""
+
+    @pytest.mark.parametrize(
+        ("instr", "expected"),
+        [
+            # 16-bit T1: three operands, sharing a register or not.
+            (0x18AD << 16, "adds\tr5, r5, r2"),
+            (0x18C5 << 16, "adds\tr5, r0, r3"),
+            (0x1C40 << 16, "adds\tr0, r0, #1"),
+            (0x1E00 << 16, "subs\tr0, r0, #0"),
+            # 16-bit <Rdn> encodings: two, the destination standing in for the
+            # first operand.
+            (0x3001 << 16, "adds\tr0, #1"),
+            (0x3801 << 16, "subs\tr0, #1"),
+            (0x4148 << 16, "adcs\tr0, r1"),
+            (0x4088 << 16, "lsls\tr0, r1"),
+            (0x4408 << 16, "add\tr0, r1"),
+            # MUL T1 spells its destination as <Rdm>, so it is the multiplicand
+            # that goes unwritten, not the multiplier.
+            (0x4341 << 16, "muls\tr1, r0"),
+            # Wide encodings always write all three.
+            (0xEA000000, "and.w\tr0, r0, r0"),
+            (0xEB100000, "adds.w\tr0, r0, r0"),
+            (0xF1000001, "add.w\tr0, r0, #1"),
+            (0xFA00F001, "lsl.w\tr0, r0, r1"),
+            (0xFB00F000, "mul.w\tr0, r0, r0"),
+        ],
+    )
+    def test_operand_count(self, ctx, instr: int, expected: str) -> None:
+        result, _ = decode(instr, ctx)
+        assert disassemble(result, instr) == expected
+
+    @pytest.mark.parametrize(
+        ("instr", "expected"),
+        [
+            # SP arithmetic leaves SP out of the operands only when narrow.
+            (0x4468 << 16, "add\tr0, sp"),
+            (0x4485 << 16, "add\tsp, r0"),
+            (0xB001 << 16, "add\tsp, #4"),
+            (0xB081 << 16, "sub\tsp, #4"),
+            (0xEB0D0000, "add.w\tr0, sp, r0"),
+            (0xEB0D0D00, "add.w\tsp, sp, r0"),
+            (0xF10D0D01, "add.w\tsp, sp, #1"),
+            (0xF1AD0D01, "sub.w\tsp, sp, #1"),
+        ],
+    )
+    def test_sp_operand_form(self, ctx, instr: int, expected: str) -> None:
+        result, _ = decode(instr, ctx)
+        assert disassemble(result, instr) == expected
+
+
+class TestDisasmZeroOffset:
+    """A wide encoding drops a zero offset; a narrow one spells it out."""
+
+    @pytest.mark.parametrize(
+        ("instr", "expected"),
+        [
+            (0xF8DC3000, "ldr.w\tr3, [ip]"),
+            (0xF8500C00, "ldr.w\tr0, [r0]"),  # negative zero reads the same
+            (0xF8510F00, "ldr.w\tr0, [r1]!"),
+            (0xED900A00, "vldr\ts0, [r0]"),
+            # Post-indexed: the offset is what advances Rn, so it stays.
+            (0xF8510B00, "ldr.w\tr0, [r1], #0"),
+            # 16-bit forms always spell it.
+            (0x6800 << 16, "ldr\tr0, [r0, #0]"),
+            (0x9800 << 16, "ldr\tr0, [sp, #0]"),
+        ],
+    )
+    def test_zero_offset(self, ctx, instr: int, expected: str) -> None:
+        result, _ = decode(instr, ctx)
+        assert disassemble(result, instr) == expected
+
+    def test_wide_literal_drops_zero(self, ctx) -> None:
+        result, _ = decode(0xF8DF0000, ctx)
+        assert disassemble(result, 0xF8DF0000).startswith("ldr.w\tr0, [pc]")
+
+
 class TestDisasmIT:
     @pytest.mark.parametrize(
         ("word", "expected"),
@@ -365,11 +444,11 @@ class TestDisasmIT:
     def test_16bit_data_processing_drops_s_in_block(self, ctx) -> None:
         # ADD (register) T1 decodes with setflags = !InITBlock(), so the
         # running ITSTATE has to reach the decoder, not just the formatter.
-        assert disassemble_stream(ctx, [0x1800]) == ["adds\tr0, r0"]
+        assert disassemble_stream(ctx, [0x1800]) == ["adds\tr0, r0, r0"]
         assert disassemble_stream(ctx, [0xBF2C, 0x1800, 0x1800]) == [
             "ite\tcs",
-            "addcs\tr0, r0",
-            "addcc\tr0, r0",
+            "addcs\tr0, r0, r0",
+            "addcc\tr0, r0, r0",
         ]
 
     def test_unconditional_branch_takes_the_block_condition(self, ctx) -> None:
