@@ -1528,19 +1528,6 @@ def _fmt_ldc_ldc2_lit(result: Any, instr: int = 0, offset: int = 0) -> str:
 
 
 # ---------------------------------------------------------------------------
-# Shadow aliases (CPY, NEG, MOV_shifted_register)
-# ---------------------------------------------------------------------------
-
-
-def _fmt_cpy(result: Any) -> str:
-    return f"cpy{_SEP}{_reg(result.d)}, {_reg(result.m)}"
-
-
-def _fmt_neg(result: Any) -> str:
-    return f"neg{_SEP}{_reg(result.d)}, {_reg(result.m)}"
-
-
-# ---------------------------------------------------------------------------
 # Dispatch table — maps class name → (formatter_fn, extra_args)
 # ---------------------------------------------------------------------------
 
@@ -1574,7 +1561,6 @@ _DISPATCH: dict[int, Any] = {
     Opcode.OP_CMP_IMMEDIATE: lambda r: _fmt_test_imm(r, "cmp"),
     Opcode.OP_CMP_REGISTER: lambda r: _fmt_test_reg(r, "cmp"),
     Opcode.OP_CPS: _fmt_cps,
-    "CPY": _fmt_cpy,
     Opcode.OP_CSDB: lambda r: _fmt_noargs(r, "csdb"),
     Opcode.OP_DBG: _fmt_dbg,
     Opcode.OP_DMB: _fmt_dmb,
