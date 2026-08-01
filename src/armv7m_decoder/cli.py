@@ -14,11 +14,10 @@ import click
 
 from armv7m_decoder import (
     Context,
+    InstructionSize,
     decode,
-    decoded_bytes,
     disassemble,
-    get_decoder_eval_bytes,
-    get_min_instr_bytes,
+    instr_size,
     next_itstate,
 )
 
@@ -64,51 +63,41 @@ def decode_cmd(
     """Decode a binary file using the ARMv7-M instruction decoder."""
     data = Path(bin_path).read_bytes()
 
-    eval_bytes = get_decoder_eval_bytes()
-    min_bytes = get_min_instr_bytes()
-
     ctx = Context()
 
     out = open(out_file, "w", encoding="utf-8") if out_file else sys.stdout
 
     offset = start_address
     total = 0
-    while offset < len(data):
+    while offset + 2 <= len(data):
         if max_instructions is not None and total >= max_instructions:
             break
 
-        remaining = data[offset:]
-        if len(remaining) < min_bytes:
+        # The first halfword settles the size, whether or not an encoding
+        # matches -- skipping only half of a 32-bit word would leave the
+        # second halfword to be disassembled as an instruction of its own.
+        hw1 = struct.unpack_from("<H", data, offset)[0]
+        size = instr_size(hw1)
+        n_bytes = size // 8
+        if offset + n_bytes > len(data):
             break
 
-        buf = remaining[:eval_bytes]
-        if len(buf) < eval_bytes:
-            buf = buf + b"\x00" * (eval_bytes - len(buf))
-
-        hw1 = struct.unpack("<H", buf[0:2])[0]
-        hw2 = struct.unpack("<H", buf[2:4])[0]
-        instr = (hw1 << 16) | hw2
+        if size == InstructionSize.SIZE_32BIT:
+            hw2 = struct.unpack_from("<H", data, offset + 2)[0]
+            instr = (hw1 << 16) | hw2
+            hex_bytes = f"{hw1:04x} {hw2:04x}"
+        else:
+            instr = hw1
+            hex_bytes = f"{hw1:04x}"
 
         # ITSTATE reaches the decoder through ``ctx`` -- 16-bit data processing
         # inside an IT block decodes without the S bit -- and tells the
         # disassembler to spell ``moveq`` rather than ``mov``.
         istate = ctx.istate
-        result, n_bytes = decode(instr, ctx)
-        # A word the decoder matched nothing for still has the length Thumb
-        # gives it -- skipping only half of a 32-bit one would disassemble its
-        # second halfword as an instruction.
-        n_bytes = decoded_bytes(instr, result, n_bytes)
-
-        if result is not None:
-            if n_bytes == 2:
-                hex_bytes = f"{hw1:04x}"
-                instr_clean = hw1 << 16
-            else:
-                hex_bytes = f"{hw1:04x} {hw2:04x}"
-                instr_clean = instr
-            asm = disassemble(result, instr_clean, offset, istate)
-            out.write(f"{offset:8x}:\t{hex_bytes:<10}\t{asm}\n")
-            ctx.istate = next_itstate(istate, result)
+        result = decode(instr, ctx, size)
+        asm = disassemble(result, instr, size, offset, istate)
+        out.write(f"{offset:8x}:\t{hex_bytes:<10}\t{asm}\n")
+        ctx.istate = next_itstate(istate, result)
 
         offset += n_bytes
         total += 1

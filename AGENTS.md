@@ -18,10 +18,11 @@ uv run ruff format                         # Format
 
 ### Layering
 
-- **`src/armv7m_decoder/_decoder.py`** — Generated decoder module (committed artifact). Contains embedded armtranspiller runtime, instruction dataclasses, `decode(instr, ctx)` entry point, and pseudo-instruction classes (`NoMatch`, `Undefined`, `Unpredictable`, `See`).
-- **`src/armv7m_decoder/_disasm.py`** — Disassembler: `disassemble(result, instr, offset, istate)` turns a decoded dataclass into a UAL string.
+- **`src/armv7m_decoder/_decoder.py`** — Generated decoder module (committed artifact). Contains embedded armtranspiller runtime, instruction dataclasses, the `InstructionSize` enum, the per-size decoders (`decode_16bit`, `decode_32bit`), the `decode(instr, ctx, size)` entry point, and pseudo-instruction classes (`NoMatch`, `Undefined`, `Unpredictable`, `See`).
+- **`src/armv7m_decoder/_disasm.py`** — Disassembler: `disassemble(result, instr, size, offset, istate)` turns a decoded dataclass into a UAL string.
 - **`src/armv7m_decoder/_itstate.py`** — ITSTATE tracking (`next_itstate`, `current_cond`, `in_it_block`) for carrying an IT block's condition across a stream.
-- **`src/armv7m_decoder/__init__.py`** — Public API: re-exports `decode`, `Context`, `disassemble`, the ITSTATE helpers, `NoMatch`, `Undefined`, `Unpredictable`, `See`, `get_decoder_eval_bytes`, `get_min_instr_bytes`, and all instruction dataclasses from `_decoder`.
+- **`src/armv7m_decoder/_size.py`** — The Thumb rule that settles an instruction's size from its first halfword (`instr_size`, `instr_bytes`), applied before anything is decoded.
+- **`src/armv7m_decoder/__init__.py`** — Public API: re-exports `decode`, `Context`, `InstructionSize`, `disassemble`, the ITSTATE helpers, the size helpers, `NoMatch`, `Undefined`, `Unpredictable`, `See`, `get_supported_sizes`, and all instruction dataclasses from `_decoder`.
 - **`src/armv7m_decoder/_generate.py`** — Regeneration script: reads `formats/armv7-m.yaml` and calls `decoder_forge.generate_code` to produce `_decoder.py`.
 - **`src/armv7m_decoder/cli.py`** — Click CLI with `decode` subcommand for decoding binary files.
 
@@ -29,7 +30,9 @@ uv run ruff format                         # Format
 
 The generated `_decoder.py` is fully self-contained: Jinja2 template `python_decoder.py.jinja` in decoder-forge embeds armtranspiller's runtime verbatim via `get_runtime_source("python")`. No runtime dependency on decoder-forge or armtranspiller is needed.
 
-`decode(instr, ctx)` returns `(result, n_bytes)`. The number of bytes the matched instruction occupies is a literal known from each encoding's pattern, so variable-length (16/32-bit Thumb) decoding needs no separate size pass: the caller reads up to `get_decoder_eval_bytes()` (4 bytes), decodes once, and advances by the reported length.
+`decode(instr, ctx, size)` returns the decoded instruction alone, and the size is an input rather than a result: each size has its own decode tree, matching against a word of exactly its own width, and `decode` only routes to the right one. `instr` therefore holds exactly `size` bits — a 16-bit instruction is a bare halfword, not one padded out to 32 bits.
+
+Settling the size is the caller's job, and Thumb settles it from the first halfword alone (`instr_size` in `_size.py`, Armv7-M ARM A5.1). That rule holds whether or not an encoding matches, which is what keeps a stream in step where nothing does: a word the decoder answers `NoMatch` for is still skipped whole.
 
 ### IT blocks
 
@@ -41,9 +44,10 @@ decoder reads it via `InITBlock` / `LastInITBlock`, which is what turns 16-bit
 can spell `moveq`, and advance it after every instruction:
 
 ```python
+size = instr_size(hw1)
 istate = ctx.istate
-result, n_bytes = decode(instr, ctx)
-asm = disassemble(result, instr, offset, istate)
+result = decode(instr, ctx, size)
+asm = disassemble(result, instr, size, offset, istate)
 ctx.istate = next_itstate(istate, result)
 ```
 
@@ -73,6 +77,7 @@ src/armv7m_decoder/         # Source package
   _decoder.py               # Generated decoder (committed)
   _disasm.py                # Decoded instruction -> UAL assembler text
   _itstate.py               # ITSTATE tracking across a stream (IT blocks)
+  _size.py                  # Instruction size, from the first halfword
   _generate.py              # Regeneration script
   cli.py                    # CLI entry point
 formats/                    # YAML format / instruction-set definitions

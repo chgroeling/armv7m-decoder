@@ -3,13 +3,15 @@ that follow it."""
 
 import pytest
 
-from armv7m_decoder import COND_AL, current_cond, decode, in_it_block, next_itstate
+from armv7m_decoder import COND_AL, current_cond, in_it_block, next_itstate
+
+from .helpers import decode_word
 
 
 @pytest.fixture
 def it_ittee_gt(ctx):
     """Decoded ``ittee gt`` -- a block with all four slots in use."""
-    result, _ = decode(0xBFC7 << 16, ctx)
+    result = decode_word(ctx, 0xBFC7)
     return result
 
 
@@ -26,21 +28,21 @@ class TestITState:
         conds = []
         while in_it_block(istate):
             conds.append(current_cond(istate))
-            nop, _ = decode(0xBF00 << 16, ctx)
+            nop = decode_word(ctx, 0xBF00)
             istate = next_itstate(istate, nop)
         # gt, gt, le, le -- "then, then, else, else".
         assert conds == [0xC, 0xC, 0xD, 0xD]
         assert istate == 0
 
     def test_single_slot_block_ends_at_once(self, ctx) -> None:
-        it, _ = decode(0xBF08 << 16, ctx)  # it eq
+        it = decode_word(ctx, 0xBF08)  # it eq
         istate = next_itstate(0, it)
         assert current_cond(istate) == 0x0
-        nop, _ = decode(0xBF00 << 16, ctx)
+        nop = decode_word(ctx, 0xBF00)
         assert next_itstate(istate, nop) == 0
 
     def test_advance_outside_a_block_is_a_no_op(self, ctx) -> None:
-        nop, _ = decode(0xBF00 << 16, ctx)
+        nop = decode_word(ctx, 0xBF00)
         assert next_itstate(0, nop) == 0
 
     def test_zero_mask_reads_as_outside_a_block(self) -> None:

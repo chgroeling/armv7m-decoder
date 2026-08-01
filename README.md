@@ -12,11 +12,15 @@ uv add armv7m-decoder
 ## Usage
 
 ```python
-from armv7m_decoder import decode, Context
+from armv7m_decoder import Context, decode, instr_size
 
 ctx = Context()
-result, n_bytes = decode(instr, ctx)
+size = instr_size(hw1)  # 16 or 32 bits, from the first halfword
+result = decode(instr, ctx, size)
 ```
+
+`instr` holds exactly `size` bits: a bare halfword for a 16-bit instruction, a
+full word (first halfword in the high half) for a 32-bit one.
 
 ## CLI
 

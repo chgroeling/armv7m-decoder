@@ -4,22 +4,24 @@ Provides the :func:`decode` entry point, the :class:`Context` for threading runt
 state, the :func:`disassemble` function for assembler formatting, the ITSTATE
 helpers that carry an IT block's condition across a stream
 (:func:`next_itstate`, :func:`current_cond`, :func:`in_it_block`), the
-instruction-length helpers (:func:`decoded_bytes`, :func:`instr_bytes`), the
-pseudo-instruction classes (:class:`NoMatch`, :class:`Undefined`,
-:class:`Unpredictable`, :class:`See`), and all instruction dataclasses.
+instruction-size helpers that settle how wide a word is before it is decoded
+(:func:`instr_size`, :func:`instr_bytes`), the pseudo-instruction classes
+(:class:`NoMatch`, :class:`Undefined`, :class:`Unpredictable`, :class:`See`),
+and all instruction dataclasses.
 """
 
 from armv7m_decoder._decoder import (  # noqa: F401
     Context,
-    DecoderState,
+    InstructionSize,
     NoMatch,
     Opcode,
     See,
     Undefined,
     Unpredictable,
     decode,
-    get_decoder_eval_bytes,
-    get_min_instr_bytes,
+    decode_16bit,
+    decode_32bit,
+    get_supported_sizes,
 )
 from armv7m_decoder._disasm import disassemble  # noqa: F401
 from armv7m_decoder._itstate import (  # noqa: F401
@@ -28,12 +30,12 @@ from armv7m_decoder._itstate import (  # noqa: F401
     in_it_block,
     next_itstate,
 )
-from armv7m_decoder._length import decoded_bytes, instr_bytes  # noqa: F401
+from armv7m_decoder._size import instr_bytes, instr_size  # noqa: F401
 
 __all__ = [
     "COND_AL",
     "Context",
-    "DecoderState",
+    "InstructionSize",
     "NoMatch",
     "Opcode",
     "See",
@@ -41,12 +43,13 @@ __all__ = [
     "Unpredictable",
     "current_cond",
     "decode",
-    "decoded_bytes",
+    "decode_16bit",
+    "decode_32bit",
     "disassemble",
-    "get_decoder_eval_bytes",
-    "get_min_instr_bytes",
+    "get_supported_sizes",
     "in_it_block",
     "instr_bytes",
+    "instr_size",
     "next_itstate",
 ]
 

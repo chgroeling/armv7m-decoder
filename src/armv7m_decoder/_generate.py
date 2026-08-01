@@ -14,7 +14,6 @@ from decoder_forge.template_engine import TemplateEngine
 
 FORMAT_YAML = Path(__file__).resolve().parent.parent.parent / "formats" / "armv7-m.yaml"
 OUTPUT_FILE = Path(__file__).resolve().parent / "_decoder.py"
-DECODER_WIDTH = 32
 
 
 def main() -> None:
@@ -23,7 +22,7 @@ def main() -> None:
     tengine.load("python")
 
     with OUTPUT_FILE.open("w", encoding="utf-8") as f:
-        generate_code(yaml_text, DECODER_WIDTH, tengine, f)
+        generate_code(yaml_text, tengine, f)
 
     print(f"Generated {OUTPUT_FILE} from {FORMAT_YAML}", file=sys.stderr)
 

@@ -10,8 +10,8 @@ decoder can read it through ``InITBlock`` / ``LastInITBlock``, and needed by
 
 Callers walking a stream keep that state up to date with::
 
-    result, n_bytes = decode(instr, ctx)
-    asm = disassemble(result, instr, offset, ctx.istate)
+    result = decode(instr, ctx, size)
+    asm = disassemble(result, instr, size, offset, ctx.istate)
     ctx.istate = next_itstate(ctx.istate, result)
 
 See the Armv7-M ARM (ARM DDI 0403E.e) B1.4.2 for ITSTATE, and A7.7.38 for IT.

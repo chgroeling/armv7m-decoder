@@ -1,134 +1,89 @@
-"""Disassembly formatting tests for the ARMv7-M instruction decoder."""
+"""Disassembly formatting tests for the ARMv7-M instruction decoder.
 
-import struct
+Instruction words are written as an architecture manual spells the encoding --
+``0xBF00`` for a 16-bit one, ``0xF3AF8000`` for a 32-bit one -- and `disasm`
+decodes each at the size that width implies.
+"""
 
 import pytest
 
-from armv7m_decoder import (
-    Context,
-    decode,
-    decoded_bytes,
-    disassemble,
-    next_itstate,
-)
-
-
-def disassemble_stream(ctx: Context, halfwords: list[int]) -> list[str]:
-    """Disassemble a Thumb stream, carrying ITSTATE across it like the CLI."""
-    data = b"".join(struct.pack("<H", hw) for hw in halfwords)
-    asm: list[str] = []
-    offset = 0
-    while offset < len(data):
-        hw1, hw2 = struct.unpack("<HH", (data[offset : offset + 4] + b"\0\0")[:4])
-        istate = ctx.istate
-        result, n_bytes = decode((hw1 << 16) | hw2, ctx)
-        n_bytes = decoded_bytes((hw1 << 16) | hw2, result, n_bytes)
-        instr = hw1 << 16 if n_bytes == 2 else (hw1 << 16) | hw2
-        asm.append(disassemble(result, instr, offset, istate))
-        ctx.istate = next_itstate(istate, result)
-        offset += n_bytes
-    return asm
+from .helpers import disasm, disassemble_stream
 
 
 class TestDisasmBasics:
     def test_nop(self, ctx) -> None:
-        result, _ = decode(0xBF00 << 16, ctx)
-        assert disassemble(result) == "nop"
+        assert disasm(ctx, 0xBF00) == "nop"
 
     def test_mov_immediate(self, ctx) -> None:
-        result, _ = decode(0x2000 << 16, ctx)
-        assert disassemble(result) == "movs\tr0, #0"
+        assert disasm(ctx, 0x2000) == "movs\tr0, #0"
 
     def test_mov_register(self, ctx) -> None:
-        result, _ = decode(0x0000 << 16, ctx)
-        assert disassemble(result) == "movs\tr0, r0"
+        assert disasm(ctx, 0x0000) == "movs\tr0, r0"
 
     def test_add_immediate(self, ctx) -> None:
-        result, _ = decode(0x1C00 << 16, ctx)
-        assert disassemble(result, 0x1C00 << 16) == "adds\tr0, r0, #0"
+        assert disasm(ctx, 0x1C00) == "adds\tr0, r0, #0"
 
     def test_sub_immediate(self, ctx) -> None:
-        result, _ = decode(0x1E00 << 16, ctx)
-        assert disassemble(result, 0x1E00 << 16) == "subs\tr0, r0, #0"
+        assert disasm(ctx, 0x1E00) == "subs\tr0, r0, #0"
 
     def test_adc_register(self, ctx) -> None:
-        result, _ = decode(0x4140 << 16, ctx)
-        assert disassemble(result, 0x4140 << 16) == "adcs\tr0, r0"
+        assert disasm(ctx, 0x4140) == "adcs\tr0, r0"
 
     def test_bkpt(self, ctx) -> None:
-        result, _ = decode(0xBE00 << 16, ctx)
-        assert disassemble(result) == "bkpt\t0x0000"
+        assert disasm(ctx, 0xBE00) == "bkpt\t0x0000"
 
     def test_push(self, ctx) -> None:
-        result, _ = decode(0xB401 << 16, ctx)
-        assert disassemble(result) == "push\t{r0}"
+        assert disasm(ctx, 0xB401) == "push\t{r0}"
 
     def test_ldr_immediate(self, ctx) -> None:
-        result, _ = decode(0x6800 << 16, ctx)
-        assert disassemble(result) == "ldr\tr0, [r0, #0]"
+        assert disasm(ctx, 0x6800) == "ldr\tr0, [r0, #0]"
 
     def test_str_immediate(self, ctx) -> None:
-        result, _ = decode(0x6000 << 16, ctx)
-        assert disassemble(result) == "str\tr0, [r0, #0]"
+        assert disasm(ctx, 0x6000) == "str\tr0, [r0, #0]"
 
     def test_mul(self, ctx) -> None:
-        result, _ = decode(0x4340 << 16, ctx)
-        assert disassemble(result, 0x4340 << 16) == "muls\tr0, r0"
+        assert disasm(ctx, 0x4340) == "muls\tr0, r0"
 
 
 class TestDisasmBranch:
     def test_b_t2(self, ctx) -> None:
-        result, _ = decode(0xE010 << 16, ctx)
-        assert disassemble(result) == "b.n\t0x24"
+        assert disasm(ctx, 0xE010) == "b.n\t0x24"
 
     def test_b_t2_backwards(self, ctx) -> None:
-        result, _ = decode(0xE7FE << 16, ctx)
-        assert "b" in disassemble(result)
+        assert "b" in disasm(ctx, 0xE7FE)
 
     def test_blx_register(self, ctx) -> None:
-        result, _ = decode(0x4780 << 16, ctx)
-        assert disassemble(result) == "blx\tr0"
+        assert disasm(ctx, 0x4780) == "blx\tr0"
 
     def test_bx(self, ctx) -> None:
-        result, _ = decode(0x4700 << 16, ctx)
-        assert disassemble(result) == "bx\tr0"
+        assert disasm(ctx, 0x4700) == "bx\tr0"
 
 
 class TestDisasmRegisterNames:
     def test_sp(self, ctx) -> None:
-        result, _ = decode((0xF10D << 16) | 0x0D00, ctx)
-        assert "sp" in disassemble(result)
+        assert "sp" in disasm(ctx, 0xF10D0D00)
 
     def test_pc_in_branch(self, ctx) -> None:
-        result, _ = decode(0x4778 << 16, ctx)
-        assert "pc" in disassemble(result)
+        assert "pc" in disasm(ctx, 0x4778)
 
 
 class TestDisasmPseudoInstructions:
     def test_nomatch(self, ctx) -> None:
-        result, _ = decode(0xFFFF0000, ctx)
-        assert disassemble(result).startswith("<nomatch")
+        assert disasm(ctx, 0xFFFF0000).startswith("<nomatch")
 
     def test_undefined(self, ctx) -> None:
-        result, _ = decode(0xF81DBAA1, ctx)
-        assert disassemble(result).startswith("<undefined")
+        assert disasm(ctx, 0xF81DBAA1).startswith("<undefined")
 
 
 class TestDisasmAdr:
     """ADR prints as the PC-relative add/sub it encodes, matching objdump."""
 
     def test_narrow_resolves_target(self, ctx) -> None:
-        result, _ = decode(0xA5D8 << 16, ctx)
-        assert (
-            disassemble(result, 0xA5D8 << 16, 0x60)
-            == "add\tr5, pc, #864\t@ (adr r5, 0x3c4)"
-        )
+        assert disasm(ctx, 0xA5D8, 0x60) == "add\tr5, pc, #864\t@ (adr r5, 0x3c4)"
 
     def test_narrow_target_aligns_pc(self, ctx) -> None:
         # PC is offset + 4, then rounded down to a word boundary.
-        instr = 0xA000 << 16
-        result, _ = decode(instr, ctx)
-        assert disassemble(result, instr, 0x62) == "add\tr0, pc, #0\t@ (adr r0, 0x64)"
+        assert disasm(ctx, 0xA000, 0x62) == "add\tr0, pc, #0\t@ (adr r0, 0x64)"
 
     @pytest.mark.parametrize(
         ("instr", "expected"),
@@ -140,8 +95,7 @@ class TestDisasmAdr:
         ],
     )
     def test_wide_is_addw_subw(self, ctx, instr: int, expected: str) -> None:
-        result, _ = decode(instr, ctx)
-        assert disassemble(result, instr, 0x64) == expected
+        assert disasm(ctx, instr, 0x64) == expected
 
 
 class TestDisasmWidthSuffix:
@@ -159,8 +113,7 @@ class TestDisasmWidthSuffix:
         ],
     )
     def test_wide_gets_suffix(self, ctx, instr: int, expected: str) -> None:
-        result, _ = decode(instr, ctx)
-        assert disassemble(result) == expected
+        assert disasm(ctx, instr) == expected
 
     @pytest.mark.parametrize(
         ("instr", "expected"),
@@ -173,12 +126,10 @@ class TestDisasmWidthSuffix:
         ],
     )
     def test_wide_only_gets_no_suffix(self, ctx, instr: int, expected: str) -> None:
-        result, _ = decode(instr, ctx)
-        assert disassemble(result) == expected
+        assert disasm(ctx, instr) == expected
 
     def test_narrow_gets_no_suffix(self, ctx) -> None:
-        result, _ = decode(0x4140 << 16, ctx)
-        assert disassemble(result, 0x4140 << 16) == "adcs\tr0, r0"
+        assert disasm(ctx, 0x4140) == "adcs\tr0, r0"
 
 
 class TestDisasmStackAndMultiTransfer:
@@ -187,15 +138,14 @@ class TestDisasmStackAndMultiTransfer:
     @pytest.mark.parametrize(
         ("instr", "expected"),
         [
-            (0xB401 << 16, "push\t{r0}"),
-            (0xB501 << 16, "push\t{r0, lr}"),
-            (0xBC01 << 16, "pop\t{r0}"),
-            (0xBD01 << 16, "pop\t{r0, pc}"),
+            (0xB401, "push\t{r0}"),
+            (0xB501, "push\t{r0, lr}"),
+            (0xBC01, "pop\t{r0}"),
+            (0xBD01, "pop\t{r0, pc}"),
         ],
     )
     def test_narrow_push_pop(self, ctx, instr: int, expected: str) -> None:
-        result, _ = decode(instr, ctx)
-        assert disassemble(result) == expected
+        assert disasm(ctx, instr) == expected
 
     @pytest.mark.parametrize(
         ("instr", "expected"),
@@ -209,14 +159,13 @@ class TestDisasmStackAndMultiTransfer:
         ],
     )
     def test_wide_push_pop(self, ctx, instr: int, expected: str) -> None:
-        result, _ = decode(instr, ctx)
-        assert disassemble(result) == expected
+        assert disasm(ctx, instr) == expected
 
     @pytest.mark.parametrize(
         ("instr", "expected"),
         [
-            (0xC901 << 16, "ldmia\tr1!, {r0}"),
-            (0xC101 << 16, "stmia\tr1!, {r0}"),
+            (0xC901, "ldmia\tr1!, {r0}"),
+            (0xC101, "stmia\tr1!, {r0}"),
             (0xE8B34091, "ldmia.w\tr3!, {r0, r4, r7, lr}"),
             (0xE8930003, "ldmia.w\tr3, {r0, r1}"),
             (0xE8A30003, "stmia.w\tr3!, {r0, r1}"),
@@ -226,22 +175,18 @@ class TestDisasmStackAndMultiTransfer:
         ],
     )
     def test_multi_transfer_width_suffix(self, ctx, instr: int, expected: str) -> None:
-        result, _ = decode(instr, ctx)
-        assert disassemble(result) == expected
+        assert disasm(ctx, instr) == expected
 
 
 class TestDisasmDMB:
     def test_dmb(self, ctx) -> None:
-        result, _ = decode(0xF3BF8F5F, ctx)
-        assert "dmb" in disassemble(result)
+        assert "dmb" in disasm(ctx, 0xF3BF8F5F)
 
     def test_dsb(self, ctx) -> None:
-        result, _ = decode(0xF3BF8F4F, ctx)
-        assert "dsb" in disassemble(result)
+        assert "dsb" in disasm(ctx, 0xF3BF8F4F)
 
     def test_isb(self, ctx) -> None:
-        result, _ = decode(0xF3BF8F6F, ctx)
-        assert "isb" in disassemble(result)
+        assert "isb" in disasm(ctx, 0xF3BF8F6F)
 
     @pytest.mark.parametrize(
         ("option", "expected"),
@@ -265,8 +210,7 @@ class TestDisasmDMB:
         ],
     )
     def test_dmb_options(self, ctx, option: int, expected: str) -> None:
-        result, _ = decode(0xF3BF8F50 | option, ctx)
-        assert disassemble(result) == expected
+        assert disasm(ctx, 0xF3BF8F50 | option) == expected
 
     @pytest.mark.parametrize(
         ("option", "expected"),
@@ -278,19 +222,15 @@ class TestDisasmDMB:
         ],
     )
     def test_dsb_options(self, ctx, option: int, expected: str) -> None:
-        result, _ = decode(0xF3BF8F40 | option, ctx)
-        assert disassemble(result) == expected
+        assert disasm(ctx, 0xF3BF8F40 | option) == expected
 
     def test_isb_only_names_sy(self, ctx) -> None:
         # ISB leaves every option but SY numeric, matching objdump.
-        result, _ = decode(0xF3BF8F6B, ctx)
-        assert disassemble(result) == "isb\t#11"
-        result, _ = decode(0xF3BF8F6F, ctx)
-        assert disassemble(result) == "isb\tsy"
+        assert disasm(ctx, 0xF3BF8F6B) == "isb\t#11"
+        assert disasm(ctx, 0xF3BF8F6F) == "isb\tsy"
 
     def test_dbg(self, ctx) -> None:
-        result, _ = decode(0xF3AF80F5, ctx)
-        assert disassemble(result) == "dbg\t#5"
+        assert disasm(ctx, 0xF3AF80F5) == "dbg\t#5"
 
 
 class TestDisasmOperandForm:
@@ -301,20 +241,20 @@ class TestDisasmOperandForm:
         ("instr", "expected"),
         [
             # 16-bit T1: three operands, sharing a register or not.
-            (0x18AD << 16, "adds\tr5, r5, r2"),
-            (0x18C5 << 16, "adds\tr5, r0, r3"),
-            (0x1C40 << 16, "adds\tr0, r0, #1"),
-            (0x1E00 << 16, "subs\tr0, r0, #0"),
+            (0x18AD, "adds\tr5, r5, r2"),
+            (0x18C5, "adds\tr5, r0, r3"),
+            (0x1C40, "adds\tr0, r0, #1"),
+            (0x1E00, "subs\tr0, r0, #0"),
             # 16-bit <Rdn> encodings: two, the destination standing in for the
             # first operand.
-            (0x3001 << 16, "adds\tr0, #1"),
-            (0x3801 << 16, "subs\tr0, #1"),
-            (0x4148 << 16, "adcs\tr0, r1"),
-            (0x4088 << 16, "lsls\tr0, r1"),
-            (0x4408 << 16, "add\tr0, r1"),
+            (0x3001, "adds\tr0, #1"),
+            (0x3801, "subs\tr0, #1"),
+            (0x4148, "adcs\tr0, r1"),
+            (0x4088, "lsls\tr0, r1"),
+            (0x4408, "add\tr0, r1"),
             # MUL T1 spells its destination as <Rdm>, so it is the multiplicand
             # that goes unwritten, not the multiplier.
-            (0x4341 << 16, "muls\tr1, r0"),
+            (0x4341, "muls\tr1, r0"),
             # Wide encodings always write all three.
             (0xEA000000, "and.w\tr0, r0, r0"),
             (0xEB100000, "adds.w\tr0, r0, r0"),
@@ -324,17 +264,16 @@ class TestDisasmOperandForm:
         ],
     )
     def test_operand_count(self, ctx, instr: int, expected: str) -> None:
-        result, _ = decode(instr, ctx)
-        assert disassemble(result, instr) == expected
+        assert disasm(ctx, instr) == expected
 
     @pytest.mark.parametrize(
         ("instr", "expected"),
         [
             # SP arithmetic leaves SP out of the operands only when narrow.
-            (0x4468 << 16, "add\tr0, sp"),
-            (0x4485 << 16, "add\tsp, r0"),
-            (0xB001 << 16, "add\tsp, #4"),
-            (0xB081 << 16, "sub\tsp, #4"),
+            (0x4468, "add\tr0, sp"),
+            (0x4485, "add\tsp, r0"),
+            (0xB001, "add\tsp, #4"),
+            (0xB081, "sub\tsp, #4"),
             (0xEB0D0000, "add.w\tr0, sp, r0"),
             (0xEB0D0D00, "add.w\tsp, sp, r0"),
             (0xF10D0D01, "add.w\tsp, sp, #1"),
@@ -342,8 +281,7 @@ class TestDisasmOperandForm:
         ],
     )
     def test_sp_operand_form(self, ctx, instr: int, expected: str) -> None:
-        result, _ = decode(instr, ctx)
-        assert disassemble(result, instr) == expected
+        assert disasm(ctx, instr) == expected
 
 
 class TestDisasmCoprocessor:
@@ -367,8 +305,7 @@ class TestDisasmCoprocessor:
         ],
     )
     def test_transfer(self, ctx, instr: int, expected: str) -> None:
-        result, _ = decode(instr, ctx)
-        assert disassemble(result, instr) == expected
+        assert disasm(ctx, instr) == expected
 
     @pytest.mark.parametrize(
         ("instr", "expected"),
@@ -381,8 +318,7 @@ class TestDisasmCoprocessor:
         ],
     )
     def test_register_transfer(self, ctx, instr: int, expected: str) -> None:
-        result, _ = decode(instr, ctx)
-        assert disassemble(result, instr) == expected
+        assert disasm(ctx, instr) == expected
 
 
 class TestDisasmShiftImmediate:
@@ -403,16 +339,15 @@ class TestDisasmShiftImmediate:
             (0xEA5F0037, "movs.w\tr0, r7, rrx"),
             # No shift at all, and the narrow encodings, keep their own name.
             (0xEA4F0007, "mov.w\tr0, r7"),
-            (0x0087 << 16, "lsls\tr7, r0, #2"),
-            (0x0887 << 16, "lsrs\tr7, r0, #2"),
-            (0x1087 << 16, "asrs\tr7, r0, #2"),
+            (0x0087, "lsls\tr7, r0, #2"),
+            (0x0887, "lsrs\tr7, r0, #2"),
+            (0x1087, "asrs\tr7, r0, #2"),
             # A shift by a register is a shift in its own right at any width.
             (0xFA07F006, "lsl.w\tr0, r7, r6"),
         ],
     )
     def test_shift_immediate(self, ctx, instr: int, expected: str) -> None:
-        result, _ = decode(instr, ctx)
-        assert disassemble(result, instr) == expected
+        assert disasm(ctx, instr) == expected
 
 
 class TestDisasmTableBranch:
@@ -427,8 +362,7 @@ class TestDisasmTableBranch:
         ],
     )
     def test_table_branch(self, ctx, instr: int, expected: str) -> None:
-        result, _ = decode(instr, ctx)
-        assert disassemble(result, instr) == expected
+        assert disasm(ctx, instr) == expected
 
 
 class TestDisasmNeg:
@@ -437,8 +371,8 @@ class TestDisasmNeg:
     @pytest.mark.parametrize(
         ("instr", "expected"),
         [
-            (0x4252 << 16, "negs\tr2, r2"),
-            (0x4241 << 16, "negs\tr1, r0"),
+            (0x4252, "negs\tr2, r2"),
+            (0x4241, "negs\tr1, r0"),
             # The wide forms keep the rsb spelling -- and take no .w, having no
             # narrow form of that name to be told apart from.
             (0xF1C10200, "rsb\tr2, r1, #0"),
@@ -447,8 +381,7 @@ class TestDisasmNeg:
         ],
     )
     def test_neg(self, ctx, instr: int, expected: str) -> None:
-        result, _ = decode(instr, ctx)
-        assert disassemble(result, instr) == expected
+        assert disasm(ctx, instr) == expected
 
     def test_neg_in_it_block(self, ctx) -> None:
         # T1 sets flags only outside an IT block, so the s gives way to the
@@ -468,13 +401,12 @@ class TestDisasmZeroOffset:
             # Post-indexed: the offset is what advances Rn, so it stays.
             (0xF8510B00, "ldr.w\tr0, [r1], #0"),
             # 16-bit forms always spell it.
-            (0x6800 << 16, "ldr\tr0, [r0, #0]"),
-            (0x9800 << 16, "ldr\tr0, [sp, #0]"),
+            (0x6800, "ldr\tr0, [r0, #0]"),
+            (0x9800, "ldr\tr0, [sp, #0]"),
         ],
     )
     def test_zero_offset(self, ctx, instr: int, expected: str) -> None:
-        result, _ = decode(instr, ctx)
-        assert disassemble(result, instr) == expected
+        assert disasm(ctx, instr) == expected
 
     @pytest.mark.parametrize(
         ("instr", "expected"),
@@ -491,8 +423,7 @@ class TestDisasmZeroOffset:
         ],
     )
     def test_negative_zero_offset(self, ctx, instr: int, expected: str) -> None:
-        result, _ = decode(instr, ctx)
-        assert disassemble(result, instr) == expected
+        assert disasm(ctx, instr) == expected
 
     @pytest.mark.parametrize(
         ("instr", "expected"),
@@ -501,7 +432,7 @@ class TestDisasmZeroOffset:
             # holding an imm12 -- and say nothing about an imm8, however
             # indexed and whichever way it goes.
             (0xF8841021, "strb.w\tr1, [r4, #33]\t@ 0x21"),
-            (0x6B00 << 16, "ldr\tr0, [r0, #48]\t@ 0x30"),
+            (0x6B00, "ldr\tr0, [r0, #48]\t@ 0x30"),
             (0xF8041C58, "strb.w\tr1, [r4, #-88]"),
             (0xF8041F21, "strb.w\tr1, [r4, #33]!"),
             (0xF8041B21, "strb.w\tr1, [r4], #33"),
@@ -515,30 +446,26 @@ class TestDisasmZeroOffset:
         ],
     )
     def test_offset_gloss(self, ctx, instr: int, expected: str) -> None:
-        result, _ = decode(instr, ctx)
-        assert disassemble(result, instr) == expected
+        assert disasm(ctx, instr) == expected
 
     @pytest.mark.parametrize(
         ("instr", "expected"),
         [
             # A PC-relative load is glossed with the address it reads, in
             # brackets for the narrow form only.
-            (0x4A06 << 16, "ldr\tr2, [pc, #24]\t@ (0x3c)"),
+            (0x4A06, "ldr\tr2, [pc, #24]\t@ (0x3c)"),
             (0xF85F1C21, "ldr.w\tr1, [pc, #-3105]\t@ 0xfffff403"),
             (0xED1F0A10, "vldr\ts0, [pc, #-64]\t@ 0xffffffe4"),
         ],
     )
     def test_literal_gloss(self, ctx, instr: int, expected: str) -> None:
-        result, _ = decode(instr, ctx)
-        assert disassemble(result, instr, 0x20) == expected
+        assert disasm(ctx, instr, 0x20) == expected
 
     def test_dual_literal_drops_zero(self, ctx) -> None:
-        result, _ = decode(0xE9DF0B00, ctx)
-        assert disassemble(result, 0xE9DF0B00).startswith("ldrd\tr0, fp, [pc]")
+        assert disasm(ctx, 0xE9DF0B00).startswith("ldrd\tr0, fp, [pc]")
 
     def test_wide_literal_drops_zero(self, ctx) -> None:
-        result, _ = decode(0xF8DF0000, ctx)
-        assert disassemble(result, 0xF8DF0000).startswith("ldr.w\tr0, [pc]")
+        assert disasm(ctx, 0xF8DF0000).startswith("ldr.w\tr0, [pc]")
 
 
 class TestDisasmIT:
@@ -561,8 +488,7 @@ class TestDisasmIT:
         ],
     )
     def test_it_mnemonic(self, ctx, word: int, expected: str) -> None:
-        result, _ = decode(word << 16, ctx)
-        assert disassemble(result) == expected
+        assert disasm(ctx, word) == expected
 
     def test_block_conditions_alternate(self, ctx) -> None:
         assert disassemble_stream(ctx, [0xBF0C, 0x2001, 0x2102]) == [
@@ -630,8 +556,7 @@ class TestDisasmIT:
     def test_branch_keeps_its_own_condition(self, ctx) -> None:
         # B T1 carries the condition CurrentCond reports, so a block's
         # condition is never appended on top of it.
-        result, _ = decode(0xD0FE << 16, ctx)
-        assert disassemble(result, istate=0x18) == "beq.n\t0x0"
+        assert disasm(ctx, 0xD0FE, istate=0x18) == "beq.n\t0x0"
 
 
 class TestDisasmVFP:
