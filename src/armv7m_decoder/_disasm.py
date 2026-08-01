@@ -336,7 +336,12 @@ def _fmt_dp_imm(result: Any, mnemonic: str) -> str:
 
 def _fmt_mov_imm(result: Any, instr: int = 0) -> str:
     s = _flags(result.setflags) + _width(result, "mov")
-    if instr and (instr >> 20) & 0x3F == 0x24:
+    # T2 (mov.w) and T3 (movw) are both 32-bit, so the width alone cannot tell
+    # them apart -- bits 25:20 pick out T3. The width test keeps a 16-bit T1
+    # word, whose low halfword is zeroed, from aliasing onto that bit pattern.
+    if (result.decoder_state & DecoderState.DECODED_32BIT) and (
+        instr >> 20
+    ) & 0x3F == 0x24:
         return (
             f"movw{_SEP}{_reg(result.d)}, #{result.imm32}{_hex_comment(result.imm32)}"
         )
