@@ -2946,6 +2946,7 @@ def decode_16bit(instr: int, ctx: Context):
         imm11 = _bits(instr, 0, 11)
         # decode
         cond = 14
+        # Set to default condition - al
         imm32 = SignExtend(concat_bits(imm11, 0, 1), 12)
         if InITBlock(ctx) and (not (LastInITBlock(ctx))):
             sideffect_flags |= SIDEFFECT_UNPREDICTABLE
@@ -5312,6 +5313,7 @@ def decode_32bit(instr: int, ctx: Context):
                 imm11 = _bits(instr, 0, 11)
                 # decode
                 cond = 14
+                # Set to default condition - al
                 I1 = (~((J1 ^ S) & 0x1)) & 0x1
                 I2 = (~((J2 ^ S) & 0x1)) & 0x1
                 imm32 = SignExtend(
