@@ -70,11 +70,17 @@ class TestDisasmRegisterNames:
 class TestDisasmPseudoInstructions:
     def test_nomatch_comments_the_word(self, ctx) -> None:
         # No encoding matches, so there is no mnemonic to spell -- objdump
-        # writes the word itself as a comment, and so do we.
-        assert disasm(ctx, 0xF2E53EFF) == "@ <UNDEFINED> instruction: 0xf2e53eff"
+        # writes the word itself as a comment, and so do we. A line is
+        # mnemonic, tab, operands, tab, comment; with the first two empty the
+        # comment is left holding both tabs, which is how objdump lands it in
+        # the same column as any other comment:
+        #
+        #     2:\tf20d 154f \taddw\tr5, sp, #335\t@ 0x14f
+        #     6:\tf2e5 3eff \t\t\t@ <UNDEFINED> instruction: 0xf2e53eff
+        assert disasm(ctx, 0xF2E53EFF) == "\t\t@ <UNDEFINED> instruction: 0xf2e53eff"
 
     def test_narrow_nomatch_is_a_halfword_wide(self, ctx) -> None:
-        assert disasm(ctx, 0xB717) == "@ <UNDEFINED> instruction: 0xb717"
+        assert disasm(ctx, 0xB717) == "\t\t@ <UNDEFINED> instruction: 0xb717"
 
     def test_undefined(self, ctx) -> None:
         assert disasm(ctx, 0xF81DBAA1).startswith("<undefined")

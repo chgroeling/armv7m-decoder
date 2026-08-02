@@ -37,6 +37,6 @@ class TestStreamResync:
         # line after it is suspect.
         assert disassemble_stream(ctx, [0x0001, 0xF2E5, 0x3EFF, 0x068E]) == [
             "movs\tr1, r0",
-            "@ <UNDEFINED> instruction: 0xf2e53eff",
+            "\t\t@ <UNDEFINED> instruction: 0xf2e53eff",
             "lsls\tr6, r1, #26",
         ]
