@@ -12,6 +12,7 @@ and all instruction dataclasses.
 
 from armv7m_decoder._decoder import (  # noqa: F401
     Context,
+    Encoding,
     InstructionSize,
     NoMatch,
     Opcode,
@@ -35,6 +36,7 @@ from armv7m_decoder._size import instr_bytes, instr_size  # noqa: F401
 __all__ = [
     "COND_AL",
     "Context",
+    "Encoding",
     "InstructionSize",
     "NoMatch",
     "Opcode",

@@ -8,7 +8,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from armv7m_decoder._decoder import InstructionSize, Opcode
+from armv7m_decoder._decoder import Encoding, InstructionSize, Opcode
 from armv7m_decoder._itstate import COND_AL, current_cond, in_it_block
 
 # Separates the mnemonic from its operands. Formatters emit it directly, so a
@@ -83,6 +83,27 @@ _MNEMONICS_WITH_BOTH_WIDTHS: frozenset[str] = frozenset(
         "yield",
     }
 )
+# Which encoding of an instruction is the 16-bit <Rdn> form, naming its
+# destination once. Instructions absent from the table have none: SUB (register)
+# and ADD (register) T1 are 16-bit but write three operands, and ORN, RSB and
+# SBC (register) are wide-only. RSB (immediate) T1 is the <Rdn> form too, but
+# never reaches here -- it is spelled `negs` by its own formatter.
+_RDN_ENCODINGS: dict[int, Encoding] = {
+    Opcode.OP_ADC_REGISTER: Encoding.T1,
+    Opcode.OP_ADD_IMMEDIATE: Encoding.T2,
+    Opcode.OP_ADD_REGISTER: Encoding.T2,
+    Opcode.OP_AND_REGISTER: Encoding.T1,
+    Opcode.OP_ASR_REGISTER: Encoding.T1,
+    Opcode.OP_BIC_REGISTER: Encoding.T1,
+    Opcode.OP_EOR_REGISTER: Encoding.T1,
+    Opcode.OP_LSL_REGISTER: Encoding.T1,
+    Opcode.OP_LSR_REGISTER: Encoding.T1,
+    Opcode.OP_MUL: Encoding.T1,
+    Opcode.OP_ORR_REGISTER: Encoding.T1,
+    Opcode.OP_ROR_REGISTER: Encoding.T1,
+    Opcode.OP_SBC_REGISTER: Encoding.T1,
+    Opcode.OP_SUB_IMMEDIATE: Encoding.T2,
+}
 _BARRIER_OPTIONS: dict[int, str] = {
     0x1: "oshld",
     0x2: "oshst",
@@ -337,26 +358,19 @@ def _hex_target(offset: int, imm32: int, add: bool = True, narrow: bool = True) 
 # ---------------------------------------------------------------------------
 
 
-def _is_coproc2(instr: int) -> bool:
-    return bool(instr & 0x10000000)
+def _is_coproc2(result: Any) -> bool:
+    """Whether this is the `2` variant, which is T2 for all of CDP/MCR/MRC."""
+    return result.encoding == Encoding.T2
 
 
-def _is_rdn_encoding(instr: int, size: int = 0) -> bool:
+def _is_rdn_encoding(result: Any) -> bool:
     """Whether the encoding names its destination once, as `<Rdn>`.
 
-    Three 16-bit groups do, and write two operands where the wide forms
-    write three: ADD/SUB (immediate) T2 (0x3000), the data-processing group
-    (0x4000) and ADD (register) T2 (0x4400). Nothing else does -- `d == n`
-    is not the test, because the 16-bit T1 forms take three registers and
-    two of them may well be the same one: 18ad is `adds r5, r5, r2`.
-
-    Which of an instruction's encodings was matched is not in the decoded
-    result, so this needs the instruction word; without one the wide,
-    always-valid form is used.
+    These encodings write two operands where their wide siblings write three.
+    `d == n` is not the test, because the 16-bit three-operand forms may name
+    the same register twice: 18ad is `adds r5, r5, r2`, not `adds r5, r2`.
     """
-    if not _is_narrow(size):
-        return False
-    return 0x3000 <= instr < 0x4700
+    return _RDN_ENCODINGS.get(result.opcode) == result.encoding
 
 
 def _nhigh_mhigh_mnemonic(base: str, n_high: bool, m_high: bool) -> str:
@@ -389,9 +403,9 @@ def _round_mnemonic(base: str, round_val: bool) -> str:
 # --- Data-processing immediate ---
 
 
-def _fmt_dp_imm(result: Any, mnemonic: str, instr: int = 0, size: int = 0, **_) -> str:
+def _fmt_dp_imm(result: Any, mnemonic: str, size: int = 0, **_) -> str:
     s = _flags(result.setflags) + _width(size, mnemonic)
-    if _is_rdn_encoding(instr, size):
+    if _is_rdn_encoding(result):
         return (
             f"{mnemonic}{s}{_SEP}{_reg(result.d)}, #{result.imm32}"
             f"{_hex_comment(result.imm32)}"
@@ -402,23 +416,23 @@ def _fmt_dp_imm(result: Any, mnemonic: str, instr: int = 0, size: int = 0, **_) 
     )
 
 
-def _fmt_mov_imm(result: Any, instr: int = 0, size: int = 0, **_) -> str:
+def _fmt_mov_imm(result: Any, size: int = 0, **_) -> str:
     s = _flags(result.setflags) + _width(size, "mov")
-    # T2 (mov.w) and T3 (movw) are both 32-bit, so the width alone cannot tell
-    # them apart -- bits 25:20 pick out T3, which only a 32-bit word has.
-    if size == InstructionSize.SIZE_32BIT and (instr >> 20) & 0x3F == 0x24:
+    # T2 (mov.w) and T3 (movw) are both 32-bit, so the width cannot tell them
+    # apart; only the encoding can.
+    if result.encoding == Encoding.T3:
         return (
             f"movw{_SEP}{_reg(result.d)}, #{result.imm32}{_hex_comment(result.imm32)}"
         )
     return f"mov{s}{_SEP}{_reg(result.d)}, #{result.imm32}{_hex_comment(result.imm32)}"
 
 
-def _fmt_rsb_imm(result: Any, instr: int = 0, size: int = 0, **_) -> str:
+def _fmt_rsb_imm(result: Any, size: int = 0, **_) -> str:
     # T1 subtracts from a literal zero it has no room to encode, and is spelled
     # as the negate it performs: "negs r2, r2".
     if _is_narrow(size):
         return f"neg{_flags(result.setflags)}{_SEP}{_reg(result.d)}, {_reg(result.n)}"
-    return _fmt_dp_imm(result, "rsb", instr, size=size)
+    return _fmt_dp_imm(result, "rsb", size=size)
 
 
 def _fmt_mvn_imm(result: Any, mnemonic: str = "mvn", size: int = 0, **_) -> str:
@@ -440,10 +454,10 @@ def _fmt_and_imm(result: Any, mnemonic: str = "and", size: int = 0, **_) -> str:
 # --- Data-processing register ---
 
 
-def _fmt_dp_reg(result: Any, mnemonic: str, instr: int = 0, size: int = 0, **_) -> str:
+def _fmt_dp_reg(result: Any, mnemonic: str, size: int = 0, **_) -> str:
     s = _flags(result.setflags) + _width(size, mnemonic)
     sh = _shift(result.shift_t, result.shift_n)
-    if _is_rdn_encoding(instr, size):
+    if _is_rdn_encoding(result):
         return f"{mnemonic}{s}{_SEP}{_reg(result.d)}, {_reg(result.m)}{sh}"
     return (
         f"{mnemonic}{s}{_SEP}{_reg(result.d)}, {_reg(result.n)}, {_reg(result.m)}{sh}"
@@ -510,11 +524,9 @@ def _fmt_ror_imm(result: Any, size: int = 0, **_) -> str:
 # --- Shift register ---
 
 
-def _fmt_shift_reg(
-    result: Any, mnemonic: str, instr: int = 0, size: int = 0, **_
-) -> str:
+def _fmt_shift_reg(result: Any, mnemonic: str, size: int = 0, **_) -> str:
     s = _flags(result.setflags) + _width(size, mnemonic)
-    if _is_rdn_encoding(instr, size):
+    if _is_rdn_encoding(result):
         return f"{mnemonic}{s}{_SEP}{_reg(result.d)}, {_reg(result.m)}"
     return f"{mnemonic}{s}{_SEP}{_reg(result.d)}, {_reg(result.n)}, {_reg(result.m)}"
 
@@ -763,7 +775,7 @@ def _fmt_push(result: Any, size: int = 0, **_) -> str:
 # --- Branch ---
 
 
-def _fmt_b(result: Any, offset: int = 0, instr: int = 0, size: int = 0, **_) -> str:
+def _fmt_b(result: Any, offset: int = 0, size: int = 0, **_) -> str:
     c = _cond(result.cond)
     # .n and .w occupy the same slot; B is the only mnemonic that spells both.
     if _is_narrow(size):
@@ -944,13 +956,11 @@ def _fmt_umaal(result: Any, **_) -> str:
 # --- Multiply ---
 
 
-def _fmt_mul(
-    result: Any, setflags: bool = False, instr: int = 0, size: int = 0, **_
-) -> str:
+def _fmt_mul(result: Any, setflags: bool = False, size: int = 0, **_) -> str:
     s = _flags(setflags) + _width(size, "mul")
     # T1 spells the destination as <Rdm>, so it is the multiplicand that goes
     # unwritten here, not the multiplier the other Rdn encodings drop.
-    if _is_rdn_encoding(instr, size):
+    if _is_rdn_encoding(result):
         return f"mul{s}{_SEP}{_reg(result.d)}, {_reg(result.n)}"
     return f"mul{s}{_SEP}{_reg(result.d)}, {_reg(result.n)}, {_reg(result.m)}"
 
@@ -1463,49 +1473,49 @@ def _fmt_smusd_variants(result: Any, **_) -> str:
 # trailing opc2 in braces.
 
 
-def _fmt_cdp_cdp2(result: Any, instr: int = 0, **_) -> str:
-    suffix = "2" if _is_coproc2(instr) else ""
+def _fmt_cdp_cdp2(result: Any, **_) -> str:
+    suffix = "2" if _is_coproc2(result) else ""
     return (
         f"cdp{suffix}{_SEP}{result.cp}, {result.opc1}, cr{result.CRd},"
         f" cr{result.CRn}, cr{result.CRm}, {{{result.opc2}}}"
     )
 
 
-def _fmt_mcr_mcr2(result: Any, instr: int = 0, **_) -> str:
-    return _fmt_mcr_mrc(result, "mcr", instr)
+def _fmt_mcr_mcr2(result: Any, **_) -> str:
+    return _fmt_mcr_mrc(result, "mcr")
 
 
-def _fmt_mrc_mrc2(result: Any, instr: int = 0, **_) -> str:
-    return _fmt_mcr_mrc(result, "mrc", instr)
+def _fmt_mrc_mrc2(result: Any, **_) -> str:
+    return _fmt_mcr_mrc(result, "mrc")
 
 
-def _fmt_mcr_mrc(result: Any, base: str, instr: int) -> str:
-    suffix = "2" if _is_coproc2(instr) else ""
+def _fmt_mcr_mrc(result: Any, base: str) -> str:
+    suffix = "2" if _is_coproc2(result) else ""
     return (
         f"{base}{suffix}{_SEP}{result.cp}, {result.opc1}, {_reg(result.t)},"
         f" cr{result.CRn}, cr{result.CRm}, {{{result.opc2}}}"
     )
 
 
-def _fmt_mcrr_mcrr2(result: Any, instr: int = 0, **_) -> str:
-    return _fmt_mcrr_mrrc(result, "mcrr", instr)
+def _fmt_mcrr_mcrr2(result: Any, **_) -> str:
+    return _fmt_mcrr_mrrc(result, "mcrr")
 
 
-def _fmt_mrrc_mrrc2(result: Any, instr: int = 0, **_) -> str:
-    return _fmt_mcrr_mrrc(result, "mrrc", instr)
+def _fmt_mrrc_mrrc2(result: Any, **_) -> str:
+    return _fmt_mcrr_mrrc(result, "mrrc")
 
 
-def _fmt_mcrr_mrrc(result: Any, base: str, instr: int) -> str:
-    suffix = "2" if _is_coproc2(instr) else ""
+def _fmt_mcrr_mrrc(result: Any, base: str) -> str:
+    suffix = "2" if _is_coproc2(result) else ""
     return (
         f"{base}{suffix}{_SEP}{result.cp}, {result.opc1},"
         f" {_reg(result.t)}, {_reg(result.t2)}, cr{result.CRm}"
     )
 
 
-def _coproc_mnemonic(base: str, result: Any, instr: int) -> str:
+def _coproc_mnemonic(base: str, result: Any) -> str:
     """`ldc`/`stc` with the variant and the long bit it carries: `ldc2l`."""
-    return f"{base}{'2' if _is_coproc2(instr) else ''}{'l' if result.D else ''}"
+    return f"{base}{'2' if _is_coproc2(result) else ''}{'l' if result.D else ''}"
 
 
 def _addr_coproc(result: Any, size: int = 0) -> str:
@@ -1516,18 +1526,18 @@ def _addr_coproc(result: Any, size: int = 0) -> str:
     return _addr_imm(result, _XFER_COPROC, size=size)
 
 
-def _fmt_stc_stc2(result: Any, instr: int = 0, size: int = 0, **_) -> str:
-    m = _coproc_mnemonic("stc", result, instr)
+def _fmt_stc_stc2(result: Any, size: int = 0, **_) -> str:
+    m = _coproc_mnemonic("stc", result)
     return f"{m}{_SEP}{result.cp}, cr{result.CRd}, {_addr_coproc(result, size=size)}"
 
 
-def _fmt_ldc_ldc2_imm(result: Any, instr: int = 0, size: int = 0, **_) -> str:
-    m = _coproc_mnemonic("ldc", result, instr)
+def _fmt_ldc_ldc2_imm(result: Any, size: int = 0, **_) -> str:
+    m = _coproc_mnemonic("ldc", result)
     return f"{m}{_SEP}{result.cp}, cr{result.CRd}, {_addr_coproc(result, size=size)}"
 
 
-def _fmt_ldc_ldc2_lit(result: Any, instr: int = 0, offset: int = 0, **_) -> str:
-    m = _coproc_mnemonic("ldc", result, instr)
+def _fmt_ldc_ldc2_lit(result: Any, offset: int = 0, **_) -> str:
+    m = _coproc_mnemonic("ldc", result)
     sign = "" if result.add else "-"
     target = _hex_target(offset, result.imm32, result.add, narrow=False)
     return f"{m}{_SEP}{result.cp}, cr{result.CRd}, [pc, #{sign}{result.imm32}]{target}"
@@ -1841,10 +1851,10 @@ def disassemble(
     Args:
         result: Decoded instruction dataclass instance (or pseudo-instruction).
         instr: The instruction word, exactly `size` bits wide -- the same word
-               that was handed to :func:`decode`. Which of an instruction's
-               encodings was matched is not in `result`, so the spelling of a
-               few of them (MCR vs MCR2, `add r0, r1` vs `add r0, r0, r1`)
-               has to be read back off the word.
+               that was handed to :func:`decode`. Only a word that matched no
+               encoding needs it, to spell the bytes it stands for; everything
+               else is spelled from `result`, whose `encoding` member names the
+               form that matched.
         size: Width of that word, as determined by the caller before decoding.
               It decides the `.w`/`.n` qualifiers and the operand forms that
               only one width spells.
@@ -1874,9 +1884,9 @@ def disassemble(
     if fmt_func is None:
         return repr(result)
 
-    # Every formatter is handed the whole word; the ones that spell nothing
-    # but their own operands absorb what they have no use for through **_.
-    asm = fmt_func(result, instr=instr, size=size, offset=offset)
+    # Every formatter is called the same way; the ones that spell nothing but
+    # their own operands absorb what they have no use for through **_.
+    asm = fmt_func(result, size=size, offset=offset)
 
     # B (T1/T3) and VSEL carry their own condition, which is what the
     # architecture reports as CurrentCond -- they never take the block's. (Both

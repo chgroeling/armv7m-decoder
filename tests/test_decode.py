@@ -5,7 +5,10 @@ and holds exactly that many bits: a 16-bit encoding is a bare halfword, a
 32-bit one a full word.
 """
 
+import pytest
+
 from armv7m_decoder import (
+    Encoding,
     InstructionSize,
     NoMatch,
     Undefined,
@@ -107,6 +110,37 @@ class TestKnownEncodings:
         from armv7m_decoder import B
 
         assert isinstance(decode_word(ctx, 0xE010), B)
+
+
+class TestEncodingMember:
+    """Every instruction says which of its encodings matched.
+
+    All encodings of an instruction share one class, so the fields alone cannot
+    tell T3 from T4 -- `add.w r5, sp, #1` and `addw r5, sp, #335` differ in no
+    member but this one. The disassembler spells several forms from it.
+    """
+
+    @pytest.mark.parametrize(
+        ("instr", "expected"),
+        [
+            (0xF20D154F, Encoding.T4),  # addw r5, sp, #335
+            (0xF10D0501, Encoding.T3),  # add.w r5, sp, #1
+            (0xF2AD154F, Encoding.T3),  # subw r5, sp, #335
+            (0xF1AD0501, Encoding.T2),  # sub.w r5, sp, #1
+            (0xF240154F, Encoding.T3),  # movw r5, #335
+            (0xF04F0501, Encoding.T2),  # mov.w r5, #1
+            (0x3501, Encoding.T2),  # adds r5, #1  -- the narrow <Rdn> form
+            (0x1CAD, Encoding.T1),  # adds r5, r5, #2 -- narrow, three operands
+        ],
+    )
+    def test_encoding_is_reported(self, ctx, instr: int, expected: Encoding) -> None:
+        assert decode_word(ctx, instr).encoding == expected
+
+    def test_pseudo_instructions_carry_no_encoding(self) -> None:
+        # No encoding matched, so there is no form to name.
+        assert not hasattr(NoMatch(), "encoding")
+        assert not hasattr(Undefined(), "encoding")
+        assert not hasattr(Unpredictable(), "encoding")
 
 
 class TestPseudoInstructions:
