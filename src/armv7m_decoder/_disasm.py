@@ -1916,12 +1916,12 @@ def disassemble(
         # A word no encoding matches has no mnemonic to spell, so the whole
         # field is a comment carrying the word itself, as objdump writes it.
         return f"\t\t@ <UNDEFINED> instruction: 0x{instr:0{size // 4}x}"
-    # A flagged side effect no longer replaces the instruction -- it is decoded
-    # in full and reports the condition -- so which one to spell, and in what
-    # order, is ours to pick. Keep the decoder's old precedence: SEE redirects
-    # to another encoding, so this decode does not describe the word at all;
-    # UNDEFINED says the word has no meaning; UNPREDICTABLE only that its
-    # meaning is not guaranteed, which is the weakest claim of the three.
+    # An instruction is decoded in full whatever its decode flags, and can
+    # carry more than one condition at once, so which to spell is a choice of
+    # precedence. SEE comes first: it redirects to another encoding, so this
+    # decode does not describe the word at all. Then UNDEFINED, which says the
+    # word has no meaning. Then UNPREDICTABLE, which says only that its meaning
+    # is not guaranteed -- the weakest claim of the three.
     flags = result.sideeffects
     if flags & SIDEFFECT_SEE:
         return "<see>"

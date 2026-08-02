@@ -145,7 +145,7 @@ class TestEncodingMember:
 
 
 class TestSideEffects:
-    """A flagged side effect annotates the instruction, it does not replace it.
+    """A flagged side effect is reported on the instruction it belongs to.
 
     The decoder returns the instruction with every field decoded and the
     condition on `sideeffects`, so a caller can see both what the word decodes
@@ -155,7 +155,7 @@ class TestSideEffects:
     def test_undefined_is_reported_on_the_instruction(self, ctx) -> None:
         result = decode_word(ctx, 0xF81DBAA1)
         assert result.sideeffects & SIDEFFECT_UNDEFINED
-        # ...and the instruction itself is still there to inspect.
+        # ...and every field of the instruction is there to inspect.
         assert result.opcode >= 0
         assert hasattr(result, "encoding")
 
@@ -175,7 +175,7 @@ class TestSideEffects:
     def test_clean_decode_flags_nothing(self, ctx) -> None:
         assert decode_word(ctx, 0xBF08).sideeffects == SIDEFFECT_NONE
 
-    def test_nomatch_is_still_not_an_instruction(self, ctx) -> None:
+    def test_nomatch_is_not_an_instruction(self, ctx) -> None:
         # NoMatch is the one result that is not an instruction, so it has
         # neither an encoding nor side effects to report.
         result = decode_word(ctx, 0xF2E53EFF)
