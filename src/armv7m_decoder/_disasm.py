@@ -104,6 +104,17 @@ _RDN_ENCODINGS: dict[int, Encoding] = {
     Opcode.OP_SBC_REGISTER: Encoding.T1,
     Opcode.OP_SUB_IMMEDIATE: Encoding.T2,
 }
+
+# Which encoding takes a bare 12-bit immediate, spelled `addw`/`subw`/`movw`
+# rather than `.w`. ADR has two such encodings and is spelled from `add`
+# directly, so it is formatted on its own rather than through this table.
+_IMM12_ENCODINGS: dict[int, Encoding] = {
+    Opcode.OP_ADD_IMMEDIATE: Encoding.T4,
+    Opcode.OP_ADD_SP_PLUS_IMMEDIATE: Encoding.T4,
+    Opcode.OP_MOV_IMMEDIATE: Encoding.T3,
+    Opcode.OP_SUB_IMMEDIATE: Encoding.T4,
+    Opcode.OP_SUB_SP_MINUS_IMMEDIATE: Encoding.T3,
+}
 _BARRIER_OPTIONS: dict[int, str] = {
     0x1: "oshld",
     0x2: "oshst",
@@ -373,6 +384,19 @@ def _is_rdn_encoding(result: Any) -> bool:
     return _RDN_ENCODINGS.get(result.opcode) == result.encoding
 
 
+def _is_imm12_encoding(result: Any) -> bool:
+    """Whether the encoding takes a plain 12-bit immediate, spelled `addw`.
+
+    ADD, SUB and MOV each have two wide immediate encodings: one taking a
+    modified immediate, spelled with `.w`, and one taking a bare 12-bit value
+    that no shift can reach, spelled `addw`/`subw`/`movw`. They are different
+    mnemonics rather than one with a suffix, so the choice is not cosmetic --
+    335 has no modified-immediate form, and `add.w r5, sp, #335` will not
+    assemble back.
+    """
+    return _IMM12_ENCODINGS.get(result.opcode) == result.encoding
+
+
 def _nhigh_mhigh_mnemonic(base: str, n_high: bool, m_high: bool) -> str:
     if not n_high and not m_high:
         return base + "bb"
@@ -404,6 +428,11 @@ def _round_mnemonic(base: str, round_val: bool) -> str:
 
 
 def _fmt_dp_imm(result: Any, mnemonic: str, size: int = 0, **_) -> str:
+    if _is_imm12_encoding(result):
+        return (
+            f"{mnemonic}w{_SEP}{_reg(result.d)}, {_reg(result.n)}, #{result.imm32}"
+            f"{_hex_comment(result.imm32)}"
+        )
     s = _flags(result.setflags) + _width(size, mnemonic)
     if _is_rdn_encoding(result):
         return (
@@ -418,9 +447,7 @@ def _fmt_dp_imm(result: Any, mnemonic: str, size: int = 0, **_) -> str:
 
 def _fmt_mov_imm(result: Any, size: int = 0, **_) -> str:
     s = _flags(result.setflags) + _width(size, "mov")
-    # T2 (mov.w) and T3 (movw) are both 32-bit, so the width cannot tell them
-    # apart; only the encoding can.
-    if result.encoding == Encoding.T3:
+    if _is_imm12_encoding(result):
         return (
             f"movw{_SEP}{_reg(result.d)}, #{result.imm32}{_hex_comment(result.imm32)}"
         )
@@ -540,6 +567,11 @@ def _fmt_shift_reg(result: Any, mnemonic: str, size: int = 0, **_) -> str:
 
 
 def _fmt_add_sp_imm(result: Any, size: int = 0, **_) -> str:
+    if _is_imm12_encoding(result):
+        return (
+            f"addw{_SEP}{_reg(result.d)}, sp, #{result.imm32}"
+            f"{_hex_comment(result.imm32)}"
+        )
     s = _flags(result.setflags) + _width(size, "add")
     if result.d == 13 and _is_narrow(size):
         return f"add{s}{_SEP}sp, #{result.imm32}{_hex_comment(result.imm32)}"
@@ -560,6 +592,11 @@ def _fmt_add_sp_reg(result: Any, size: int = 0, **_) -> str:
 
 
 def _fmt_sub_sp_imm(result: Any, size: int = 0, **_) -> str:
+    if _is_imm12_encoding(result):
+        return (
+            f"subw{_SEP}{_reg(result.d)}, sp, #{result.imm32}"
+            f"{_hex_comment(result.imm32)}"
+        )
     s = _flags(result.setflags) + _width(size, "sub")
     if result.d == 13 and _is_narrow(size):
         return f"sub{s}{_SEP}sp, #{result.imm32}{_hex_comment(result.imm32)}"

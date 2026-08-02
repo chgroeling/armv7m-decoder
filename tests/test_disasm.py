@@ -137,6 +137,48 @@ class TestDisasmWidthSuffix:
         assert disasm(ctx, 0x4140) == "adcs\tr0, r0"
 
 
+class TestDisasmImm12Form:
+    """`addw` is a mnemonic of its own, not `add.w` with a different immediate.
+
+    ADD, SUB and MOV each have two wide immediate encodings: one takes a
+    modified immediate and is spelled with `.w`, the other a bare 12-bit value
+    and is spelled `addw`/`subw`/`movw`. Both are 32 bits, so only bit 25 of
+    the word tells them apart. Getting it wrong produces a line that will not
+    assemble back: 335 has no modified-immediate form.
+    """
+
+    @pytest.mark.parametrize(
+        ("instr", "expected"),
+        [
+            (0xF20D154F, "addw\tr5, sp, #335\t@ 0x14f"),
+            (0xF20D2DBC, "addw\tsp, sp, #700\t@ 0x2bc"),
+            (0xF2AD154F, "subw\tr5, sp, #335\t@ 0x14f"),
+            (0xF2AD2DBC, "subw\tsp, sp, #700\t@ 0x2bc"),
+            (0xF206154F, "addw\tr5, r6, #335\t@ 0x14f"),
+            (0xF2A6154F, "subw\tr5, r6, #335\t@ 0x14f"),
+            (0xF240154F, "movw\tr5, #335\t@ 0x14f"),
+        ],
+    )
+    def test_imm12_form_is_spelled_w(self, ctx, instr: int, expected: str) -> None:
+        assert disasm(ctx, instr) == expected
+
+    @pytest.mark.parametrize(
+        ("instr", "expected"),
+        [
+            (0xF10D0501, "add.w\tr5, sp, #1"),
+            (0xF50D5D80, "add.w\tsp, sp, #4096\t@ 0x1000"),
+            (0xF1AD0501, "sub.w\tr5, sp, #1"),
+            (0xF1060501, "add.w\tr5, r6, #1"),
+            (0xF1A60501, "sub.w\tr5, r6, #1"),
+            (0xF04F0501, "mov.w\tr5, #1"),
+        ],
+    )
+    def test_modified_immediate_keeps_dot_w(
+        self, ctx, instr: int, expected: str
+    ) -> None:
+        assert disasm(ctx, instr) == expected
+
+
 class TestDisasmStackAndMultiTransfer:
     """Only the 16-bit T1 forms are spelled push/pop, matching objdump."""
 
