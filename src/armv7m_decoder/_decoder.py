@@ -269,9 +269,8 @@ class Encoding(IntEnum):
 
     An instruction is spelled by several encodings -- named T1, T2, ... in an
     architecture manual -- that share one instruction object, so the form that matched
-    is only recoverable from the object's ``encoding`` member. The pseudo-instructions
-    (``NoMatch``, ``Undefined``, ``Unpredictable``, ``See``) have no encoding and carry
-    no such member.
+    is only recoverable from the object's ``encoding`` member. ``NoMatch`` is not a
+    decoded instruction and carries no such member.
     """
 
     T1 = 1
@@ -282,9 +281,6 @@ class Encoding(IntEnum):
 
 class Opcode(IntEnum):
     OP_NO_MATCH = -1
-    OP_UNDEFINED = -2
-    OP_UNPREDICTABLE = -3
-    OP_SEE = -4
     OP_ADC_IMMEDIATE = 0
     OP_ADC_REGISTER = 1
     OP_ADD_IMMEDIATE = 2
@@ -554,50 +550,6 @@ class NoMatch:
     opcode: ClassVar[int] = Opcode.OP_NO_MATCH
 
 
-@dataclass(frozen=True, eq=True)
-class Undefined:
-    """Pseudo-instruction returned when a decode flags the UNDEFINED side effect."""
-
-    opcode: ClassVar[int] = Opcode.OP_UNDEFINED
-
-
-@dataclass(frozen=True, eq=True)
-class Unpredictable:
-    """Pseudo-instruction returned when a decode flags the UNPREDICTABLE side effect."""
-
-    opcode: ClassVar[int] = Opcode.OP_UNPREDICTABLE
-
-
-@dataclass(frozen=True, eq=True)
-class See:
-    """Pseudo-instruction returned when a decode flags the SEE side effect.
-
-    ``SEE <encoding>`` redirects decoding to another instruction. The runtime only
-    records that the redirect fired (the target survives solely as a comment in the
-    transpiled block).
-    """
-
-    opcode: ClassVar[int] = Opcode.OP_SEE
-
-
-def _apply_sideeffect(sideffect_flags, decoded):
-    """Map a side effect flagged during decode onto a pseudo-instruction.
-
-    ``SEE``, ``UNDEFINED`` and ``UNPREDICTABLE`` set bits on ``sideffect_flags``.
-    Once the block has run, a flagged side effect replaces the decoded instruction with
-    the matching pseudo instruction; otherwise the decoded instruction stands. ``SEE``
-    wins (it redirects to another instruction, so the current decode does not apply),
-    then ``UNDEFINED``, then ``UNPREDICTABLE``.
-    """
-    if sideffect_flags & SIDEFFECT_SEE:
-        return See()
-    if sideffect_flags & SIDEFFECT_UNDEFINED:
-        return Undefined()
-    if sideffect_flags & SIDEFFECT_UNPREDICTABLE:
-        return Unpredictable()
-    return decoded
-
-
 def _bits(instr, lsb, width):
     return (instr >> lsb) & ((1 << width) - 1)
 
@@ -609,6 +561,7 @@ def _bits(instr, lsb, width):
 class ADC_immediate:
     opcode: ClassVar[int] = Opcode.OP_ADC_IMMEDIATE
     encoding: Encoding
+    sideeffects: SideffectFlags
     d: int  # uint32
     n: int  # uint32
     setflags: bool
@@ -619,6 +572,7 @@ class ADC_immediate:
 class ADC_register:
     opcode: ClassVar[int] = Opcode.OP_ADC_REGISTER
     encoding: Encoding
+    sideeffects: SideffectFlags
     d: int  # uint32
     n: int  # uint32
     m: int  # uint32
@@ -631,6 +585,7 @@ class ADC_register:
 class ADD_immediate:
     opcode: ClassVar[int] = Opcode.OP_ADD_IMMEDIATE
     encoding: Encoding
+    sideeffects: SideffectFlags
     d: int  # uint32
     n: int  # uint32
     setflags: bool
@@ -641,6 +596,7 @@ class ADD_immediate:
 class ADD_register:
     opcode: ClassVar[int] = Opcode.OP_ADD_REGISTER
     encoding: Encoding
+    sideeffects: SideffectFlags
     d: int  # uint32
     n: int  # uint32
     m: int  # uint32
@@ -653,6 +609,7 @@ class ADD_register:
 class ADD_SP_plus_immediate:
     opcode: ClassVar[int] = Opcode.OP_ADD_SP_PLUS_IMMEDIATE
     encoding: Encoding
+    sideeffects: SideffectFlags
     d: int  # uint32
     setflags: bool
     imm32: int  # bits32
@@ -662,6 +619,7 @@ class ADD_SP_plus_immediate:
 class ADD_SP_plus_register:
     opcode: ClassVar[int] = Opcode.OP_ADD_SP_PLUS_REGISTER
     encoding: Encoding
+    sideeffects: SideffectFlags
     d: int  # uint32
     m: int  # uint32
     setflags: bool
@@ -673,6 +631,7 @@ class ADD_SP_plus_register:
 class ADR:
     opcode: ClassVar[int] = Opcode.OP_ADR
     encoding: Encoding
+    sideeffects: SideffectFlags
     d: int  # uint32
     imm32: int  # bits32
     add: bool
@@ -682,6 +641,7 @@ class ADR:
 class SUB_immediate:
     opcode: ClassVar[int] = Opcode.OP_SUB_IMMEDIATE
     encoding: Encoding
+    sideeffects: SideffectFlags
     d: int  # uint32
     n: int  # uint32
     setflags: bool
@@ -692,6 +652,7 @@ class SUB_immediate:
 class SUB_register:
     opcode: ClassVar[int] = Opcode.OP_SUB_REGISTER
     encoding: Encoding
+    sideeffects: SideffectFlags
     d: int  # uint32
     n: int  # uint32
     m: int  # uint32
@@ -704,6 +665,7 @@ class SUB_register:
 class SUB_SP_minus_immediate:
     opcode: ClassVar[int] = Opcode.OP_SUB_SP_MINUS_IMMEDIATE
     encoding: Encoding
+    sideeffects: SideffectFlags
     d: int  # uint32
     setflags: bool
     imm32: int  # bits32
@@ -713,6 +675,7 @@ class SUB_SP_minus_immediate:
 class SUB_SP_minus_register:
     opcode: ClassVar[int] = Opcode.OP_SUB_SP_MINUS_REGISTER
     encoding: Encoding
+    sideeffects: SideffectFlags
     d: int  # uint32
     m: int  # uint32
     setflags: bool
@@ -724,6 +687,7 @@ class SUB_SP_minus_register:
 class MOV_immediate:
     opcode: ClassVar[int] = Opcode.OP_MOV_IMMEDIATE
     encoding: Encoding
+    sideeffects: SideffectFlags
     d: int  # uint32
     setflags: bool
     imm32: int  # bits32
@@ -734,6 +698,7 @@ class MOV_immediate:
 class MOV_register:
     opcode: ClassVar[int] = Opcode.OP_MOV_REGISTER
     encoding: Encoding
+    sideeffects: SideffectFlags
     d: int  # uint32
     m: int  # uint32
     setflags: bool
@@ -743,12 +708,14 @@ class MOV_register:
 class NOP:
     opcode: ClassVar[int] = Opcode.OP_NOP
     encoding: Encoding
+    sideeffects: SideffectFlags
 
 
 @dataclass(frozen=True, eq=True)
 class LDR_immediate:
     opcode: ClassVar[int] = Opcode.OP_LDR_IMMEDIATE
     encoding: Encoding
+    sideeffects: SideffectFlags
     t: int  # uint32
     n: int  # uint32
     imm32: int  # bits32
@@ -761,6 +728,7 @@ class LDR_immediate:
 class LDR_literal:
     opcode: ClassVar[int] = Opcode.OP_LDR_LITERAL
     encoding: Encoding
+    sideeffects: SideffectFlags
     t: int  # uint32
     imm32: int  # bits32
     add: bool
@@ -770,6 +738,7 @@ class LDR_literal:
 class LDR_register:
     opcode: ClassVar[int] = Opcode.OP_LDR_REGISTER
     encoding: Encoding
+    sideeffects: SideffectFlags
     t: int  # uint32
     n: int  # uint32
     m: int  # uint32
@@ -784,6 +753,7 @@ class LDR_register:
 class LSL_immediate:
     opcode: ClassVar[int] = Opcode.OP_LSL_IMMEDIATE
     encoding: Encoding
+    sideeffects: SideffectFlags
     d: int  # uint32
     m: int  # uint32
     setflags: bool
@@ -794,6 +764,7 @@ class LSL_immediate:
 class LSL_register:
     opcode: ClassVar[int] = Opcode.OP_LSL_REGISTER
     encoding: Encoding
+    sideeffects: SideffectFlags
     d: int  # uint32
     n: int  # uint32
     m: int  # uint32
@@ -804,6 +775,7 @@ class LSL_register:
 class LSR_immediate:
     opcode: ClassVar[int] = Opcode.OP_LSR_IMMEDIATE
     encoding: Encoding
+    sideeffects: SideffectFlags
     d: int  # uint32
     m: int  # uint32
     setflags: bool
@@ -814,6 +786,7 @@ class LSR_immediate:
 class LSR_register:
     opcode: ClassVar[int] = Opcode.OP_LSR_REGISTER
     encoding: Encoding
+    sideeffects: SideffectFlags
     d: int  # uint32
     n: int  # uint32
     m: int  # uint32
@@ -824,6 +797,7 @@ class LSR_register:
 class AND_immediate:
     opcode: ClassVar[int] = Opcode.OP_AND_IMMEDIATE
     encoding: Encoding
+    sideeffects: SideffectFlags
     d: int  # uint32
     n: int  # uint32
     setflags: bool
@@ -835,6 +809,7 @@ class AND_immediate:
 class AND_register:
     opcode: ClassVar[int] = Opcode.OP_AND_REGISTER
     encoding: Encoding
+    sideeffects: SideffectFlags
     d: int  # uint32
     n: int  # uint32
     m: int  # uint32
@@ -847,6 +822,7 @@ class AND_register:
 class ORR_immediate:
     opcode: ClassVar[int] = Opcode.OP_ORR_IMMEDIATE
     encoding: Encoding
+    sideeffects: SideffectFlags
     d: int  # uint32
     n: int  # uint32
     setflags: bool
@@ -858,6 +834,7 @@ class ORR_immediate:
 class ORR_register:
     opcode: ClassVar[int] = Opcode.OP_ORR_REGISTER
     encoding: Encoding
+    sideeffects: SideffectFlags
     d: int  # uint32
     n: int  # uint32
     m: int  # uint32
@@ -870,6 +847,7 @@ class ORR_register:
 class LDRB_immediate:
     opcode: ClassVar[int] = Opcode.OP_LDRB_IMMEDIATE
     encoding: Encoding
+    sideeffects: SideffectFlags
     t: int  # uint32
     n: int  # uint32
     imm32: int  # bits32
@@ -882,6 +860,7 @@ class LDRB_immediate:
 class LDRB_literal:
     opcode: ClassVar[int] = Opcode.OP_LDRB_LITERAL
     encoding: Encoding
+    sideeffects: SideffectFlags
     t: int  # uint32
     imm32: int  # bits32
     add: bool
@@ -891,6 +870,7 @@ class LDRB_literal:
 class LDRB_register:
     opcode: ClassVar[int] = Opcode.OP_LDRB_REGISTER
     encoding: Encoding
+    sideeffects: SideffectFlags
     t: int  # uint32
     n: int  # uint32
     m: int  # uint32
@@ -905,6 +885,7 @@ class LDRB_register:
 class B:
     opcode: ClassVar[int] = Opcode.OP_B
     encoding: Encoding
+    sideeffects: SideffectFlags
     imm32: int  # bits32
     cond: int  # bits4
 
@@ -913,6 +894,7 @@ class B:
 class BKPT:
     opcode: ClassVar[int] = Opcode.OP_BKPT
     encoding: Encoding
+    sideeffects: SideffectFlags
     imm32: int  # bits32
 
 
@@ -920,6 +902,7 @@ class BKPT:
 class BL:
     opcode: ClassVar[int] = Opcode.OP_BL
     encoding: Encoding
+    sideeffects: SideffectFlags
     imm32: int  # bits32
 
 
@@ -927,6 +910,7 @@ class BL:
 class LDRH_immediate:
     opcode: ClassVar[int] = Opcode.OP_LDRH_IMMEDIATE
     encoding: Encoding
+    sideeffects: SideffectFlags
     t: int  # uint32
     n: int  # uint32
     imm32: int  # bits32
@@ -939,6 +923,7 @@ class LDRH_immediate:
 class LDRH_literal:
     opcode: ClassVar[int] = Opcode.OP_LDRH_LITERAL
     encoding: Encoding
+    sideeffects: SideffectFlags
     t: int  # uint32
     imm32: int  # bits32
     add: bool
@@ -948,6 +933,7 @@ class LDRH_literal:
 class LDRH_register:
     opcode: ClassVar[int] = Opcode.OP_LDRH_REGISTER
     encoding: Encoding
+    sideeffects: SideffectFlags
     t: int  # uint32
     n: int  # uint32
     m: int  # uint32
@@ -962,6 +948,7 @@ class LDRH_register:
 class POP:
     opcode: ClassVar[int] = Opcode.OP_POP
     encoding: Encoding
+    sideeffects: SideffectFlags
     registers: int  # bits16
     UnalignedAllowed: bool
     t: int  # uint32
@@ -971,6 +958,7 @@ class POP:
 class PUSH:
     opcode: ClassVar[int] = Opcode.OP_PUSH
     encoding: Encoding
+    sideeffects: SideffectFlags
     registers: int  # bits16
     UnalignedAllowed: bool
     t: int  # uint32
@@ -980,6 +968,7 @@ class PUSH:
 class STR_immediate:
     opcode: ClassVar[int] = Opcode.OP_STR_IMMEDIATE
     encoding: Encoding
+    sideeffects: SideffectFlags
     t: int  # uint32
     n: int  # uint32
     imm32: int  # bits32
@@ -992,6 +981,7 @@ class STR_immediate:
 class STR_register:
     opcode: ClassVar[int] = Opcode.OP_STR_REGISTER
     encoding: Encoding
+    sideeffects: SideffectFlags
     t: int  # uint32
     n: int  # uint32
     m: int  # uint32
@@ -1006,6 +996,7 @@ class STR_register:
 class STRD_immediate:
     opcode: ClassVar[int] = Opcode.OP_STRD_IMMEDIATE
     encoding: Encoding
+    sideeffects: SideffectFlags
     t: int  # uint32
     t2: int  # uint32
     n: int  # uint32
@@ -1019,6 +1010,7 @@ class STRD_immediate:
 class STREX:
     opcode: ClassVar[int] = Opcode.OP_STREX
     encoding: Encoding
+    sideeffects: SideffectFlags
     d: int  # uint32
     t: int  # uint32
     n: int  # uint32
@@ -1029,6 +1021,7 @@ class STREX:
 class ASR_immediate:
     opcode: ClassVar[int] = Opcode.OP_ASR_IMMEDIATE
     encoding: Encoding
+    sideeffects: SideffectFlags
     d: int  # uint32
     m: int  # uint32
     setflags: bool
@@ -1039,6 +1032,7 @@ class ASR_immediate:
 class ASR_register:
     opcode: ClassVar[int] = Opcode.OP_ASR_REGISTER
     encoding: Encoding
+    sideeffects: SideffectFlags
     d: int  # uint32
     n: int  # uint32
     m: int  # uint32
@@ -1049,6 +1043,7 @@ class ASR_register:
 class EOR_immediate:
     opcode: ClassVar[int] = Opcode.OP_EOR_IMMEDIATE
     encoding: Encoding
+    sideeffects: SideffectFlags
     d: int  # uint32
     n: int  # uint32
     setflags: bool
@@ -1060,6 +1055,7 @@ class EOR_immediate:
 class EOR_register:
     opcode: ClassVar[int] = Opcode.OP_EOR_REGISTER
     encoding: Encoding
+    sideeffects: SideffectFlags
     d: int  # uint32
     n: int  # uint32
     m: int  # uint32
@@ -1072,6 +1068,7 @@ class EOR_register:
 class MVN_immediate:
     opcode: ClassVar[int] = Opcode.OP_MVN_IMMEDIATE
     encoding: Encoding
+    sideeffects: SideffectFlags
     d: int  # uint32
     setflags: bool
     imm32: int  # bits32
@@ -1082,6 +1079,7 @@ class MVN_immediate:
 class MVN_register:
     opcode: ClassVar[int] = Opcode.OP_MVN_REGISTER
     encoding: Encoding
+    sideeffects: SideffectFlags
     d: int  # uint32
     m: int  # uint32
     setflags: bool
@@ -1093,6 +1091,7 @@ class MVN_register:
 class TST_immediate:
     opcode: ClassVar[int] = Opcode.OP_TST_IMMEDIATE
     encoding: Encoding
+    sideeffects: SideffectFlags
     n: int  # uint32
     imm32: int  # bits32
     carry: int  # bits1
@@ -1102,6 +1101,7 @@ class TST_immediate:
 class TST_register:
     opcode: ClassVar[int] = Opcode.OP_TST_REGISTER
     encoding: Encoding
+    sideeffects: SideffectFlags
     n: int  # uint32
     m: int  # uint32
     shift_t: int  # bits3
@@ -1112,6 +1112,7 @@ class TST_register:
 class LDRSB_immediate:
     opcode: ClassVar[int] = Opcode.OP_LDRSB_IMMEDIATE
     encoding: Encoding
+    sideeffects: SideffectFlags
     t: int  # uint32
     n: int  # uint32
     imm32: int  # bits32
@@ -1124,6 +1125,7 @@ class LDRSB_immediate:
 class LDRSB_literal:
     opcode: ClassVar[int] = Opcode.OP_LDRSB_LITERAL
     encoding: Encoding
+    sideeffects: SideffectFlags
     t: int  # uint32
     imm32: int  # bits32
     add: bool
@@ -1133,6 +1135,7 @@ class LDRSB_literal:
 class LDRSB_register:
     opcode: ClassVar[int] = Opcode.OP_LDRSB_REGISTER
     encoding: Encoding
+    sideeffects: SideffectFlags
     t: int  # uint32
     n: int  # uint32
     m: int  # uint32
@@ -1147,6 +1150,7 @@ class LDRSB_register:
 class LDRSH_immediate:
     opcode: ClassVar[int] = Opcode.OP_LDRSH_IMMEDIATE
     encoding: Encoding
+    sideeffects: SideffectFlags
     t: int  # uint32
     n: int  # uint32
     imm32: int  # bits32
@@ -1159,6 +1163,7 @@ class LDRSH_immediate:
 class LDRSH_literal:
     opcode: ClassVar[int] = Opcode.OP_LDRSH_LITERAL
     encoding: Encoding
+    sideeffects: SideffectFlags
     t: int  # uint32
     imm32: int  # bits32
     add: bool
@@ -1168,6 +1173,7 @@ class LDRSH_literal:
 class LDRSH_register:
     opcode: ClassVar[int] = Opcode.OP_LDRSH_REGISTER
     encoding: Encoding
+    sideeffects: SideffectFlags
     t: int  # uint32
     n: int  # uint32
     m: int  # uint32
@@ -1182,6 +1188,7 @@ class LDRSH_register:
 class LDM:
     opcode: ClassVar[int] = Opcode.OP_LDM
     encoding: Encoding
+    sideeffects: SideffectFlags
     n: int  # uint32
     registers: int  # bits16
     wback: bool
@@ -1191,6 +1198,7 @@ class LDM:
 class STM:
     opcode: ClassVar[int] = Opcode.OP_STM
     encoding: Encoding
+    sideeffects: SideffectFlags
     n: int  # uint32
     registers: int  # bits16
     wback: bool
@@ -1200,6 +1208,7 @@ class STM:
 class BLX_register:
     opcode: ClassVar[int] = Opcode.OP_BLX_REGISTER
     encoding: Encoding
+    sideeffects: SideffectFlags
     m: int  # uint32
 
 
@@ -1207,6 +1216,7 @@ class BLX_register:
 class BX:
     opcode: ClassVar[int] = Opcode.OP_BX
     encoding: Encoding
+    sideeffects: SideffectFlags
     m: int  # uint32
 
 
@@ -1214,6 +1224,7 @@ class BX:
 class IT:
     opcode: ClassVar[int] = Opcode.OP_IT
     encoding: Encoding
+    sideeffects: SideffectFlags
     firstcond: int  # bits4
     mask: int  # bits4
 
@@ -1222,6 +1233,7 @@ class IT:
 class SVC:
     opcode: ClassVar[int] = Opcode.OP_SVC
     encoding: Encoding
+    sideeffects: SideffectFlags
     imm32: int  # bits32
 
 
@@ -1229,6 +1241,7 @@ class SVC:
 class BFI:
     opcode: ClassVar[int] = Opcode.OP_BFI
     encoding: Encoding
+    sideeffects: SideffectFlags
     d: int  # uint32
     n: int  # uint32
     msbit: int  # uint32
@@ -1239,6 +1252,7 @@ class BFI:
 class CBNZ_CBZ:
     opcode: ClassVar[int] = Opcode.OP_CBNZ_CBZ
     encoding: Encoding
+    sideeffects: SideffectFlags
     n: int  # uint32
     imm32: int  # bits32
     nonzero: bool
@@ -1248,6 +1262,7 @@ class CBNZ_CBZ:
 class CLZ:
     opcode: ClassVar[int] = Opcode.OP_CLZ
     encoding: Encoding
+    sideeffects: SideffectFlags
     d: int  # uint32
     m: int  # uint32
 
@@ -1256,6 +1271,7 @@ class CLZ:
 class CMN_immediate:
     opcode: ClassVar[int] = Opcode.OP_CMN_IMMEDIATE
     encoding: Encoding
+    sideeffects: SideffectFlags
     n: int  # uint32
     imm32: int  # bits32
 
@@ -1264,6 +1280,7 @@ class CMN_immediate:
 class CMN_register:
     opcode: ClassVar[int] = Opcode.OP_CMN_REGISTER
     encoding: Encoding
+    sideeffects: SideffectFlags
     n: int  # uint32
     m: int  # uint32
     shift_t: int  # bits3
@@ -1274,6 +1291,7 @@ class CMN_register:
 class CMP_immediate:
     opcode: ClassVar[int] = Opcode.OP_CMP_IMMEDIATE
     encoding: Encoding
+    sideeffects: SideffectFlags
     n: int  # uint32
     imm32: int  # bits32
 
@@ -1282,6 +1300,7 @@ class CMP_immediate:
 class CMP_register:
     opcode: ClassVar[int] = Opcode.OP_CMP_REGISTER
     encoding: Encoding
+    sideeffects: SideffectFlags
     n: int  # uint32
     m: int  # uint32
     shift_t: int  # bits3
@@ -1292,6 +1311,7 @@ class CMP_register:
 class DMB:
     opcode: ClassVar[int] = Opcode.OP_DMB
     encoding: Encoding
+    sideeffects: SideffectFlags
     option: int  # bits4
 
 
@@ -1299,6 +1319,7 @@ class DMB:
 class BIC_immediate:
     opcode: ClassVar[int] = Opcode.OP_BIC_IMMEDIATE
     encoding: Encoding
+    sideeffects: SideffectFlags
     d: int  # uint32
     n: int  # uint32
     setflags: bool
@@ -1310,6 +1331,7 @@ class BIC_immediate:
 class BIC_register:
     opcode: ClassVar[int] = Opcode.OP_BIC_REGISTER
     encoding: Encoding
+    sideeffects: SideffectFlags
     d: int  # uint32
     n: int  # uint32
     m: int  # uint32
@@ -1322,6 +1344,7 @@ class BIC_register:
 class TEQ_immediate:
     opcode: ClassVar[int] = Opcode.OP_TEQ_IMMEDIATE
     encoding: Encoding
+    sideeffects: SideffectFlags
     n: int  # uint32
     imm32: int  # bits32
     carry: int  # bits1
@@ -1331,6 +1354,7 @@ class TEQ_immediate:
 class TEQ_register:
     opcode: ClassVar[int] = Opcode.OP_TEQ_REGISTER
     encoding: Encoding
+    sideeffects: SideffectFlags
     n: int  # uint32
     m: int  # uint32
     shift_t: int  # bits3
@@ -1341,6 +1365,7 @@ class TEQ_register:
 class RSB_immediate:
     opcode: ClassVar[int] = Opcode.OP_RSB_IMMEDIATE
     encoding: Encoding
+    sideeffects: SideffectFlags
     d: int  # uint32
     n: int  # uint32
     setflags: bool
@@ -1351,6 +1376,7 @@ class RSB_immediate:
 class RSB_register:
     opcode: ClassVar[int] = Opcode.OP_RSB_REGISTER
     encoding: Encoding
+    sideeffects: SideffectFlags
     d: int  # uint32
     n: int  # uint32
     m: int  # uint32
@@ -1363,6 +1389,7 @@ class RSB_register:
 class SBC_immediate:
     opcode: ClassVar[int] = Opcode.OP_SBC_IMMEDIATE
     encoding: Encoding
+    sideeffects: SideffectFlags
     d: int  # uint32
     n: int  # uint32
     setflags: bool
@@ -1373,6 +1400,7 @@ class SBC_immediate:
 class SBC_register:
     opcode: ClassVar[int] = Opcode.OP_SBC_REGISTER
     encoding: Encoding
+    sideeffects: SideffectFlags
     d: int  # uint32
     n: int  # uint32
     m: int  # uint32
@@ -1385,6 +1413,7 @@ class SBC_register:
 class MUL:
     opcode: ClassVar[int] = Opcode.OP_MUL
     encoding: Encoding
+    sideeffects: SideffectFlags
     d: int  # uint32
     n: int  # uint32
     m: int  # uint32
@@ -1395,6 +1424,7 @@ class MUL:
 class MLA:
     opcode: ClassVar[int] = Opcode.OP_MLA
     encoding: Encoding
+    sideeffects: SideffectFlags
     d: int  # uint32
     n: int  # uint32
     m: int  # uint32
@@ -1406,6 +1436,7 @@ class MLA:
 class MLS:
     opcode: ClassVar[int] = Opcode.OP_MLS
     encoding: Encoding
+    sideeffects: SideffectFlags
     d: int  # uint32
     n: int  # uint32
     m: int  # uint32
@@ -1416,6 +1447,7 @@ class MLS:
 class SMULL:
     opcode: ClassVar[int] = Opcode.OP_SMULL
     encoding: Encoding
+    sideeffects: SideffectFlags
     dLo: int  # uint32
     dHi: int  # uint32
     n: int  # uint32
@@ -1427,6 +1459,7 @@ class SMULL:
 class UMULL:
     opcode: ClassVar[int] = Opcode.OP_UMULL
     encoding: Encoding
+    sideeffects: SideffectFlags
     dLo: int  # uint32
     dHi: int  # uint32
     n: int  # uint32
@@ -1438,6 +1471,7 @@ class UMULL:
 class UMLAL:
     opcode: ClassVar[int] = Opcode.OP_UMLAL
     encoding: Encoding
+    sideeffects: SideffectFlags
     dLo: int  # uint32
     dHi: int  # uint32
     n: int  # uint32
@@ -1449,6 +1483,7 @@ class UMLAL:
 class SDIV:
     opcode: ClassVar[int] = Opcode.OP_SDIV
     encoding: Encoding
+    sideeffects: SideffectFlags
     d: int  # uint32
     n: int  # uint32
     m: int  # uint32
@@ -1458,6 +1493,7 @@ class SDIV:
 class UDIV:
     opcode: ClassVar[int] = Opcode.OP_UDIV
     encoding: Encoding
+    sideeffects: SideffectFlags
     d: int  # uint32
     n: int  # uint32
     m: int  # uint32
@@ -1467,6 +1503,7 @@ class UDIV:
 class SXTAB:
     opcode: ClassVar[int] = Opcode.OP_SXTAB
     encoding: Encoding
+    sideeffects: SideffectFlags
     d: int  # uint32
     n: int  # uint32
     m: int  # uint32
@@ -1477,6 +1514,7 @@ class SXTAB:
 class SXTAB16:
     opcode: ClassVar[int] = Opcode.OP_SXTAB16
     encoding: Encoding
+    sideeffects: SideffectFlags
     d: int  # uint32
     n: int  # uint32
     m: int  # uint32
@@ -1487,6 +1525,7 @@ class SXTAB16:
 class SXTAH:
     opcode: ClassVar[int] = Opcode.OP_SXTAH
     encoding: Encoding
+    sideeffects: SideffectFlags
     d: int  # uint32
     n: int  # uint32
     m: int  # uint32
@@ -1497,6 +1536,7 @@ class SXTAH:
 class SXTB:
     opcode: ClassVar[int] = Opcode.OP_SXTB
     encoding: Encoding
+    sideeffects: SideffectFlags
     d: int  # uint32
     m: int  # uint32
     rotation: int  # uint32
@@ -1506,6 +1546,7 @@ class SXTB:
 class SXTB16:
     opcode: ClassVar[int] = Opcode.OP_SXTB16
     encoding: Encoding
+    sideeffects: SideffectFlags
     d: int  # uint32
     m: int  # uint32
     rotation: int  # uint32
@@ -1515,6 +1556,7 @@ class SXTB16:
 class SXTH:
     opcode: ClassVar[int] = Opcode.OP_SXTH
     encoding: Encoding
+    sideeffects: SideffectFlags
     d: int  # uint32
     m: int  # uint32
     rotation: int  # uint32
@@ -1524,6 +1566,7 @@ class SXTH:
 class UXTB:
     opcode: ClassVar[int] = Opcode.OP_UXTB
     encoding: Encoding
+    sideeffects: SideffectFlags
     d: int  # uint32
     m: int  # uint32
     rotation: int  # uint32
@@ -1533,6 +1576,7 @@ class UXTB:
 class UXTH:
     opcode: ClassVar[int] = Opcode.OP_UXTH
     encoding: Encoding
+    sideeffects: SideffectFlags
     d: int  # uint32
     m: int  # uint32
     rotation: int  # uint32
@@ -1542,6 +1586,7 @@ class UXTH:
 class UBFX:
     opcode: ClassVar[int] = Opcode.OP_UBFX
     encoding: Encoding
+    sideeffects: SideffectFlags
     d: int  # uint32
     n: int  # uint32
     lsbit: int  # uint32
@@ -1552,6 +1597,7 @@ class UBFX:
 class RRX:
     opcode: ClassVar[int] = Opcode.OP_RRX
     encoding: Encoding
+    sideeffects: SideffectFlags
     d: int  # uint32
     m: int  # uint32
     setflags: bool
@@ -1561,6 +1607,7 @@ class RRX:
 class STRB_immediate:
     opcode: ClassVar[int] = Opcode.OP_STRB_IMMEDIATE
     encoding: Encoding
+    sideeffects: SideffectFlags
     t: int  # uint32
     n: int  # uint32
     imm32: int  # bits32
@@ -1573,6 +1620,7 @@ class STRB_immediate:
 class STRB_register:
     opcode: ClassVar[int] = Opcode.OP_STRB_REGISTER
     encoding: Encoding
+    sideeffects: SideffectFlags
     t: int  # uint32
     n: int  # uint32
     m: int  # uint32
@@ -1587,6 +1635,7 @@ class STRB_register:
 class STRH_immediate:
     opcode: ClassVar[int] = Opcode.OP_STRH_IMMEDIATE
     encoding: Encoding
+    sideeffects: SideffectFlags
     t: int  # uint32
     n: int  # uint32
     imm32: int  # bits32
@@ -1599,6 +1648,7 @@ class STRH_immediate:
 class STRH_register:
     opcode: ClassVar[int] = Opcode.OP_STRH_REGISTER
     encoding: Encoding
+    sideeffects: SideffectFlags
     t: int  # uint32
     n: int  # uint32
     m: int  # uint32
@@ -1613,6 +1663,7 @@ class STRH_register:
 class LDREX:
     opcode: ClassVar[int] = Opcode.OP_LDREX
     encoding: Encoding
+    sideeffects: SideffectFlags
     t: int  # uint32
     n: int  # uint32
     imm32: int  # bits32
@@ -1622,6 +1673,7 @@ class LDREX:
 class STMDB:
     opcode: ClassVar[int] = Opcode.OP_STMDB
     encoding: Encoding
+    sideeffects: SideffectFlags
     n: int  # uint32
     registers: int  # bits16
     wback: bool
@@ -1631,6 +1683,7 @@ class STMDB:
 class MRS:
     opcode: ClassVar[int] = Opcode.OP_MRS
     encoding: Encoding
+    sideeffects: SideffectFlags
     d: int  # uint32
     SYSm: int  # bits8
 
@@ -1639,6 +1692,7 @@ class MRS:
 class MSR:
     opcode: ClassVar[int] = Opcode.OP_MSR
     encoding: Encoding
+    sideeffects: SideffectFlags
     n: int  # uint32
     mask: int  # bits2
     SYSm: int  # bits8
@@ -1648,6 +1702,7 @@ class MSR:
 class TBB_TBH:
     opcode: ClassVar[int] = Opcode.OP_TBB_TBH
     encoding: Encoding
+    sideeffects: SideffectFlags
     n: int  # uint32
     m: int  # uint32
     is_tbh: bool
@@ -1657,6 +1712,7 @@ class TBB_TBH:
 class BFC:
     opcode: ClassVar[int] = Opcode.OP_BFC
     encoding: Encoding
+    sideeffects: SideffectFlags
     d: int  # uint32
     msbit: int  # uint32
     lsbit: int  # uint32
@@ -1666,6 +1722,7 @@ class BFC:
 class CDP_CDP2:
     opcode: ClassVar[int] = Opcode.OP_CDP_CDP2
     encoding: Encoding
+    sideeffects: SideffectFlags
     cp: int  # uint32
     opc1: int  # bits4
     CRn: int  # bits4
@@ -1678,6 +1735,7 @@ class CDP_CDP2:
 class ISB:
     opcode: ClassVar[int] = Opcode.OP_ISB
     encoding: Encoding
+    sideeffects: SideffectFlags
     option: int  # bits4
 
 
@@ -1685,6 +1743,7 @@ class ISB:
 class LDMDB:
     opcode: ClassVar[int] = Opcode.OP_LDMDB
     encoding: Encoding
+    sideeffects: SideffectFlags
     n: int  # uint32
     registers: int  # bits16
     wback: bool
@@ -1694,6 +1753,7 @@ class LDMDB:
 class LDRD_immediate:
     opcode: ClassVar[int] = Opcode.OP_LDRD_IMMEDIATE
     encoding: Encoding
+    sideeffects: SideffectFlags
     t: int  # uint32
     t2: int  # uint32
     n: int  # uint32
@@ -1707,6 +1767,7 @@ class LDRD_immediate:
 class LDRD_literal:
     opcode: ClassVar[int] = Opcode.OP_LDRD_LITERAL
     encoding: Encoding
+    sideeffects: SideffectFlags
     t: int  # uint32
     t2: int  # uint32
     imm32: int  # bits32
@@ -1719,6 +1780,7 @@ class LDRD_literal:
 class STC_STC2:
     opcode: ClassVar[int] = Opcode.OP_STC_STC2
     encoding: Encoding
+    sideeffects: SideffectFlags
     n: int  # uint32
     cp: int  # uint32
     imm32: int  # bits32
@@ -1733,6 +1795,7 @@ class STC_STC2:
 class LDC_LDC2_immediate:
     opcode: ClassVar[int] = Opcode.OP_LDC_LDC2_IMMEDIATE
     encoding: Encoding
+    sideeffects: SideffectFlags
     n: int  # uint32
     cp: int  # uint32
     imm32: int  # bits32
@@ -1747,6 +1810,7 @@ class LDC_LDC2_immediate:
 class LDC_LDC2_literal:
     opcode: ClassVar[int] = Opcode.OP_LDC_LDC2_LITERAL
     encoding: Encoding
+    sideeffects: SideffectFlags
     index: bool
     add: bool
     cp: int  # uint32
@@ -1760,12 +1824,14 @@ class LDC_LDC2_literal:
 class CLREX:
     opcode: ClassVar[int] = Opcode.OP_CLREX
     encoding: Encoding
+    sideeffects: SideffectFlags
 
 
 @dataclass(frozen=True, eq=True)
 class CPS:
     opcode: ClassVar[int] = Opcode.OP_CPS
     encoding: Encoding
+    sideeffects: SideffectFlags
     enable: bool
     disable: bool
     affectPRI: bool
@@ -1776,12 +1842,14 @@ class CPS:
 class CSDB:
     opcode: ClassVar[int] = Opcode.OP_CSDB
     encoding: Encoding
+    sideeffects: SideffectFlags
 
 
 @dataclass(frozen=True, eq=True)
 class DBG:
     opcode: ClassVar[int] = Opcode.OP_DBG
     encoding: Encoding
+    sideeffects: SideffectFlags
     option: int  # bits4
 
 
@@ -1789,6 +1857,7 @@ class DBG:
 class DSB:
     opcode: ClassVar[int] = Opcode.OP_DSB
     encoding: Encoding
+    sideeffects: SideffectFlags
     option: int  # bits4
 
 
@@ -1796,6 +1865,7 @@ class DSB:
 class LDRT:
     opcode: ClassVar[int] = Opcode.OP_LDRT
     encoding: Encoding
+    sideeffects: SideffectFlags
     t: int  # uint32
     n: int  # uint32
     postindex: bool
@@ -1808,6 +1878,7 @@ class LDRT:
 class MCR_MCR2:
     opcode: ClassVar[int] = Opcode.OP_MCR_MCR2
     encoding: Encoding
+    sideeffects: SideffectFlags
     t: int  # uint32
     cp: int  # uint32
     opc1: int  # bits3
@@ -1820,6 +1891,7 @@ class MCR_MCR2:
 class MCRR_MCRR2:
     opcode: ClassVar[int] = Opcode.OP_MCRR_MCRR2
     encoding: Encoding
+    sideeffects: SideffectFlags
     t: int  # uint32
     t2: int  # uint32
     cp: int  # uint32
@@ -1831,6 +1903,7 @@ class MCRR_MCRR2:
 class MOVT:
     opcode: ClassVar[int] = Opcode.OP_MOVT
     encoding: Encoding
+    sideeffects: SideffectFlags
     d: int  # uint32
     imm16: int  # bits16
 
@@ -1839,6 +1912,7 @@ class MOVT:
 class MRC_MRC2:
     opcode: ClassVar[int] = Opcode.OP_MRC_MRC2
     encoding: Encoding
+    sideeffects: SideffectFlags
     t: int  # uint32
     cp: int  # uint32
     opc1: int  # bits3
@@ -1851,6 +1925,7 @@ class MRC_MRC2:
 class ORN_immediate:
     opcode: ClassVar[int] = Opcode.OP_ORN_IMMEDIATE
     encoding: Encoding
+    sideeffects: SideffectFlags
     d: int  # uint32
     n: int  # uint32
     setflags: bool
@@ -1862,6 +1937,7 @@ class ORN_immediate:
 class ORN_register:
     opcode: ClassVar[int] = Opcode.OP_ORN_REGISTER
     encoding: Encoding
+    sideeffects: SideffectFlags
     d: int  # uint32
     n: int  # uint32
     m: int  # uint32
@@ -1874,6 +1950,7 @@ class ORN_register:
 class PLD_immediate:
     opcode: ClassVar[int] = Opcode.OP_PLD_IMMEDIATE
     encoding: Encoding
+    sideeffects: SideffectFlags
     n: int  # uint32
     imm32: int  # bits32
     add: bool
@@ -1883,6 +1960,7 @@ class PLD_immediate:
 class PLD_literal:
     opcode: ClassVar[int] = Opcode.OP_PLD_LITERAL
     encoding: Encoding
+    sideeffects: SideffectFlags
     imm32: int  # bits32
     add: bool
 
@@ -1891,6 +1969,7 @@ class PLD_literal:
 class PLD_register:
     opcode: ClassVar[int] = Opcode.OP_PLD_REGISTER
     encoding: Encoding
+    sideeffects: SideffectFlags
     n: int  # uint32
     m: int  # uint32
     add: bool
@@ -1902,6 +1981,7 @@ class PLD_register:
 class PLI_immediate_literal:
     opcode: ClassVar[int] = Opcode.OP_PLI_IMMEDIATE_LITERAL
     encoding: Encoding
+    sideeffects: SideffectFlags
     n: int  # uint32
     imm32: int  # bits32
     add: bool
@@ -1911,6 +1991,7 @@ class PLI_immediate_literal:
 class PLI_register:
     opcode: ClassVar[int] = Opcode.OP_PLI_REGISTER
     encoding: Encoding
+    sideeffects: SideffectFlags
     n: int  # uint32
     m: int  # uint32
     add: bool
@@ -1922,6 +2003,7 @@ class PLI_register:
 class REV:
     opcode: ClassVar[int] = Opcode.OP_REV
     encoding: Encoding
+    sideeffects: SideffectFlags
     d: int  # uint32
     m: int  # uint32
 
@@ -1930,6 +2012,7 @@ class REV:
 class REV16:
     opcode: ClassVar[int] = Opcode.OP_REV16
     encoding: Encoding
+    sideeffects: SideffectFlags
     d: int  # uint32
     m: int  # uint32
 
@@ -1938,6 +2021,7 @@ class REV16:
 class REVSH:
     opcode: ClassVar[int] = Opcode.OP_REVSH
     encoding: Encoding
+    sideeffects: SideffectFlags
     d: int  # uint32
     m: int  # uint32
 
@@ -1946,6 +2030,7 @@ class REVSH:
 class ROR_immediate:
     opcode: ClassVar[int] = Opcode.OP_ROR_IMMEDIATE
     encoding: Encoding
+    sideeffects: SideffectFlags
     d: int  # uint32
     m: int  # uint32
     setflags: bool
@@ -1956,6 +2041,7 @@ class ROR_immediate:
 class ROR_register:
     opcode: ClassVar[int] = Opcode.OP_ROR_REGISTER
     encoding: Encoding
+    sideeffects: SideffectFlags
     d: int  # uint32
     n: int  # uint32
     m: int  # uint32
@@ -1966,18 +2052,21 @@ class ROR_register:
 class WFE:
     opcode: ClassVar[int] = Opcode.OP_WFE
     encoding: Encoding
+    sideeffects: SideffectFlags
 
 
 @dataclass(frozen=True, eq=True)
 class WFI:
     opcode: ClassVar[int] = Opcode.OP_WFI
     encoding: Encoding
+    sideeffects: SideffectFlags
 
 
 @dataclass(frozen=True, eq=True)
 class UXTAB:
     opcode: ClassVar[int] = Opcode.OP_UXTAB
     encoding: Encoding
+    sideeffects: SideffectFlags
     d: int  # uint32
     n: int  # uint32
     m: int  # uint32
@@ -1988,6 +2077,7 @@ class UXTAB:
 class UXTAB16:
     opcode: ClassVar[int] = Opcode.OP_UXTAB16
     encoding: Encoding
+    sideeffects: SideffectFlags
     d: int  # uint32
     n: int  # uint32
     m: int  # uint32
@@ -1998,6 +2088,7 @@ class UXTAB16:
 class UADD16:
     opcode: ClassVar[int] = Opcode.OP_UADD16
     encoding: Encoding
+    sideeffects: SideffectFlags
     d: int  # uint32
     n: int  # uint32
     m: int  # uint32
@@ -2007,6 +2098,7 @@ class UADD16:
 class UADD8:
     opcode: ClassVar[int] = Opcode.OP_UADD8
     encoding: Encoding
+    sideeffects: SideffectFlags
     d: int  # uint32
     n: int  # uint32
     m: int  # uint32
@@ -2016,6 +2108,7 @@ class UADD8:
 class PKHBT_PKHTB:
     opcode: ClassVar[int] = Opcode.OP_PKHBT_PKHTB
     encoding: Encoding
+    sideeffects: SideffectFlags
     d: int  # uint32
     n: int  # uint32
     m: int  # uint32
@@ -2030,12 +2123,14 @@ class PKHBT_PKHTB:
 class PSSBB:
     opcode: ClassVar[int] = Opcode.OP_PSSBB
     encoding: Encoding
+    sideeffects: SideffectFlags
 
 
 @dataclass(frozen=True, eq=True)
 class QADD:
     opcode: ClassVar[int] = Opcode.OP_QADD
     encoding: Encoding
+    sideeffects: SideffectFlags
     d: int  # uint32
     n: int  # uint32
     m: int  # uint32
@@ -2045,6 +2140,7 @@ class QADD:
 class QADD16:
     opcode: ClassVar[int] = Opcode.OP_QADD16
     encoding: Encoding
+    sideeffects: SideffectFlags
     d: int  # uint32
     n: int  # uint32
     m: int  # uint32
@@ -2054,6 +2150,7 @@ class QADD16:
 class QADD8:
     opcode: ClassVar[int] = Opcode.OP_QADD8
     encoding: Encoding
+    sideeffects: SideffectFlags
     d: int  # uint32
     n: int  # uint32
     m: int  # uint32
@@ -2063,6 +2160,7 @@ class QADD8:
 class QASX:
     opcode: ClassVar[int] = Opcode.OP_QASX
     encoding: Encoding
+    sideeffects: SideffectFlags
     d: int  # uint32
     n: int  # uint32
     m: int  # uint32
@@ -2072,6 +2170,7 @@ class QASX:
 class QDADD:
     opcode: ClassVar[int] = Opcode.OP_QDADD
     encoding: Encoding
+    sideeffects: SideffectFlags
     d: int  # uint32
     n: int  # uint32
     m: int  # uint32
@@ -2081,6 +2180,7 @@ class QDADD:
 class QDSUB:
     opcode: ClassVar[int] = Opcode.OP_QDSUB
     encoding: Encoding
+    sideeffects: SideffectFlags
     d: int  # uint32
     n: int  # uint32
     m: int  # uint32
@@ -2090,6 +2190,7 @@ class QDSUB:
 class QSAX:
     opcode: ClassVar[int] = Opcode.OP_QSAX
     encoding: Encoding
+    sideeffects: SideffectFlags
     d: int  # uint32
     n: int  # uint32
     m: int  # uint32
@@ -2099,6 +2200,7 @@ class QSAX:
 class QSUB:
     opcode: ClassVar[int] = Opcode.OP_QSUB
     encoding: Encoding
+    sideeffects: SideffectFlags
     d: int  # uint32
     n: int  # uint32
     m: int  # uint32
@@ -2108,6 +2210,7 @@ class QSUB:
 class QSUB16:
     opcode: ClassVar[int] = Opcode.OP_QSUB16
     encoding: Encoding
+    sideeffects: SideffectFlags
     d: int  # uint32
     n: int  # uint32
     m: int  # uint32
@@ -2117,6 +2220,7 @@ class QSUB16:
 class QSUB8:
     opcode: ClassVar[int] = Opcode.OP_QSUB8
     encoding: Encoding
+    sideeffects: SideffectFlags
     d: int  # uint32
     n: int  # uint32
     m: int  # uint32
@@ -2126,6 +2230,7 @@ class QSUB8:
 class RBIT:
     opcode: ClassVar[int] = Opcode.OP_RBIT
     encoding: Encoding
+    sideeffects: SideffectFlags
     d: int  # uint32
     m: int  # uint32
 
@@ -2134,6 +2239,7 @@ class RBIT:
 class SADD16:
     opcode: ClassVar[int] = Opcode.OP_SADD16
     encoding: Encoding
+    sideeffects: SideffectFlags
     d: int  # uint32
     n: int  # uint32
     m: int  # uint32
@@ -2143,6 +2249,7 @@ class SADD16:
 class SADD8:
     opcode: ClassVar[int] = Opcode.OP_SADD8
     encoding: Encoding
+    sideeffects: SideffectFlags
     d: int  # uint32
     n: int  # uint32
     m: int  # uint32
@@ -2152,6 +2259,7 @@ class SADD8:
 class SMLABB_SMLABT_SMLATB_SMLATT:
     opcode: ClassVar[int] = Opcode.OP_SMLABB_SMLABT_SMLATB_SMLATT
     encoding: Encoding
+    sideeffects: SideffectFlags
     d: int  # uint32
     n: int  # uint32
     m: int  # uint32
@@ -2164,6 +2272,7 @@ class SMLABB_SMLABT_SMLATB_SMLATT:
 class SMLAD_SMLADX:
     opcode: ClassVar[int] = Opcode.OP_SMLAD_SMLADX
     encoding: Encoding
+    sideeffects: SideffectFlags
     d: int  # uint32
     n: int  # uint32
     m: int  # uint32
@@ -2175,6 +2284,7 @@ class SMLAD_SMLADX:
 class SMLAL:
     opcode: ClassVar[int] = Opcode.OP_SMLAL
     encoding: Encoding
+    sideeffects: SideffectFlags
     dLo: int  # uint32
     dHi: int  # uint32
     n: int  # uint32
@@ -2186,6 +2296,7 @@ class SMLAL:
 class SMLALBB_SMLALBT_SMLALTB_SMLALTT:
     opcode: ClassVar[int] = Opcode.OP_SMLALBB_SMLALBT_SMLALTB_SMLALTT
     encoding: Encoding
+    sideeffects: SideffectFlags
     dLo: int  # uint32
     dHi: int  # uint32
     n: int  # uint32
@@ -2198,6 +2309,7 @@ class SMLALBB_SMLALBT_SMLALTB_SMLALTT:
 class SMLALD_SMLALDX:
     opcode: ClassVar[int] = Opcode.OP_SMLALD_SMLALDX
     encoding: Encoding
+    sideeffects: SideffectFlags
     dLo: int  # uint32
     dHi: int  # uint32
     n: int  # uint32
@@ -2209,6 +2321,7 @@ class SMLALD_SMLALDX:
 class SMLAWB_SMLAWT:
     opcode: ClassVar[int] = Opcode.OP_SMLAWB_SMLAWT
     encoding: Encoding
+    sideeffects: SideffectFlags
     d: int  # uint32
     n: int  # uint32
     m: int  # uint32
@@ -2220,6 +2333,7 @@ class SMLAWB_SMLAWT:
 class SMLSD_SMLSDX:
     opcode: ClassVar[int] = Opcode.OP_SMLSD_SMLSDX
     encoding: Encoding
+    sideeffects: SideffectFlags
     d: int  # uint32
     n: int  # uint32
     m: int  # uint32
@@ -2231,6 +2345,7 @@ class SMLSD_SMLSDX:
 class SMLSLD_SMLSLDX:
     opcode: ClassVar[int] = Opcode.OP_SMLSLD_SMLSLDX
     encoding: Encoding
+    sideeffects: SideffectFlags
     dLo: int  # uint32
     dHi: int  # uint32
     n: int  # uint32
@@ -2242,6 +2357,7 @@ class SMLSLD_SMLSLDX:
 class SMMLA_SMMLAR:
     opcode: ClassVar[int] = Opcode.OP_SMMLA_SMMLAR
     encoding: Encoding
+    sideeffects: SideffectFlags
     d: int  # uint32
     n: int  # uint32
     m: int  # uint32
@@ -2253,6 +2369,7 @@ class SMMLA_SMMLAR:
 class SMMLS_SMMLSR:
     opcode: ClassVar[int] = Opcode.OP_SMMLS_SMMLSR
     encoding: Encoding
+    sideeffects: SideffectFlags
     d: int  # uint32
     n: int  # uint32
     m: int  # uint32
@@ -2264,6 +2381,7 @@ class SMMLS_SMMLSR:
 class SMMUL_SMMULR:
     opcode: ClassVar[int] = Opcode.OP_SMMUL_SMMULR
     encoding: Encoding
+    sideeffects: SideffectFlags
     d: int  # uint32
     n: int  # uint32
     m: int  # uint32
@@ -2274,6 +2392,7 @@ class SMMUL_SMMULR:
 class SMUAD_SMUADX:
     opcode: ClassVar[int] = Opcode.OP_SMUAD_SMUADX
     encoding: Encoding
+    sideeffects: SideffectFlags
     d: int  # uint32
     n: int  # uint32
     m: int  # uint32
@@ -2284,6 +2403,7 @@ class SMUAD_SMUADX:
 class SMULBB_SMULBT_SMULTB_SMULTT:
     opcode: ClassVar[int] = Opcode.OP_SMULBB_SMULBT_SMULTB_SMULTT
     encoding: Encoding
+    sideeffects: SideffectFlags
     d: int  # uint32
     n: int  # uint32
     m: int  # uint32
@@ -2295,6 +2415,7 @@ class SMULBB_SMULBT_SMULTB_SMULTT:
 class SMULWB_SMULWT:
     opcode: ClassVar[int] = Opcode.OP_SMULWB_SMULWT
     encoding: Encoding
+    sideeffects: SideffectFlags
     d: int  # uint32
     n: int  # uint32
     m: int  # uint32
@@ -2305,6 +2426,7 @@ class SMULWB_SMULWT:
 class SMUSD_SMUSDX:
     opcode: ClassVar[int] = Opcode.OP_SMUSD_SMUSDX
     encoding: Encoding
+    sideeffects: SideffectFlags
     d: int  # uint32
     n: int  # uint32
     m: int  # uint32
@@ -2315,6 +2437,7 @@ class SMUSD_SMUSDX:
 class SSAT:
     opcode: ClassVar[int] = Opcode.OP_SSAT
     encoding: Encoding
+    sideeffects: SideffectFlags
     d: int  # uint32
     n: int  # uint32
     saturate_to: int  # uint32
@@ -2326,6 +2449,7 @@ class SSAT:
 class SSAT16:
     opcode: ClassVar[int] = Opcode.OP_SSAT16
     encoding: Encoding
+    sideeffects: SideffectFlags
     d: int  # uint32
     n: int  # uint32
     saturate_to: int  # uint32
@@ -2335,6 +2459,7 @@ class SSAT16:
 class SSAX:
     opcode: ClassVar[int] = Opcode.OP_SSAX
     encoding: Encoding
+    sideeffects: SideffectFlags
     d: int  # uint32
     n: int  # uint32
     m: int  # uint32
@@ -2344,12 +2469,14 @@ class SSAX:
 class SSBB:
     opcode: ClassVar[int] = Opcode.OP_SSBB
     encoding: Encoding
+    sideeffects: SideffectFlags
 
 
 @dataclass(frozen=True, eq=True)
 class SSUB16:
     opcode: ClassVar[int] = Opcode.OP_SSUB16
     encoding: Encoding
+    sideeffects: SideffectFlags
     d: int  # uint32
     n: int  # uint32
     m: int  # uint32
@@ -2359,6 +2486,7 @@ class SSUB16:
 class SSUB8:
     opcode: ClassVar[int] = Opcode.OP_SSUB8
     encoding: Encoding
+    sideeffects: SideffectFlags
     d: int  # uint32
     n: int  # uint32
     m: int  # uint32
@@ -2368,6 +2496,7 @@ class SSUB8:
 class UDF:
     opcode: ClassVar[int] = Opcode.OP_UDF
     encoding: Encoding
+    sideeffects: SideffectFlags
     imm32: int  # bits32
 
 
@@ -2375,6 +2504,7 @@ class UDF:
 class UHADD16:
     opcode: ClassVar[int] = Opcode.OP_UHADD16
     encoding: Encoding
+    sideeffects: SideffectFlags
     d: int  # uint32
     n: int  # uint32
     m: int  # uint32
@@ -2384,6 +2514,7 @@ class UHADD16:
 class UHADD8:
     opcode: ClassVar[int] = Opcode.OP_UHADD8
     encoding: Encoding
+    sideeffects: SideffectFlags
     d: int  # uint32
     n: int  # uint32
     m: int  # uint32
@@ -2393,6 +2524,7 @@ class UHADD8:
 class UHASX:
     opcode: ClassVar[int] = Opcode.OP_UHASX
     encoding: Encoding
+    sideeffects: SideffectFlags
     d: int  # uint32
     n: int  # uint32
     m: int  # uint32
@@ -2402,6 +2534,7 @@ class UHASX:
 class UHSAX:
     opcode: ClassVar[int] = Opcode.OP_UHSAX
     encoding: Encoding
+    sideeffects: SideffectFlags
     d: int  # uint32
     n: int  # uint32
     m: int  # uint32
@@ -2411,6 +2544,7 @@ class UHSAX:
 class UHSUB16:
     opcode: ClassVar[int] = Opcode.OP_UHSUB16
     encoding: Encoding
+    sideeffects: SideffectFlags
     d: int  # uint32
     n: int  # uint32
     m: int  # uint32
@@ -2420,6 +2554,7 @@ class UHSUB16:
 class UHSUB8:
     opcode: ClassVar[int] = Opcode.OP_UHSUB8
     encoding: Encoding
+    sideeffects: SideffectFlags
     d: int  # uint32
     n: int  # uint32
     m: int  # uint32
@@ -2429,6 +2564,7 @@ class UHSUB8:
 class UMAAL:
     opcode: ClassVar[int] = Opcode.OP_UMAAL
     encoding: Encoding
+    sideeffects: SideffectFlags
     dLo: int  # uint32
     dHi: int  # uint32
     n: int  # uint32
@@ -2439,6 +2575,7 @@ class UMAAL:
 class UQSAX:
     opcode: ClassVar[int] = Opcode.OP_UQSAX
     encoding: Encoding
+    sideeffects: SideffectFlags
     d: int  # uint32
     n: int  # uint32
     m: int  # uint32
@@ -2448,6 +2585,7 @@ class UQSAX:
 class UQSUB16:
     opcode: ClassVar[int] = Opcode.OP_UQSUB16
     encoding: Encoding
+    sideeffects: SideffectFlags
     d: int  # uint32
     n: int  # uint32
     m: int  # uint32
@@ -2457,6 +2595,7 @@ class UQSUB16:
 class UQSUB8:
     opcode: ClassVar[int] = Opcode.OP_UQSUB8
     encoding: Encoding
+    sideeffects: SideffectFlags
     d: int  # uint32
     n: int  # uint32
     m: int  # uint32
@@ -2466,6 +2605,7 @@ class UQSUB8:
 class USAT:
     opcode: ClassVar[int] = Opcode.OP_USAT
     encoding: Encoding
+    sideeffects: SideffectFlags
     d: int  # uint32
     n: int  # uint32
     saturate_to: int  # uint32
@@ -2477,6 +2617,7 @@ class USAT:
 class USAT16:
     opcode: ClassVar[int] = Opcode.OP_USAT16
     encoding: Encoding
+    sideeffects: SideffectFlags
     d: int  # uint32
     n: int  # uint32
     saturate_to: int  # uint32
@@ -2486,12 +2627,14 @@ class USAT16:
 class YIELD:
     opcode: ClassVar[int] = Opcode.OP_YIELD
     encoding: Encoding
+    sideeffects: SideffectFlags
 
 
 @dataclass(frozen=True, eq=True)
 class LDRBT:
     opcode: ClassVar[int] = Opcode.OP_LDRBT
     encoding: Encoding
+    sideeffects: SideffectFlags
     t: int  # uint32
     n: int  # uint32
     postindex: bool
@@ -2504,6 +2647,7 @@ class LDRBT:
 class LDREXB:
     opcode: ClassVar[int] = Opcode.OP_LDREXB
     encoding: Encoding
+    sideeffects: SideffectFlags
     t: int  # uint32
     n: int  # uint32
 
@@ -2512,6 +2656,7 @@ class LDREXB:
 class LDREXH:
     opcode: ClassVar[int] = Opcode.OP_LDREXH
     encoding: Encoding
+    sideeffects: SideffectFlags
     t: int  # uint32
     n: int  # uint32
 
@@ -2520,6 +2665,7 @@ class LDREXH:
 class LDRHT:
     opcode: ClassVar[int] = Opcode.OP_LDRHT
     encoding: Encoding
+    sideeffects: SideffectFlags
     t: int  # uint32
     n: int  # uint32
     postindex: bool
@@ -2532,6 +2678,7 @@ class LDRHT:
 class LDRSBT:
     opcode: ClassVar[int] = Opcode.OP_LDRSBT
     encoding: Encoding
+    sideeffects: SideffectFlags
     t: int  # uint32
     n: int  # uint32
     postindex: bool
@@ -2544,6 +2691,7 @@ class LDRSBT:
 class LDRSHT:
     opcode: ClassVar[int] = Opcode.OP_LDRSHT
     encoding: Encoding
+    sideeffects: SideffectFlags
     t: int  # uint32
     n: int  # uint32
     postindex: bool
@@ -2556,6 +2704,7 @@ class LDRSHT:
 class MRRC_MRRC2:
     opcode: ClassVar[int] = Opcode.OP_MRRC_MRRC2
     encoding: Encoding
+    sideeffects: SideffectFlags
     t: int  # uint32
     t2: int  # uint32
     cp: int  # uint32
@@ -2567,6 +2716,7 @@ class MRRC_MRRC2:
 class SASX:
     opcode: ClassVar[int] = Opcode.OP_SASX
     encoding: Encoding
+    sideeffects: SideffectFlags
     d: int  # uint32
     n: int  # uint32
     m: int  # uint32
@@ -2576,6 +2726,7 @@ class SASX:
 class SBFX:
     opcode: ClassVar[int] = Opcode.OP_SBFX
     encoding: Encoding
+    sideeffects: SideffectFlags
     d: int  # uint32
     n: int  # uint32
     lsbit: int  # uint32
@@ -2586,6 +2737,7 @@ class SBFX:
 class SEL:
     opcode: ClassVar[int] = Opcode.OP_SEL
     encoding: Encoding
+    sideeffects: SideffectFlags
     d: int  # uint32
     n: int  # uint32
     m: int  # uint32
@@ -2595,12 +2747,14 @@ class SEL:
 class SEV:
     opcode: ClassVar[int] = Opcode.OP_SEV
     encoding: Encoding
+    sideeffects: SideffectFlags
 
 
 @dataclass(frozen=True, eq=True)
 class SHADD16:
     opcode: ClassVar[int] = Opcode.OP_SHADD16
     encoding: Encoding
+    sideeffects: SideffectFlags
     d: int  # uint32
     n: int  # uint32
     m: int  # uint32
@@ -2610,6 +2764,7 @@ class SHADD16:
 class SHADD8:
     opcode: ClassVar[int] = Opcode.OP_SHADD8
     encoding: Encoding
+    sideeffects: SideffectFlags
     d: int  # uint32
     n: int  # uint32
     m: int  # uint32
@@ -2619,6 +2774,7 @@ class SHADD8:
 class SHASX:
     opcode: ClassVar[int] = Opcode.OP_SHASX
     encoding: Encoding
+    sideeffects: SideffectFlags
     d: int  # uint32
     n: int  # uint32
     m: int  # uint32
@@ -2628,6 +2784,7 @@ class SHASX:
 class SHSAX:
     opcode: ClassVar[int] = Opcode.OP_SHSAX
     encoding: Encoding
+    sideeffects: SideffectFlags
     d: int  # uint32
     n: int  # uint32
     m: int  # uint32
@@ -2637,6 +2794,7 @@ class SHSAX:
 class SHSUB16:
     opcode: ClassVar[int] = Opcode.OP_SHSUB16
     encoding: Encoding
+    sideeffects: SideffectFlags
     d: int  # uint32
     n: int  # uint32
     m: int  # uint32
@@ -2646,6 +2804,7 @@ class SHSUB16:
 class SHSUB8:
     opcode: ClassVar[int] = Opcode.OP_SHSUB8
     encoding: Encoding
+    sideeffects: SideffectFlags
     d: int  # uint32
     n: int  # uint32
     m: int  # uint32
@@ -2655,6 +2814,7 @@ class SHSUB8:
 class STRBT:
     opcode: ClassVar[int] = Opcode.OP_STRBT
     encoding: Encoding
+    sideeffects: SideffectFlags
     t: int  # uint32
     n: int  # uint32
     postindex: bool
@@ -2667,6 +2827,7 @@ class STRBT:
 class STREXB:
     opcode: ClassVar[int] = Opcode.OP_STREXB
     encoding: Encoding
+    sideeffects: SideffectFlags
     d: int  # uint32
     t: int  # uint32
     n: int  # uint32
@@ -2676,6 +2837,7 @@ class STREXB:
 class STREXH:
     opcode: ClassVar[int] = Opcode.OP_STREXH
     encoding: Encoding
+    sideeffects: SideffectFlags
     d: int  # uint32
     t: int  # uint32
     n: int  # uint32
@@ -2685,6 +2847,7 @@ class STREXH:
 class STRHT:
     opcode: ClassVar[int] = Opcode.OP_STRHT
     encoding: Encoding
+    sideeffects: SideffectFlags
     t: int  # uint32
     n: int  # uint32
     postindex: bool
@@ -2697,6 +2860,7 @@ class STRHT:
 class STRT:
     opcode: ClassVar[int] = Opcode.OP_STRT
     encoding: Encoding
+    sideeffects: SideffectFlags
     t: int  # uint32
     n: int  # uint32
     postindex: bool
@@ -2709,6 +2873,7 @@ class STRT:
 class UASX:
     opcode: ClassVar[int] = Opcode.OP_UASX
     encoding: Encoding
+    sideeffects: SideffectFlags
     d: int  # uint32
     n: int  # uint32
     m: int  # uint32
@@ -2718,6 +2883,7 @@ class UASX:
 class UQADD16:
     opcode: ClassVar[int] = Opcode.OP_UQADD16
     encoding: Encoding
+    sideeffects: SideffectFlags
     d: int  # uint32
     n: int  # uint32
     m: int  # uint32
@@ -2727,6 +2893,7 @@ class UQADD16:
 class UQADD8:
     opcode: ClassVar[int] = Opcode.OP_UQADD8
     encoding: Encoding
+    sideeffects: SideffectFlags
     d: int  # uint32
     n: int  # uint32
     m: int  # uint32
@@ -2736,6 +2903,7 @@ class UQADD8:
 class UQASX:
     opcode: ClassVar[int] = Opcode.OP_UQASX
     encoding: Encoding
+    sideeffects: SideffectFlags
     d: int  # uint32
     n: int  # uint32
     m: int  # uint32
@@ -2745,6 +2913,7 @@ class UQASX:
 class USAD8:
     opcode: ClassVar[int] = Opcode.OP_USAD8
     encoding: Encoding
+    sideeffects: SideffectFlags
     d: int  # uint32
     n: int  # uint32
     m: int  # uint32
@@ -2754,6 +2923,7 @@ class USAD8:
 class USADA8:
     opcode: ClassVar[int] = Opcode.OP_USADA8
     encoding: Encoding
+    sideeffects: SideffectFlags
     d: int  # uint32
     n: int  # uint32
     m: int  # uint32
@@ -2764,6 +2934,7 @@ class USADA8:
 class USAX:
     opcode: ClassVar[int] = Opcode.OP_USAX
     encoding: Encoding
+    sideeffects: SideffectFlags
     d: int  # uint32
     n: int  # uint32
     m: int  # uint32
@@ -2773,6 +2944,7 @@ class USAX:
 class USUB16:
     opcode: ClassVar[int] = Opcode.OP_USUB16
     encoding: Encoding
+    sideeffects: SideffectFlags
     d: int  # uint32
     n: int  # uint32
     m: int  # uint32
@@ -2782,6 +2954,7 @@ class USUB16:
 class USUB8:
     opcode: ClassVar[int] = Opcode.OP_USUB8
     encoding: Encoding
+    sideeffects: SideffectFlags
     d: int  # uint32
     n: int  # uint32
     m: int  # uint32
@@ -2791,6 +2964,7 @@ class USUB8:
 class UXTAH:
     opcode: ClassVar[int] = Opcode.OP_UXTAH
     encoding: Encoding
+    sideeffects: SideffectFlags
     d: int  # uint32
     n: int  # uint32
     m: int  # uint32
@@ -2801,6 +2975,7 @@ class UXTAH:
 class UXTB16:
     opcode: ClassVar[int] = Opcode.OP_UXTB16
     encoding: Encoding
+    sideeffects: SideffectFlags
     d: int  # uint32
     m: int  # uint32
     rotation: int  # uint32
@@ -2810,6 +2985,7 @@ class UXTB16:
 class VABS:
     opcode: ClassVar[int] = Opcode.OP_VABS
     encoding: Encoding
+    sideeffects: SideffectFlags
     dp_operation: bool
     d: int  # uint32
     m: int  # uint32
@@ -2819,6 +2995,7 @@ class VABS:
 class VADD:
     opcode: ClassVar[int] = Opcode.OP_VADD
     encoding: Encoding
+    sideeffects: SideffectFlags
     dp_operation: bool
     d: int  # uint32
     n: int  # uint32
@@ -2829,6 +3006,7 @@ class VADD:
 class VCMP_VCMPE:
     opcode: ClassVar[int] = Opcode.OP_VCMP_VCMPE
     encoding: Encoding
+    sideeffects: SideffectFlags
     dp_operation: bool
     quiet_nan_exc: bool
     with_zero: bool
@@ -2840,6 +3018,7 @@ class VCMP_VCMPE:
 class VCVTA_VCVTN_VCVTP_VCVTM:
     opcode: ClassVar[int] = Opcode.OP_VCVTA_VCVTN_VCVTP_VCVTM
     encoding: Encoding
+    sideeffects: SideffectFlags
     dp_operation: bool
     unsigned: bool
     round_mode: int  # bits2
@@ -2851,6 +3030,7 @@ class VCVTA_VCVTN_VCVTP_VCVTM:
 class VCVT_VCVTR_integer:
     opcode: ClassVar[int] = Opcode.OP_VCVT_VCVTR_INTEGER
     encoding: Encoding
+    sideeffects: SideffectFlags
     to_integer: bool
     dp_operation: bool
     unsigned: bool
@@ -2864,6 +3044,7 @@ class VCVT_VCVTR_integer:
 class VCVT_fixed_point:
     opcode: ClassVar[int] = Opcode.OP_VCVT_FIXED_POINT
     encoding: Encoding
+    sideeffects: SideffectFlags
     to_fixed: bool
     dp_operation: bool
     unsigned: bool
@@ -2878,6 +3059,7 @@ class VCVT_fixed_point:
 class VCVT_double_single:
     opcode: ClassVar[int] = Opcode.OP_VCVT_DOUBLE_SINGLE
     encoding: Encoding
+    sideeffects: SideffectFlags
     double_to_single: bool
     d: int  # uint32
     m: int  # uint32
@@ -2887,6 +3069,7 @@ class VCVT_double_single:
 class VCVTB_VCVTT:
     opcode: ClassVar[int] = Opcode.OP_VCVTB_VCVTT
     encoding: Encoding
+    sideeffects: SideffectFlags
     dp_operation: bool
     convert_from_half: bool
     lowbit: int  # bits5
@@ -2898,6 +3081,7 @@ class VCVTB_VCVTT:
 class VDIV:
     opcode: ClassVar[int] = Opcode.OP_VDIV
     encoding: Encoding
+    sideeffects: SideffectFlags
     dp_operation: bool
     d: int  # uint32
     n: int  # uint32
@@ -2908,6 +3092,7 @@ class VDIV:
 class VFMA_VFMS:
     opcode: ClassVar[int] = Opcode.OP_VFMA_VFMS
     encoding: Encoding
+    sideeffects: SideffectFlags
     dp_operation: bool
     op1_neg: bool
     d: int  # uint32
@@ -2919,6 +3104,7 @@ class VFMA_VFMS:
 class VFNMA_VFNMS:
     opcode: ClassVar[int] = Opcode.OP_VFNMA_VFNMS
     encoding: Encoding
+    sideeffects: SideffectFlags
     op1_neg: bool
     dp_operation: bool
     d: int  # uint32
@@ -2930,6 +3116,7 @@ class VFNMA_VFNMS:
 class VLDM:
     opcode: ClassVar[int] = Opcode.OP_VLDM
     encoding: Encoding
+    sideeffects: SideffectFlags
     single_regs: bool
     add: bool
     wback: bool
@@ -2944,6 +3131,7 @@ class VLDM:
 class VLDR:
     opcode: ClassVar[int] = Opcode.OP_VLDR
     encoding: Encoding
+    sideeffects: SideffectFlags
     single_reg: bool
     add: bool
     imm32: int  # bits32
@@ -2955,6 +3143,7 @@ class VLDR:
 class VMAXNM_VMINNM:
     opcode: ClassVar[int] = Opcode.OP_VMAXNM_VMINNM
     encoding: Encoding
+    sideeffects: SideffectFlags
     dp_operation: bool
     maximum: bool
     d: int  # uint32
@@ -2966,6 +3155,7 @@ class VMAXNM_VMINNM:
 class VMLA_VMLS:
     opcode: ClassVar[int] = Opcode.OP_VMLA_VMLS
     encoding: Encoding
+    sideeffects: SideffectFlags
     dp_operation: bool
     add: bool
     d: int  # uint32
@@ -2977,6 +3167,7 @@ class VMLA_VMLS:
 class VMOV_immediate:
     opcode: ClassVar[int] = Opcode.OP_VMOV_IMMEDIATE
     encoding: Encoding
+    sideeffects: SideffectFlags
     dp_operation: bool
     d: int  # uint32
     imm64: int  # bits64
@@ -2987,6 +3178,7 @@ class VMOV_immediate:
 class VMOV_register:
     opcode: ClassVar[int] = Opcode.OP_VMOV_REGISTER
     encoding: Encoding
+    sideeffects: SideffectFlags
     dp_operation: bool
     d: int  # uint32
     m: int  # uint32
@@ -2996,6 +3188,7 @@ class VMOV_register:
 class VMOV_core_to_scalar:
     opcode: ClassVar[int] = Opcode.OP_VMOV_CORE_TO_SCALAR
     encoding: Encoding
+    sideeffects: SideffectFlags
     d: int  # uint32
     t: int  # uint32
 
@@ -3004,6 +3197,7 @@ class VMOV_core_to_scalar:
 class VMOV_scalar_to_core:
     opcode: ClassVar[int] = Opcode.OP_VMOV_SCALAR_TO_CORE
     encoding: Encoding
+    sideeffects: SideffectFlags
     t: int  # uint32
     n: int  # uint32
 
@@ -3012,6 +3206,7 @@ class VMOV_scalar_to_core:
 class VMOV_core_and_single:
     opcode: ClassVar[int] = Opcode.OP_VMOV_CORE_AND_SINGLE
     encoding: Encoding
+    sideeffects: SideffectFlags
     to_arm_register: bool
     t: int  # uint32
     n: int  # uint32
@@ -3021,6 +3216,7 @@ class VMOV_core_and_single:
 class VMOV_two_core_and_two_single:
     opcode: ClassVar[int] = Opcode.OP_VMOV_TWO_CORE_AND_TWO_SINGLE
     encoding: Encoding
+    sideeffects: SideffectFlags
     to_arm_registers: bool
     t: int  # uint32
     t2: int  # uint32
@@ -3031,6 +3227,7 @@ class VMOV_two_core_and_two_single:
 class VMOV_two_core_and_doubleword:
     opcode: ClassVar[int] = Opcode.OP_VMOV_TWO_CORE_AND_DOUBLEWORD
     encoding: Encoding
+    sideeffects: SideffectFlags
     to_arm_registers: bool
     t: int  # uint32
     t2: int  # uint32
@@ -3041,6 +3238,7 @@ class VMOV_two_core_and_doubleword:
 class VMRS:
     opcode: ClassVar[int] = Opcode.OP_VMRS
     encoding: Encoding
+    sideeffects: SideffectFlags
     t: int  # uint32
 
 
@@ -3048,6 +3246,7 @@ class VMRS:
 class VMSR:
     opcode: ClassVar[int] = Opcode.OP_VMSR
     encoding: Encoding
+    sideeffects: SideffectFlags
     t: int  # uint32
 
 
@@ -3055,6 +3254,7 @@ class VMSR:
 class VMUL:
     opcode: ClassVar[int] = Opcode.OP_VMUL
     encoding: Encoding
+    sideeffects: SideffectFlags
     dp_operation: bool
     d: int  # uint32
     n: int  # uint32
@@ -3065,6 +3265,7 @@ class VMUL:
 class VNEG:
     opcode: ClassVar[int] = Opcode.OP_VNEG
     encoding: Encoding
+    sideeffects: SideffectFlags
     dp_operation: bool
     d: int  # uint32
     m: int  # uint32
@@ -3074,6 +3275,7 @@ class VNEG:
 class VNMLA_VNMLS_VNMUL:
     opcode: ClassVar[int] = Opcode.OP_VNMLA_VNMLS_VNMUL
     encoding: Encoding
+    sideeffects: SideffectFlags
     type: int  # bits2
     dp_operation: bool
     d: int  # uint32
@@ -3085,6 +3287,7 @@ class VNMLA_VNMLS_VNMUL:
 class VPOP:
     opcode: ClassVar[int] = Opcode.OP_VPOP
     encoding: Encoding
+    sideeffects: SideffectFlags
     single_regs: bool
     d: int  # uint32
     imm32: int  # bits32
@@ -3095,6 +3298,7 @@ class VPOP:
 class VPUSH:
     opcode: ClassVar[int] = Opcode.OP_VPUSH
     encoding: Encoding
+    sideeffects: SideffectFlags
     single_regs: bool
     d: int  # uint32
     imm32: int  # bits32
@@ -3105,6 +3309,7 @@ class VPUSH:
 class VRINTA_VRINTN_VRINTP_VRINTM:
     opcode: ClassVar[int] = Opcode.OP_VRINTA_VRINTN_VRINTP_VRINTM
     encoding: Encoding
+    sideeffects: SideffectFlags
     dp_operation: bool
     rmode: int  # bits2
     away: bool
@@ -3117,6 +3322,7 @@ class VRINTA_VRINTN_VRINTP_VRINTM:
 class VRINTX:
     opcode: ClassVar[int] = Opcode.OP_VRINTX
     encoding: Encoding
+    sideeffects: SideffectFlags
     dp_operation: bool
     d: int  # uint32
     m: int  # uint32
@@ -3126,6 +3332,7 @@ class VRINTX:
 class VRINTZ_VRINTR:
     opcode: ClassVar[int] = Opcode.OP_VRINTZ_VRINTR
     encoding: Encoding
+    sideeffects: SideffectFlags
     dp_operation: bool
     rmode: int  # bits2
     d: int  # uint32
@@ -3136,6 +3343,7 @@ class VRINTZ_VRINTR:
 class VSEL:
     opcode: ClassVar[int] = Opcode.OP_VSEL
     encoding: Encoding
+    sideeffects: SideffectFlags
     dp_operation: bool
     cond: int  # bits4
     d: int  # uint32
@@ -3147,6 +3355,7 @@ class VSEL:
 class VSQRT:
     opcode: ClassVar[int] = Opcode.OP_VSQRT
     encoding: Encoding
+    sideeffects: SideffectFlags
     dp_operation: bool
     d: int  # uint32
     m: int  # uint32
@@ -3156,6 +3365,7 @@ class VSQRT:
 class VSTM:
     opcode: ClassVar[int] = Opcode.OP_VSTM
     encoding: Encoding
+    sideeffects: SideffectFlags
     single_regs: bool
     add: bool
     wback: bool
@@ -3170,6 +3380,7 @@ class VSTM:
 class VSTR:
     opcode: ClassVar[int] = Opcode.OP_VSTR
     encoding: Encoding
+    sideeffects: SideffectFlags
     single_reg: bool
     add: bool
     imm32: int  # bits32
@@ -3181,6 +3392,7 @@ class VSTR:
 class VSUB:
     opcode: ClassVar[int] = Opcode.OP_VSUB
     encoding: Encoding
+    sideeffects: SideffectFlags
     dp_operation: bool
     d: int  # uint32
     n: int  # uint32
@@ -3200,8 +3412,9 @@ def decode_8bit(instr: int, ctx: Context):
 
     ``instr`` holds exactly the 8 bits of the instruction -- no padding and
     no bits belonging to whatever follows it. ``ctx`` is the name arm-transpiller emits
-    for the runtime context argument. Returns the decoded instruction, or a NoMatch /
-    See / Undefined / Unpredictable pseudo-instruction.
+    for the runtime context argument. Returns the decoded instruction -- whose
+    ``sideeffects`` member reports any UNDEFINED / UNPREDICTABLE / SEE condition the
+    decode flagged -- or ``NoMatch``.
     """
     return NoMatch()  # no match
 
@@ -3211,8 +3424,9 @@ def decode_16bit(instr: int, ctx: Context):
 
     ``instr`` holds exactly the 16 bits of the instruction -- no padding and
     no bits belonging to whatever follows it. ``ctx`` is the name arm-transpiller emits
-    for the runtime context argument. Returns the decoded instruction, or a NoMatch /
-    See / Undefined / Unpredictable pseudo-instruction.
+    for the runtime context argument. Returns the decoded instruction -- whose
+    ``sideeffects`` member reports any UNDEFINED / UNPREDICTABLE / SEE condition the
+    decode flagged -- or ``NoMatch``.
     """
     sideffect_flags = SIDEFFECT_NONE
     if (instr & 0xF800) == 0xE000:  # 11100xxxxxxxxxxx
@@ -3225,8 +3439,8 @@ def decode_16bit(instr: int, ctx: Context):
         imm32 = SignExtend(concat_bits(imm11, 0, 1), 12)
         if InITBlock(ctx) and (not (LastInITBlock(ctx))):
             sideffect_flags |= SIDEFFECT_UNPREDICTABLE
-        return _apply_sideeffect(
-            sideffect_flags, B(encoding=Encoding.T2, imm32=imm32, cond=cond)
+        return B(
+            encoding=Encoding.T2, sideeffects=sideffect_flags, imm32=imm32, cond=cond
         )
     elif (instr & 0xF000) == 0x4000:  # 0100xxxxxxxxxxxx
         if (instr & 0x800) == 0x0:  # xxxx0xxxxxxxxxxx
@@ -3245,6 +3459,7 @@ def decode_16bit(instr: int, ctx: Context):
                     shift_t, shift_n = (SRType_LSL, 0)
                     return ADC_register(
                         encoding=Encoding.T1,
+                        sideeffects=SIDEFFECT_NONE,
                         d=d,
                         n=n,
                         m=m,
@@ -3264,7 +3479,12 @@ def decode_16bit(instr: int, ctx: Context):
                     m = UInt(Rm)
                     setflags = not (InITBlock(ctx))
                     return ASR_register(
-                        encoding=Encoding.T1, d=d, n=n, m=m, setflags=setflags
+                        encoding=Encoding.T1,
+                        sideeffects=SIDEFFECT_NONE,
+                        d=d,
+                        n=n,
+                        m=m,
+                        setflags=setflags,
                     )
                 elif (instr & 0xC0) == 0x80:  # xxxxxxxx10xxxxxx
                     # sbc_register_t1
@@ -3280,6 +3500,7 @@ def decode_16bit(instr: int, ctx: Context):
                     shift_t, shift_n = (SRType_LSL, 0)
                     return SBC_register(
                         encoding=Encoding.T1,
+                        sideeffects=SIDEFFECT_NONE,
                         d=d,
                         n=n,
                         m=m,
@@ -3299,7 +3520,12 @@ def decode_16bit(instr: int, ctx: Context):
                     m = UInt(Rm)
                     setflags = not (InITBlock(ctx))
                     return ROR_register(
-                        encoding=Encoding.T1, d=d, n=n, m=m, setflags=setflags
+                        encoding=Encoding.T1,
+                        sideeffects=SIDEFFECT_NONE,
+                        d=d,
+                        n=n,
+                        m=m,
+                        setflags=setflags,
                     )
                 return NoMatch()  # no match
             elif (instr & 0x700) == 0x400:  # xxxxx100xxxxxxxx
@@ -3316,16 +3542,14 @@ def decode_16bit(instr: int, ctx: Context):
                     if ((d == 15) and InITBlock(ctx)) and (not (LastInITBlock(ctx))):
                         sideffect_flags |= SIDEFFECT_UNPREDICTABLE
                     shift_t, shift_n = (SRType_LSL, 0)
-                    return _apply_sideeffect(
-                        sideffect_flags,
-                        ADD_SP_plus_register(
-                            encoding=Encoding.T1,
-                            d=d,
-                            m=m,
-                            setflags=setflags,
-                            shift_t=shift_t,
-                            shift_n=shift_n,
-                        ),
+                    return ADD_SP_plus_register(
+                        encoding=Encoding.T1,
+                        sideeffects=sideffect_flags,
+                        d=d,
+                        m=m,
+                        setflags=setflags,
+                        shift_t=shift_t,
+                        shift_n=shift_n,
                     )
                 elif (instr & 0x87) == 0x85:  # xxxxxxxx1xxxx101
                     # add_sp_plus_register_t2
@@ -3339,16 +3563,14 @@ def decode_16bit(instr: int, ctx: Context):
                     m = UInt(Rm)
                     setflags = False
                     shift_t, shift_n = (SRType_LSL, 0)
-                    return _apply_sideeffect(
-                        sideffect_flags,
-                        ADD_SP_plus_register(
-                            encoding=Encoding.T2,
-                            d=d,
-                            m=m,
-                            setflags=setflags,
-                            shift_t=shift_t,
-                            shift_n=shift_n,
-                        ),
+                    return ADD_SP_plus_register(
+                        encoding=Encoding.T2,
+                        sideeffects=sideffect_flags,
+                        d=d,
+                        m=m,
+                        setflags=setflags,
+                        shift_t=shift_t,
+                        shift_n=shift_n,
                     )
                 elif (instr & 0x0) == 0x0:  # xxxxxxxxxxxxxxxx
                     # add_register_t2
@@ -3369,17 +3591,15 @@ def decode_16bit(instr: int, ctx: Context):
                         sideffect_flags |= SIDEFFECT_UNPREDICTABLE
                     if (d == 15) and (m == 15):
                         sideffect_flags |= SIDEFFECT_UNPREDICTABLE
-                    return _apply_sideeffect(
-                        sideffect_flags,
-                        ADD_register(
-                            encoding=Encoding.T2,
-                            d=d,
-                            n=n,
-                            m=m,
-                            setflags=setflags,
-                            shift_t=shift_t,
-                            shift_n=shift_n,
-                        ),
+                    return ADD_register(
+                        encoding=Encoding.T2,
+                        sideeffects=sideffect_flags,
+                        d=d,
+                        n=n,
+                        m=m,
+                        setflags=setflags,
+                        shift_t=shift_t,
+                        shift_n=shift_n,
                     )
                 return NoMatch()  # no match
             elif (instr & 0x700) == 0x600:  # xxxxx110xxxxxxxx
@@ -3395,9 +3615,12 @@ def decode_16bit(instr: int, ctx: Context):
                 setflags = False
                 if ((d == 15) and InITBlock(ctx)) and (not (LastInITBlock(ctx))):
                     sideffect_flags |= SIDEFFECT_UNPREDICTABLE
-                return _apply_sideeffect(
-                    sideffect_flags,
-                    MOV_register(encoding=Encoding.T1, d=d, m=m, setflags=setflags),
+                return MOV_register(
+                    encoding=Encoding.T1,
+                    sideeffects=sideffect_flags,
+                    d=d,
+                    m=m,
+                    setflags=setflags,
                 )
             elif (instr & 0x700) == 0x0:  # xxxxx000xxxxxxxx
                 if (instr & 0xC0) == 0x80:  # xxxxxxxx10xxxxxx
@@ -3412,7 +3635,12 @@ def decode_16bit(instr: int, ctx: Context):
                     m = UInt(Rm)
                     setflags = not (InITBlock(ctx))
                     return LSL_register(
-                        encoding=Encoding.T1, d=d, n=n, m=m, setflags=setflags
+                        encoding=Encoding.T1,
+                        sideeffects=SIDEFFECT_NONE,
+                        d=d,
+                        n=n,
+                        m=m,
+                        setflags=setflags,
                     )
                 elif (instr & 0xC0) == 0xC0:  # xxxxxxxx11xxxxxx
                     # lsr_register_t1
@@ -3426,7 +3654,12 @@ def decode_16bit(instr: int, ctx: Context):
                     m = UInt(Rm)
                     setflags = not (InITBlock(ctx))
                     return LSR_register(
-                        encoding=Encoding.T1, d=d, n=n, m=m, setflags=setflags
+                        encoding=Encoding.T1,
+                        sideeffects=SIDEFFECT_NONE,
+                        d=d,
+                        n=n,
+                        m=m,
+                        setflags=setflags,
                     )
                 elif (instr & 0xC0) == 0x0:  # xxxxxxxx00xxxxxx
                     # and_register_t1
@@ -3442,6 +3675,7 @@ def decode_16bit(instr: int, ctx: Context):
                     shift_t, shift_n = (SRType_LSL, 0)
                     return AND_register(
                         encoding=Encoding.T1,
+                        sideeffects=SIDEFFECT_NONE,
                         d=d,
                         n=n,
                         m=m,
@@ -3463,6 +3697,7 @@ def decode_16bit(instr: int, ctx: Context):
                     shift_t, shift_n = (SRType_LSL, 0)
                     return EOR_register(
                         encoding=Encoding.T1,
+                        sideeffects=SIDEFFECT_NONE,
                         d=d,
                         n=n,
                         m=m,
@@ -3486,6 +3721,7 @@ def decode_16bit(instr: int, ctx: Context):
                     shift_t, shift_n = (SRType_LSL, 0)
                     return ORR_register(
                         encoding=Encoding.T1,
+                        sideeffects=SIDEFFECT_NONE,
                         d=d,
                         n=n,
                         m=m,
@@ -3506,6 +3742,7 @@ def decode_16bit(instr: int, ctx: Context):
                     shift_t, shift_n = (SRType_LSL, 0)
                     return MVN_register(
                         encoding=Encoding.T1,
+                        sideeffects=SIDEFFECT_NONE,
                         d=d,
                         m=m,
                         setflags=setflags,
@@ -3526,6 +3763,7 @@ def decode_16bit(instr: int, ctx: Context):
                     shift_t, shift_n = (SRType_LSL, 0)
                     return BIC_register(
                         encoding=Encoding.T1,
+                        sideeffects=SIDEFFECT_NONE,
                         d=d,
                         n=n,
                         m=m,
@@ -3544,7 +3782,14 @@ def decode_16bit(instr: int, ctx: Context):
                     n = UInt(Rn)
                     m = UInt(Rdm)
                     setflags = not (InITBlock(ctx))
-                    return MUL(encoding=Encoding.T1, d=d, n=n, m=m, setflags=setflags)
+                    return MUL(
+                        encoding=Encoding.T1,
+                        sideeffects=SIDEFFECT_NONE,
+                        d=d,
+                        n=n,
+                        m=m,
+                        setflags=setflags,
+                    )
                 return NoMatch()  # no match
             elif (instr & 0x700) == 0x200:  # xxxxx010xxxxxxxx
                 if (instr & 0xC0) == 0x0:  # xxxxxxxx00xxxxxx
@@ -3558,7 +3803,12 @@ def decode_16bit(instr: int, ctx: Context):
                     m = UInt(Rm)
                     shift_t, shift_n = (SRType_LSL, 0)
                     return TST_register(
-                        encoding=Encoding.T1, n=n, m=m, shift_t=shift_t, shift_n=shift_n
+                        encoding=Encoding.T1,
+                        sideeffects=SIDEFFECT_NONE,
+                        n=n,
+                        m=m,
+                        shift_t=shift_t,
+                        shift_n=shift_n,
                     )
                 elif (instr & 0xC0) == 0xC0:  # xxxxxxxx11xxxxxx
                     # cmn_register_t1
@@ -3571,7 +3821,12 @@ def decode_16bit(instr: int, ctx: Context):
                     m = UInt(Rm)
                     shift_t, shift_n = (SRType_LSL, 0)
                     return CMN_register(
-                        encoding=Encoding.T1, n=n, m=m, shift_t=shift_t, shift_n=shift_n
+                        encoding=Encoding.T1,
+                        sideeffects=SIDEFFECT_NONE,
+                        n=n,
+                        m=m,
+                        shift_t=shift_t,
+                        shift_n=shift_n,
                     )
                 elif (instr & 0xC0) == 0x80:  # xxxxxxxx10xxxxxx
                     # cmp_register_t1
@@ -3584,7 +3839,12 @@ def decode_16bit(instr: int, ctx: Context):
                     m = UInt(Rm)
                     shift_t, shift_n = (SRType_LSL, 0)
                     return CMP_register(
-                        encoding=Encoding.T1, n=n, m=m, shift_t=shift_t, shift_n=shift_n
+                        encoding=Encoding.T1,
+                        sideeffects=SIDEFFECT_NONE,
+                        n=n,
+                        m=m,
+                        shift_t=shift_t,
+                        shift_n=shift_n,
                     )
                 elif (instr & 0xC0) == 0x40:  # xxxxxxxx01xxxxxx
                     # rsb_immediate_t1
@@ -3598,7 +3858,12 @@ def decode_16bit(instr: int, ctx: Context):
                     setflags = not (InITBlock(ctx))
                     imm32 = Zeros(32)  # immediate = #0
                     return RSB_immediate(
-                        encoding=Encoding.T1, d=d, n=n, setflags=setflags, imm32=imm32
+                        encoding=Encoding.T1,
+                        sideeffects=SIDEFFECT_NONE,
+                        d=d,
+                        n=n,
+                        setflags=setflags,
+                        imm32=imm32,
                     )
                 return NoMatch()  # no match
             elif (instr & 0x700) == 0x700:  # xxxxx111xxxxxxxx
@@ -3613,8 +3878,8 @@ def decode_16bit(instr: int, ctx: Context):
                         sideffect_flags |= SIDEFFECT_UNPREDICTABLE
                     if InITBlock(ctx) and (not (LastInITBlock(ctx))):
                         sideffect_flags |= SIDEFFECT_UNPREDICTABLE
-                    return _apply_sideeffect(
-                        sideffect_flags, BLX_register(encoding=Encoding.T1, m=m)
+                    return BLX_register(
+                        encoding=Encoding.T1, sideeffects=sideffect_flags, m=m
                     )
                 elif (instr & 0x87) == 0x0:  # xxxxxxxx0xxxx000
                     # bx_t1
@@ -3625,9 +3890,7 @@ def decode_16bit(instr: int, ctx: Context):
                     m = UInt(Rm)
                     if InITBlock(ctx) and (not (LastInITBlock(ctx))):
                         sideffect_flags |= SIDEFFECT_UNPREDICTABLE
-                    return _apply_sideeffect(
-                        sideffect_flags, BX(encoding=Encoding.T1, m=m)
-                    )
+                    return BX(encoding=Encoding.T1, sideeffects=sideffect_flags, m=m)
                 return NoMatch()  # no match
             elif (instr & 0x700) == 0x500:  # xxxxx101xxxxxxxx
                 # cmp_register_t2
@@ -3644,11 +3907,13 @@ def decode_16bit(instr: int, ctx: Context):
                     sideffect_flags |= SIDEFFECT_UNPREDICTABLE
                 if (n == 15) or (m == 15):
                     sideffect_flags |= SIDEFFECT_UNPREDICTABLE
-                return _apply_sideeffect(
-                    sideffect_flags,
-                    CMP_register(
-                        encoding=Encoding.T2, n=n, m=m, shift_t=shift_t, shift_n=shift_n
-                    ),
+                return CMP_register(
+                    encoding=Encoding.T2,
+                    sideeffects=sideffect_flags,
+                    n=n,
+                    m=m,
+                    shift_t=shift_t,
+                    shift_n=shift_n,
                 )
             return NoMatch()  # no match
         elif (instr & 0x800) == 0x800:  # xxxx1xxxxxxxxxxx
@@ -3661,7 +3926,13 @@ def decode_16bit(instr: int, ctx: Context):
             t = UInt(Rt)
             imm32 = ZeroExtend(concat_bits(imm8, 0x0, 2), 32)
             add = True
-            return LDR_literal(encoding=Encoding.T1, t=t, imm32=imm32, add=add)
+            return LDR_literal(
+                encoding=Encoding.T1,
+                sideeffects=SIDEFFECT_NONE,
+                t=t,
+                imm32=imm32,
+                add=add,
+            )
         return NoMatch()  # no match
     elif (instr & 0xF000) == 0x1000:  # 0001xxxxxxxxxxxx
         if (instr & 0x800) == 0x800:  # xxxx1xxxxxxxxxxx
@@ -3678,7 +3949,12 @@ def decode_16bit(instr: int, ctx: Context):
                 setflags = not (InITBlock(ctx))
                 imm32 = ZeroExtend(imm3, 32)
                 return ADD_immediate(
-                    encoding=Encoding.T1, d=d, n=n, setflags=setflags, imm32=imm32
+                    encoding=Encoding.T1,
+                    sideeffects=SIDEFFECT_NONE,
+                    d=d,
+                    n=n,
+                    setflags=setflags,
+                    imm32=imm32,
                 )
             elif (instr & 0x600) == 0x0:  # xxxxx00xxxxxxxxx
                 # add_register_t1
@@ -3695,6 +3971,7 @@ def decode_16bit(instr: int, ctx: Context):
                 shift_t, shift_n = (SRType_LSL, 0)
                 return ADD_register(
                     encoding=Encoding.T1,
+                    sideeffects=SIDEFFECT_NONE,
                     d=d,
                     n=n,
                     m=m,
@@ -3715,7 +3992,12 @@ def decode_16bit(instr: int, ctx: Context):
                 setflags = not (InITBlock(ctx))
                 imm32 = ZeroExtend(imm3, 32)
                 return SUB_immediate(
-                    encoding=Encoding.T1, d=d, n=n, setflags=setflags, imm32=imm32
+                    encoding=Encoding.T1,
+                    sideeffects=SIDEFFECT_NONE,
+                    d=d,
+                    n=n,
+                    setflags=setflags,
+                    imm32=imm32,
                 )
             elif (instr & 0x600) == 0x200:  # xxxxx01xxxxxxxxx
                 # sub_register_t1
@@ -3732,6 +4014,7 @@ def decode_16bit(instr: int, ctx: Context):
                 shift_t, shift_n = (SRType_LSL, 0)
                 return SUB_register(
                     encoding=Encoding.T1,
+                    sideeffects=SIDEFFECT_NONE,
                     d=d,
                     n=n,
                     m=m,
@@ -3753,7 +4036,12 @@ def decode_16bit(instr: int, ctx: Context):
             setflags = not (InITBlock(ctx))
             _, shift_n = DecodeImmShift(0x2, imm5)
             return ASR_immediate(
-                encoding=Encoding.T1, d=d, m=m, setflags=setflags, shift_n=shift_n
+                encoding=Encoding.T1,
+                sideeffects=SIDEFFECT_NONE,
+                d=d,
+                m=m,
+                setflags=setflags,
+                shift_n=shift_n,
             )
         return NoMatch()  # no match
     elif (instr & 0xF000) == 0x3000:  # 0011xxxxxxxxxxxx
@@ -3769,7 +4057,12 @@ def decode_16bit(instr: int, ctx: Context):
             setflags = not (InITBlock(ctx))
             imm32 = ZeroExtend(imm8, 32)
             return ADD_immediate(
-                encoding=Encoding.T2, d=d, n=n, setflags=setflags, imm32=imm32
+                encoding=Encoding.T2,
+                sideeffects=SIDEFFECT_NONE,
+                d=d,
+                n=n,
+                setflags=setflags,
+                imm32=imm32,
             )
         elif (instr & 0x800) == 0x800:  # xxxx1xxxxxxxxxxx
             # sub_immediate_t2
@@ -3783,7 +4076,12 @@ def decode_16bit(instr: int, ctx: Context):
             setflags = not (InITBlock(ctx))
             imm32 = ZeroExtend(imm8, 32)
             return SUB_immediate(
-                encoding=Encoding.T2, d=d, n=n, setflags=setflags, imm32=imm32
+                encoding=Encoding.T2,
+                sideeffects=SIDEFFECT_NONE,
+                d=d,
+                n=n,
+                setflags=setflags,
+                imm32=imm32,
             )
         return NoMatch()  # no match
     elif (instr & 0xF000) == 0xA000:  # 1010xxxxxxxxxxxx
@@ -3798,7 +4096,11 @@ def decode_16bit(instr: int, ctx: Context):
             setflags = False
             imm32 = ZeroExtend(concat_bits(imm8, 0x0, 2), 32)
             return ADD_SP_plus_immediate(
-                encoding=Encoding.T1, d=d, setflags=setflags, imm32=imm32
+                encoding=Encoding.T1,
+                sideeffects=SIDEFFECT_NONE,
+                d=d,
+                setflags=setflags,
+                imm32=imm32,
             )
         elif (instr & 0x800) == 0x0:  # xxxx0xxxxxxxxxxx
             # adr_t1
@@ -3810,7 +4112,13 @@ def decode_16bit(instr: int, ctx: Context):
             d = UInt(Rd)
             imm32 = ZeroExtend(concat_bits(imm8, 0x0, 2), 32)
             add = True
-            return ADR(encoding=Encoding.T1, d=d, imm32=imm32, add=add)
+            return ADR(
+                encoding=Encoding.T1,
+                sideeffects=SIDEFFECT_NONE,
+                d=d,
+                imm32=imm32,
+                add=add,
+            )
         return NoMatch()  # no match
     elif (instr & 0xF000) == 0xB000:  # 1011xxxxxxxxxxxx
         if (instr & 0x400) == 0x0:  # xxxxx0xxxxxxxxxx
@@ -3824,7 +4132,9 @@ def decode_16bit(instr: int, ctx: Context):
                     # decode
                     d = UInt(Rd)
                     m = UInt(Rm)
-                    return REVSH(encoding=Encoding.T1, d=d, m=m)
+                    return REVSH(
+                        encoding=Encoding.T1, sideeffects=SIDEFFECT_NONE, d=d, m=m
+                    )
                 elif (instr & 0xA80) == 0x0:  # xxxx0x0x0xxxxxxx
                     # add_sp_plus_immediate_t2
                     # -> ADD_SP_plus_immediate
@@ -3835,7 +4145,11 @@ def decode_16bit(instr: int, ctx: Context):
                     setflags = False
                     imm32 = ZeroExtend(concat_bits(imm7, 0x0, 2), 32)
                     return ADD_SP_plus_immediate(
-                        encoding=Encoding.T2, d=d, setflags=setflags, imm32=imm32
+                        encoding=Encoding.T2,
+                        sideeffects=SIDEFFECT_NONE,
+                        d=d,
+                        setflags=setflags,
+                        imm32=imm32,
                     )
                 elif (instr & 0xA80) == 0x80:  # xxxx0x0x1xxxxxxx
                     # sub_sp_minus_immediate_t1
@@ -3847,7 +4161,11 @@ def decode_16bit(instr: int, ctx: Context):
                     setflags = False
                     imm32 = ZeroExtend(concat_bits(imm7, 0x0, 2), 32)
                     return SUB_SP_minus_immediate(
-                        encoding=Encoding.T1, d=d, setflags=setflags, imm32=imm32
+                        encoding=Encoding.T1,
+                        sideeffects=SIDEFFECT_NONE,
+                        d=d,
+                        setflags=setflags,
+                        imm32=imm32,
                     )
                 elif (instr & 0xA80) == 0x200:  # xxxx0x1x0xxxxxxx
                     if (instr & 0x40) == 0x40:  # xxxxxxxxx1xxxxxx
@@ -3860,7 +4178,13 @@ def decode_16bit(instr: int, ctx: Context):
                         d = UInt(Rd)
                         m = UInt(Rm)
                         rotation = 0
-                        return SXTB(encoding=Encoding.T1, d=d, m=m, rotation=rotation)
+                        return SXTB(
+                            encoding=Encoding.T1,
+                            sideeffects=SIDEFFECT_NONE,
+                            d=d,
+                            m=m,
+                            rotation=rotation,
+                        )
                     elif (instr & 0x40) == 0x0:  # xxxxxxxxx0xxxxxx
                         # sxth_t1
                         # -> SXTH
@@ -3871,7 +4195,13 @@ def decode_16bit(instr: int, ctx: Context):
                         d = UInt(Rd)
                         m = UInt(Rm)
                         rotation = 0
-                        return SXTH(encoding=Encoding.T1, d=d, m=m, rotation=rotation)
+                        return SXTH(
+                            encoding=Encoding.T1,
+                            sideeffects=SIDEFFECT_NONE,
+                            d=d,
+                            m=m,
+                            rotation=rotation,
+                        )
                     return NoMatch()  # no match
                 elif (instr & 0xA80) == 0x280:  # xxxx0x1x1xxxxxxx
                     if (instr & 0x40) == 0x40:  # xxxxxxxxx1xxxxxx
@@ -3884,7 +4214,13 @@ def decode_16bit(instr: int, ctx: Context):
                         d = UInt(Rd)
                         m = UInt(Rm)
                         rotation = 0
-                        return UXTB(encoding=Encoding.T1, d=d, m=m, rotation=rotation)
+                        return UXTB(
+                            encoding=Encoding.T1,
+                            sideeffects=SIDEFFECT_NONE,
+                            d=d,
+                            m=m,
+                            rotation=rotation,
+                        )
                     elif (instr & 0x40) == 0x0:  # xxxxxxxxx0xxxxxx
                         # uxth_t1
                         # -> UXTH
@@ -3895,7 +4231,13 @@ def decode_16bit(instr: int, ctx: Context):
                         d = UInt(Rd)
                         m = UInt(Rm)
                         rotation = 0
-                        return UXTH(encoding=Encoding.T1, d=d, m=m, rotation=rotation)
+                        return UXTH(
+                            encoding=Encoding.T1,
+                            sideeffects=SIDEFFECT_NONE,
+                            d=d,
+                            m=m,
+                            rotation=rotation,
+                        )
                     return NoMatch()  # no match
                 elif (instr & 0xA80) == 0xA00:  # xxxx1x1x0xxxxxxx
                     if (instr & 0x40) == 0x0:  # xxxxxxxxx0xxxxxx
@@ -3907,7 +4249,9 @@ def decode_16bit(instr: int, ctx: Context):
                         # decode
                         d = UInt(Rd)
                         m = UInt(Rm)
-                        return REV(encoding=Encoding.T1, d=d, m=m)
+                        return REV(
+                            encoding=Encoding.T1, sideeffects=SIDEFFECT_NONE, d=d, m=m
+                        )
                     elif (instr & 0x40) == 0x40:  # xxxxxxxxx1xxxxxx
                         # rev16_t1
                         # -> REV16
@@ -3917,7 +4261,9 @@ def decode_16bit(instr: int, ctx: Context):
                         # decode
                         d = UInt(Rd)
                         m = UInt(Rm)
-                        return REV16(encoding=Encoding.T1, d=d, m=m)
+                        return REV16(
+                            encoding=Encoding.T1, sideeffects=SIDEFFECT_NONE, d=d, m=m
+                        )
                     return NoMatch()  # no match
                 return NoMatch()  # no match
             elif (instr & 0x100) == 0x100:  # xxxxxxx1xxxxxxxx
@@ -3934,9 +4280,12 @@ def decode_16bit(instr: int, ctx: Context):
                 nonzero = op == 1
                 if InITBlock(ctx):
                     sideffect_flags |= SIDEFFECT_UNPREDICTABLE
-                return _apply_sideeffect(
-                    sideffect_flags,
-                    CBNZ_CBZ(encoding=Encoding.T1, n=n, imm32=imm32, nonzero=nonzero),
+                return CBNZ_CBZ(
+                    encoding=Encoding.T1,
+                    sideeffects=sideffect_flags,
+                    n=n,
+                    imm32=imm32,
+                    nonzero=nonzero,
                 )
             return NoMatch()  # no match
         elif (instr & 0x400) == 0x400:  # xxxxx1xxxxxxxxxx
@@ -3956,15 +4305,13 @@ def decode_16bit(instr: int, ctx: Context):
                 affectFAULT = F == 1
                 if InITBlock(ctx):
                     sideffect_flags |= SIDEFFECT_UNPREDICTABLE
-                return _apply_sideeffect(
-                    sideffect_flags,
-                    CPS(
-                        encoding=Encoding.T1,
-                        enable=enable,
-                        disable=disable,
-                        affectPRI=affectPRI,
-                        affectFAULT=affectFAULT,
-                    ),
+                return CPS(
+                    encoding=Encoding.T1,
+                    sideeffects=sideffect_flags,
+                    enable=enable,
+                    disable=disable,
+                    affectPRI=affectPRI,
+                    affectFAULT=affectFAULT,
                 )
             elif (instr & 0xA00) == 0xA00:  # xxxx1x1xxxxxxxxx
                 if (instr & 0x100) == 0x100:  # xxxxxxx1xxxxxxxx
@@ -3973,31 +4320,31 @@ def decode_16bit(instr: int, ctx: Context):
                         # -> NOP
                         # decode
                         # No additional decoding required
-                        return NOP(encoding=Encoding.T1)
+                        return NOP(encoding=Encoding.T1, sideeffects=SIDEFFECT_NONE)
                     elif (instr & 0xFF) == 0x20:  # xxxxxxxx00100000
                         # wfe_t1
                         # -> WFE
                         # decode
                         # No additional decoding required
-                        return WFE(encoding=Encoding.T1)
+                        return WFE(encoding=Encoding.T1, sideeffects=SIDEFFECT_NONE)
                     elif (instr & 0xFF) == 0x30:  # xxxxxxxx00110000
                         # wfi_t1
                         # -> WFI
                         # decode
                         # No additional decoding required
-                        return WFI(encoding=Encoding.T1)
+                        return WFI(encoding=Encoding.T1, sideeffects=SIDEFFECT_NONE)
                     elif (instr & 0xFF) == 0x10:  # xxxxxxxx00010000
                         # yield_t1
                         # -> YIELD
                         # decode
                         # No additional decoding required
-                        return YIELD(encoding=Encoding.T1)
+                        return YIELD(encoding=Encoding.T1, sideeffects=SIDEFFECT_NONE)
                     elif (instr & 0xFF) == 0x40:  # xxxxxxxx01000000
                         # sev_t1
                         # -> SEV
                         # decode
                         # No additional decoding required
-                        return SEV(encoding=Encoding.T1)
+                        return SEV(encoding=Encoding.T1, sideeffects=SIDEFFECT_NONE)
                     elif (instr & 0x0) == 0x0:  # xxxxxxxxxxxxxxxx
                         # it_t1
                         # -> IT
@@ -4013,9 +4360,11 @@ def decode_16bit(instr: int, ctx: Context):
                             sideffect_flags |= SIDEFFECT_UNPREDICTABLE
                         if InITBlock(ctx):
                             sideffect_flags |= SIDEFFECT_UNPREDICTABLE
-                        return _apply_sideeffect(
-                            sideffect_flags,
-                            IT(encoding=Encoding.T1, firstcond=firstcond, mask=mask),
+                        return IT(
+                            encoding=Encoding.T1,
+                            sideeffects=sideffect_flags,
+                            firstcond=firstcond,
+                            mask=mask,
                         )
                     return NoMatch()  # no match
                 elif (instr & 0x100) == 0x0:  # xxxxxxx0xxxxxxxx
@@ -4026,7 +4375,9 @@ def decode_16bit(instr: int, ctx: Context):
                     # decode
                     imm32 = ZeroExtend(imm8, 32)
                     # imm32 is for assembly/disassembly only and is ignored by hardware.
-                    return BKPT(encoding=Encoding.T1, imm32=imm32)
+                    return BKPT(
+                        encoding=Encoding.T1, sideeffects=SIDEFFECT_NONE, imm32=imm32
+                    )
                 return NoMatch()  # no match
             elif (instr & 0xA00) == 0x800:  # xxxx1x0xxxxxxxxx
                 # pop_t1
@@ -4045,14 +4396,12 @@ def decode_16bit(instr: int, ctx: Context):
                     not (LastInITBlock(ctx))
                 ):
                     sideffect_flags |= SIDEFFECT_UNPREDICTABLE
-                return _apply_sideeffect(
-                    sideffect_flags,
-                    POP(
-                        encoding=Encoding.T1,
-                        registers=registers,
-                        UnalignedAllowed=UnalignedAllowed,
-                        t=t,
-                    ),
+                return POP(
+                    encoding=Encoding.T1,
+                    sideeffects=sideffect_flags,
+                    registers=registers,
+                    UnalignedAllowed=UnalignedAllowed,
+                    t=t,
                 )
             elif (instr & 0xA00) == 0x0:  # xxxx0x0xxxxxxxxx
                 # push_t1
@@ -4069,14 +4418,12 @@ def decode_16bit(instr: int, ctx: Context):
                 UnalignedAllowed = False
                 if BitCount(registers) < 1:
                     sideffect_flags |= SIDEFFECT_UNPREDICTABLE
-                return _apply_sideeffect(
-                    sideffect_flags,
-                    PUSH(
-                        encoding=Encoding.T1,
-                        registers=registers,
-                        UnalignedAllowed=UnalignedAllowed,
-                        t=t,
-                    ),
+                return PUSH(
+                    encoding=Encoding.T1,
+                    sideeffects=sideffect_flags,
+                    registers=registers,
+                    UnalignedAllowed=UnalignedAllowed,
+                    t=t,
                 )
             return NoMatch()  # no match
         return NoMatch()  # no match
@@ -4093,7 +4440,12 @@ def decode_16bit(instr: int, ctx: Context):
             imm32 = ZeroExtend(imm8, 32)
             carry = ctx.apsr.C
             return MOV_immediate(
-                encoding=Encoding.T1, d=d, setflags=setflags, imm32=imm32, carry=carry
+                encoding=Encoding.T1,
+                sideeffects=SIDEFFECT_NONE,
+                d=d,
+                setflags=setflags,
+                imm32=imm32,
+                carry=carry,
             )
         elif (instr & 0x800) == 0x800:  # xxxx1xxxxxxxxxxx
             # cmp_immediate_t1
@@ -4104,7 +4456,9 @@ def decode_16bit(instr: int, ctx: Context):
             # decode
             n = UInt(Rn)
             imm32 = ZeroExtend(imm8, 32)
-            return CMP_immediate(encoding=Encoding.T1, n=n, imm32=imm32)
+            return CMP_immediate(
+                encoding=Encoding.T1, sideeffects=SIDEFFECT_NONE, n=n, imm32=imm32
+            )
         return NoMatch()  # no match
     elif (instr & 0xF000) == 0x0:  # 0000xxxxxxxxxxxx
         if (instr & 0x800) == 0x0:  # xxxx0xxxxxxxxxxx
@@ -4120,9 +4474,12 @@ def decode_16bit(instr: int, ctx: Context):
                 setflags = True
                 if InITBlock(ctx):
                     sideffect_flags |= SIDEFFECT_UNPREDICTABLE
-                return _apply_sideeffect(
-                    sideffect_flags,
-                    MOV_register(encoding=Encoding.T2, d=d, m=m, setflags=setflags),
+                return MOV_register(
+                    encoding=Encoding.T2,
+                    sideeffects=sideffect_flags,
+                    d=d,
+                    m=m,
+                    setflags=setflags,
                 )
             elif (instr & 0x0) == 0x0:  # xxxxxxxxxxxxxxxx
                 # lsl_immediate_t1
@@ -4138,15 +4495,13 @@ def decode_16bit(instr: int, ctx: Context):
                 m = UInt(Rm)
                 setflags = not (InITBlock(ctx))
                 _, shift_n = DecodeImmShift(0x0, imm5)
-                return _apply_sideeffect(
-                    sideffect_flags,
-                    LSL_immediate(
-                        encoding=Encoding.T1,
-                        d=d,
-                        m=m,
-                        setflags=setflags,
-                        shift_n=shift_n,
-                    ),
+                return LSL_immediate(
+                    encoding=Encoding.T1,
+                    sideeffects=sideffect_flags,
+                    d=d,
+                    m=m,
+                    setflags=setflags,
+                    shift_n=shift_n,
                 )
             return NoMatch()  # no match
         elif (instr & 0x800) == 0x800:  # xxxx1xxxxxxxxxxx
@@ -4162,7 +4517,12 @@ def decode_16bit(instr: int, ctx: Context):
             setflags = not (InITBlock(ctx))
             _, shift_n = DecodeImmShift(0x1, imm5)
             return LSR_immediate(
-                encoding=Encoding.T1, d=d, m=m, setflags=setflags, shift_n=shift_n
+                encoding=Encoding.T1,
+                sideeffects=SIDEFFECT_NONE,
+                d=d,
+                m=m,
+                setflags=setflags,
+                shift_n=shift_n,
             )
         return NoMatch()  # no match
     elif (instr & 0xF000) == 0x6000:  # 0110xxxxxxxxxxxx
@@ -4182,6 +4542,7 @@ def decode_16bit(instr: int, ctx: Context):
             wback = False
             return LDR_immediate(
                 encoding=Encoding.T1,
+                sideeffects=SIDEFFECT_NONE,
                 t=t,
                 n=n,
                 imm32=imm32,
@@ -4205,6 +4566,7 @@ def decode_16bit(instr: int, ctx: Context):
             wback = False
             return STR_immediate(
                 encoding=Encoding.T1,
+                sideeffects=SIDEFFECT_NONE,
                 t=t,
                 n=n,
                 imm32=imm32,
@@ -4229,6 +4591,7 @@ def decode_16bit(instr: int, ctx: Context):
             wback = False
             return LDR_immediate(
                 encoding=Encoding.T2,
+                sideeffects=SIDEFFECT_NONE,
                 t=t,
                 n=n,
                 imm32=imm32,
@@ -4251,6 +4614,7 @@ def decode_16bit(instr: int, ctx: Context):
             wback = False
             return STR_immediate(
                 encoding=Encoding.T2,
+                sideeffects=SIDEFFECT_NONE,
                 t=t,
                 n=n,
                 imm32=imm32,
@@ -4277,6 +4641,7 @@ def decode_16bit(instr: int, ctx: Context):
             shift_t, shift_n = (SRType_LSL, 0)
             return LDR_register(
                 encoding=Encoding.T1,
+                sideeffects=SIDEFFECT_NONE,
                 t=t,
                 n=n,
                 m=m,
@@ -4303,6 +4668,7 @@ def decode_16bit(instr: int, ctx: Context):
             shift_t, shift_n = (SRType_LSL, 0)
             return LDRB_register(
                 encoding=Encoding.T1,
+                sideeffects=SIDEFFECT_NONE,
                 t=t,
                 n=n,
                 m=m,
@@ -4329,6 +4695,7 @@ def decode_16bit(instr: int, ctx: Context):
             shift_t, shift_n = (SRType_LSL, 0)
             return LDRH_register(
                 encoding=Encoding.T1,
+                sideeffects=SIDEFFECT_NONE,
                 t=t,
                 n=n,
                 m=m,
@@ -4355,6 +4722,7 @@ def decode_16bit(instr: int, ctx: Context):
             shift_t, shift_n = (SRType_LSL, 0)
             return STR_register(
                 encoding=Encoding.T1,
+                sideeffects=SIDEFFECT_NONE,
                 t=t,
                 n=n,
                 m=m,
@@ -4381,6 +4749,7 @@ def decode_16bit(instr: int, ctx: Context):
             shift_t, shift_n = (SRType_LSL, 0)
             return LDRSB_register(
                 encoding=Encoding.T1,
+                sideeffects=SIDEFFECT_NONE,
                 t=t,
                 n=n,
                 m=m,
@@ -4407,6 +4776,7 @@ def decode_16bit(instr: int, ctx: Context):
             shift_t, shift_n = (SRType_LSL, 0)
             return LDRSH_register(
                 encoding=Encoding.T1,
+                sideeffects=SIDEFFECT_NONE,
                 t=t,
                 n=n,
                 m=m,
@@ -4433,6 +4803,7 @@ def decode_16bit(instr: int, ctx: Context):
             shift_t, shift_n = (SRType_LSL, 0)
             return STRB_register(
                 encoding=Encoding.T1,
+                sideeffects=SIDEFFECT_NONE,
                 t=t,
                 n=n,
                 m=m,
@@ -4459,6 +4830,7 @@ def decode_16bit(instr: int, ctx: Context):
             shift_t, shift_n = (SRType_LSL, 0)
             return STRH_register(
                 encoding=Encoding.T1,
+                sideeffects=SIDEFFECT_NONE,
                 t=t,
                 n=n,
                 m=m,
@@ -4486,6 +4858,7 @@ def decode_16bit(instr: int, ctx: Context):
             wback = False
             return LDRB_immediate(
                 encoding=Encoding.T1,
+                sideeffects=SIDEFFECT_NONE,
                 t=t,
                 n=n,
                 imm32=imm32,
@@ -4509,6 +4882,7 @@ def decode_16bit(instr: int, ctx: Context):
             wback = False
             return STRB_immediate(
                 encoding=Encoding.T1,
+                sideeffects=SIDEFFECT_NONE,
                 t=t,
                 n=n,
                 imm32=imm32,
@@ -4527,7 +4901,7 @@ def decode_16bit(instr: int, ctx: Context):
             imm32 = ZeroExtend(imm8, 32)
             # imm32 is for assembly/disassembly. SVC handlers in some systems
             # interpret imm8 in software, for example to determine the required service.
-            return SVC(encoding=Encoding.T1, imm32=imm32)
+            return SVC(encoding=Encoding.T1, sideeffects=SIDEFFECT_NONE, imm32=imm32)
         elif (instr & 0xF00) == 0xE00:  # xxxx1110xxxxxxxx
             # udf_t1
             # -> UDF
@@ -4536,7 +4910,7 @@ def decode_16bit(instr: int, ctx: Context):
             # decode
             imm32 = ZeroExtend(imm8, 32)
             # imm32 is for assembly and disassembly only, and is ignored by hardware.
-            return UDF(encoding=Encoding.T1, imm32=imm32)
+            return UDF(encoding=Encoding.T1, sideeffects=SIDEFFECT_NONE, imm32=imm32)
         elif (instr & 0x0) == 0x0:  # xxxxxxxxxxxxxxxx
             # b_t1
             # -> B
@@ -4551,8 +4925,11 @@ def decode_16bit(instr: int, ctx: Context):
             imm32 = SignExtend(concat_bits(imm8, 0, 1), 9)
             if InITBlock(ctx):
                 sideffect_flags |= SIDEFFECT_UNPREDICTABLE
-            return _apply_sideeffect(
-                sideffect_flags, B(encoding=Encoding.T1, imm32=imm32, cond=cond)
+            return B(
+                encoding=Encoding.T1,
+                sideeffects=sideffect_flags,
+                imm32=imm32,
+                cond=cond,
             )
         return NoMatch()  # no match
     elif (instr & 0xF000) == 0x8000:  # 1000xxxxxxxxxxxx
@@ -4572,6 +4949,7 @@ def decode_16bit(instr: int, ctx: Context):
             wback = False
             return LDRH_immediate(
                 encoding=Encoding.T1,
+                sideeffects=SIDEFFECT_NONE,
                 t=t,
                 n=n,
                 imm32=imm32,
@@ -4595,6 +4973,7 @@ def decode_16bit(instr: int, ctx: Context):
             wback = False
             return STRH_immediate(
                 encoding=Encoding.T1,
+                sideeffects=SIDEFFECT_NONE,
                 t=t,
                 n=n,
                 imm32=imm32,
@@ -4616,9 +4995,12 @@ def decode_16bit(instr: int, ctx: Context):
             wback = ((registers >> n) & 1) == 0
             if BitCount(registers) < 1:
                 sideffect_flags |= SIDEFFECT_UNPREDICTABLE
-            return _apply_sideeffect(
-                sideffect_flags,
-                LDM(encoding=Encoding.T1, n=n, registers=registers, wback=wback),
+            return LDM(
+                encoding=Encoding.T1,
+                sideeffects=sideffect_flags,
+                n=n,
+                registers=registers,
+                wback=wback,
             )
         elif (instr & 0x800) == 0x0:  # xxxx0xxxxxxxxxxx
             # stm_t1
@@ -4632,9 +5014,12 @@ def decode_16bit(instr: int, ctx: Context):
             wback = True
             if BitCount(registers) < 1:
                 sideffect_flags |= SIDEFFECT_UNPREDICTABLE
-            return _apply_sideeffect(
-                sideffect_flags,
-                STM(encoding=Encoding.T1, n=n, registers=registers, wback=wback),
+            return STM(
+                encoding=Encoding.T1,
+                sideeffects=sideffect_flags,
+                n=n,
+                registers=registers,
+                wback=wback,
             )
         return NoMatch()  # no match
     return NoMatch()  # no match
@@ -4645,8 +5030,9 @@ def decode_32bit(instr: int, ctx: Context):
 
     ``instr`` holds exactly the 32 bits of the instruction -- no padding and
     no bits belonging to whatever follows it. ``ctx`` is the name arm-transpiller emits
-    for the runtime context argument. Returns the decoded instruction, or a NoMatch /
-    See / Undefined / Unpredictable pseudo-instruction.
+    for the runtime context argument. Returns the decoded instruction -- whose
+    ``sideeffects`` member reports any UNDEFINED / UNPREDICTABLE / SEE condition the
+    decode flagged -- or ``NoMatch``.
     """
     sideffect_flags = SIDEFFECT_NONE
     if (instr & 0xF8000000) == 0xF0000000:  # 11110xxxxxxxxxxxxxxxxxxxxxxxxxxx
@@ -4667,15 +5053,13 @@ def decode_32bit(instr: int, ctx: Context):
                 widthminus1 = UInt(widthm1)
                 if ((d == 13) or (d == 15)) or ((n == 13) or (n == 15)):
                     sideffect_flags |= SIDEFFECT_UNPREDICTABLE
-                return _apply_sideeffect(
-                    sideffect_flags,
-                    UBFX(
-                        encoding=Encoding.T1,
-                        d=d,
-                        n=n,
-                        lsbit=lsbit,
-                        widthminus1=widthminus1,
-                    ),
+                return UBFX(
+                    encoding=Encoding.T1,
+                    sideeffects=sideffect_flags,
+                    d=d,
+                    n=n,
+                    lsbit=lsbit,
+                    widthminus1=widthminus1,
                 )
             elif (instr & 0x3F00000) == 0x2400000:  # xxxxxx100100xxxxxxxxxxxxxxxxxxxx
                 # mov_immediate_t3
@@ -4697,15 +5081,13 @@ def decode_32bit(instr: int, ctx: Context):
                 )
                 if (d == 13) or (d == 15):
                     sideffect_flags |= SIDEFFECT_UNPREDICTABLE
-                return _apply_sideeffect(
-                    sideffect_flags,
-                    MOV_immediate(
-                        encoding=Encoding.T3,
-                        d=d,
-                        setflags=setflags,
-                        imm32=imm32,
-                        carry=carry,
-                    ),
+                return MOV_immediate(
+                    encoding=Encoding.T3,
+                    sideeffects=sideffect_flags,
+                    d=d,
+                    setflags=setflags,
+                    imm32=imm32,
+                    carry=carry,
                 )
             elif (instr & 0x3F00000) == 0x2C00000:  # xxxxxx101100xxxxxxxxxxxxxxxxxxxx
                 # movt_t1
@@ -4723,8 +5105,8 @@ def decode_32bit(instr: int, ctx: Context):
                 )
                 if (d == 13) or (d == 15):
                     sideffect_flags |= SIDEFFECT_UNPREDICTABLE
-                return _apply_sideeffect(
-                    sideffect_flags, MOVT(encoding=Encoding.T1, d=d, imm16=imm16)
+                return MOVT(
+                    encoding=Encoding.T1, sideeffects=sideffect_flags, d=d, imm16=imm16
                 )
             elif (instr & 0x3E00000) == 0x1C00000:  # xxxxxx01110xxxxxxxxxxxxxxxxxxxxx
                 # rsb_immediate_t2
@@ -4745,11 +5127,13 @@ def decode_32bit(instr: int, ctx: Context):
                 )
                 if ((d == 13) or (d == 15)) or ((n == 13) or (n == 15)):
                     sideffect_flags |= SIDEFFECT_UNPREDICTABLE
-                return _apply_sideeffect(
-                    sideffect_flags,
-                    RSB_immediate(
-                        encoding=Encoding.T2, d=d, n=n, setflags=setflags, imm32=imm32
-                    ),
+                return RSB_immediate(
+                    encoding=Encoding.T2,
+                    sideeffects=sideffect_flags,
+                    d=d,
+                    n=n,
+                    setflags=setflags,
+                    imm32=imm32,
                 )
             elif (instr & 0x3C00000) == 0x1400000:  # xxxxxx0101xxxxxxxxxxxxxxxxxxxxxx
                 if (instr & 0x200000) == 0x0:  # xxxxxxxxxx0xxxxxxxxxxxxxxxxxxxxx
@@ -4771,15 +5155,13 @@ def decode_32bit(instr: int, ctx: Context):
                     )
                     if ((d == 13) or (d == 15)) or ((n == 13) or (n == 15)):
                         sideffect_flags |= SIDEFFECT_UNPREDICTABLE
-                    return _apply_sideeffect(
-                        sideffect_flags,
-                        ADC_immediate(
-                            encoding=Encoding.T1,
-                            d=d,
-                            n=n,
-                            setflags=setflags,
-                            imm32=imm32,
-                        ),
+                    return ADC_immediate(
+                        encoding=Encoding.T1,
+                        sideeffects=sideffect_flags,
+                        d=d,
+                        n=n,
+                        setflags=setflags,
+                        imm32=imm32,
                     )
                 elif (instr & 0x200000) == 0x200000:  # xxxxxxxxxx1xxxxxxxxxxxxxxxxxxxxx
                     # sbc_immediate_t1
@@ -4800,15 +5182,13 @@ def decode_32bit(instr: int, ctx: Context):
                     )
                     if ((d == 13) or (d == 15)) or ((n == 13) or (n == 15)):
                         sideffect_flags |= SIDEFFECT_UNPREDICTABLE
-                    return _apply_sideeffect(
-                        sideffect_flags,
-                        SBC_immediate(
-                            encoding=Encoding.T1,
-                            d=d,
-                            n=n,
-                            setflags=setflags,
-                            imm32=imm32,
-                        ),
+                    return SBC_immediate(
+                        encoding=Encoding.T1,
+                        sideeffects=sideffect_flags,
+                        d=d,
+                        n=n,
+                        setflags=setflags,
+                        imm32=imm32,
                     )
                 return NoMatch()  # no match
             elif (instr & 0x3C00000) == 0x1000000:  # xxxxxx0100xxxxxxxxxxxxxxxxxxxxxx
@@ -4831,9 +5211,11 @@ def decode_32bit(instr: int, ctx: Context):
                         )
                         if n == 15:
                             sideffect_flags |= SIDEFFECT_UNPREDICTABLE
-                        return _apply_sideeffect(
-                            sideffect_flags,
-                            CMN_immediate(encoding=Encoding.T1, n=n, imm32=imm32),
+                        return CMN_immediate(
+                            encoding=Encoding.T1,
+                            sideeffects=sideffect_flags,
+                            n=n,
+                            imm32=imm32,
                         )
                     elif (
                         instr & 0xF0000
@@ -4857,14 +5239,12 @@ def decode_32bit(instr: int, ctx: Context):
                         )
                         if (d == 15) and (S == 0):
                             sideffect_flags |= SIDEFFECT_UNPREDICTABLE
-                        return _apply_sideeffect(
-                            sideffect_flags,
-                            ADD_SP_plus_immediate(
-                                encoding=Encoding.T3,
-                                d=d,
-                                setflags=setflags,
-                                imm32=imm32,
-                            ),
+                        return ADD_SP_plus_immediate(
+                            encoding=Encoding.T3,
+                            sideeffects=sideffect_flags,
+                            d=d,
+                            setflags=setflags,
+                            imm32=imm32,
                         )
                     elif (instr & 0x0) == 0x0:  # xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
                         # add_immediate_t3
@@ -4892,15 +5272,13 @@ def decode_32bit(instr: int, ctx: Context):
                         )
                         if ((d == 13) or ((d == 15) and (S == 0))) or (n == 15):
                             sideffect_flags |= SIDEFFECT_UNPREDICTABLE
-                        return _apply_sideeffect(
-                            sideffect_flags,
-                            ADD_immediate(
-                                encoding=Encoding.T3,
-                                d=d,
-                                n=n,
-                                setflags=setflags,
-                                imm32=imm32,
-                            ),
+                        return ADD_immediate(
+                            encoding=Encoding.T3,
+                            sideeffects=sideffect_flags,
+                            d=d,
+                            n=n,
+                            setflags=setflags,
+                            imm32=imm32,
                         )
                     return NoMatch()  # no match
                 return NoMatch()  # no match
@@ -4922,14 +5300,12 @@ def decode_32bit(instr: int, ctx: Context):
                         )
                         if d == 15:
                             sideffect_flags |= SIDEFFECT_UNPREDICTABLE
-                        return _apply_sideeffect(
-                            sideffect_flags,
-                            ADD_SP_plus_immediate(
-                                encoding=Encoding.T4,
-                                d=d,
-                                setflags=setflags,
-                                imm32=imm32,
-                            ),
+                        return ADD_SP_plus_immediate(
+                            encoding=Encoding.T4,
+                            sideeffects=sideffect_flags,
+                            d=d,
+                            setflags=setflags,
+                            imm32=imm32,
                         )
                     elif (
                         instr & 0xF0000
@@ -4949,9 +5325,12 @@ def decode_32bit(instr: int, ctx: Context):
                         add = True
                         if (d == 13) or (d == 15):
                             sideffect_flags |= SIDEFFECT_UNPREDICTABLE
-                        return _apply_sideeffect(
-                            sideffect_flags,
-                            ADR(encoding=Encoding.T3, d=d, imm32=imm32, add=add),
+                        return ADR(
+                            encoding=Encoding.T3,
+                            sideeffects=sideffect_flags,
+                            d=d,
+                            imm32=imm32,
+                            add=add,
                         )
                     elif (instr & 0x0) == 0x0:  # xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
                         # add_immediate_t4
@@ -4977,15 +5356,13 @@ def decode_32bit(instr: int, ctx: Context):
                         )
                         if (d == 13) or (d == 15):
                             sideffect_flags |= SIDEFFECT_UNPREDICTABLE
-                        return _apply_sideeffect(
-                            sideffect_flags,
-                            ADD_immediate(
-                                encoding=Encoding.T4,
-                                d=d,
-                                n=n,
-                                setflags=setflags,
-                                imm32=imm32,
-                            ),
+                        return ADD_immediate(
+                            encoding=Encoding.T4,
+                            sideeffects=sideffect_flags,
+                            d=d,
+                            n=n,
+                            setflags=setflags,
+                            imm32=imm32,
                         )
                     return NoMatch()  # no match
                 return NoMatch()  # no match
@@ -5007,9 +5384,12 @@ def decode_32bit(instr: int, ctx: Context):
                         add = False
                         if (d == 13) or (d == 15):
                             sideffect_flags |= SIDEFFECT_UNPREDICTABLE
-                        return _apply_sideeffect(
-                            sideffect_flags,
-                            ADR(encoding=Encoding.T2, d=d, imm32=imm32, add=add),
+                        return ADR(
+                            encoding=Encoding.T2,
+                            sideeffects=sideffect_flags,
+                            d=d,
+                            imm32=imm32,
+                            add=add,
                         )
                     elif (
                         instr & 0xF0000
@@ -5029,14 +5409,12 @@ def decode_32bit(instr: int, ctx: Context):
                         )
                         if d == 15:
                             sideffect_flags |= SIDEFFECT_UNPREDICTABLE
-                        return _apply_sideeffect(
-                            sideffect_flags,
-                            SUB_SP_minus_immediate(
-                                encoding=Encoding.T3,
-                                d=d,
-                                setflags=setflags,
-                                imm32=imm32,
-                            ),
+                        return SUB_SP_minus_immediate(
+                            encoding=Encoding.T3,
+                            sideeffects=sideffect_flags,
+                            d=d,
+                            setflags=setflags,
+                            imm32=imm32,
                         )
                     elif (instr & 0x0) == 0x0:  # xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
                         # sub_immediate_t4
@@ -5062,15 +5440,13 @@ def decode_32bit(instr: int, ctx: Context):
                         )
                         if (d == 13) or (d == 15):
                             sideffect_flags |= SIDEFFECT_UNPREDICTABLE
-                        return _apply_sideeffect(
-                            sideffect_flags,
-                            SUB_immediate(
-                                encoding=Encoding.T4,
-                                d=d,
-                                n=n,
-                                setflags=setflags,
-                                imm32=imm32,
-                            ),
+                        return SUB_immediate(
+                            encoding=Encoding.T4,
+                            sideeffects=sideffect_flags,
+                            d=d,
+                            n=n,
+                            setflags=setflags,
+                            imm32=imm32,
                         )
                     return NoMatch()  # no match
                 return NoMatch()  # no match
@@ -5094,9 +5470,11 @@ def decode_32bit(instr: int, ctx: Context):
                         )
                         if n == 15:
                             sideffect_flags |= SIDEFFECT_UNPREDICTABLE
-                        return _apply_sideeffect(
-                            sideffect_flags,
-                            CMP_immediate(encoding=Encoding.T2, n=n, imm32=imm32),
+                        return CMP_immediate(
+                            encoding=Encoding.T2,
+                            sideeffects=sideffect_flags,
+                            n=n,
+                            imm32=imm32,
                         )
                     elif (
                         instr & 0xF0000
@@ -5120,14 +5498,12 @@ def decode_32bit(instr: int, ctx: Context):
                         )
                         if (d == 15) and (S == 0):
                             sideffect_flags |= SIDEFFECT_UNPREDICTABLE
-                        return _apply_sideeffect(
-                            sideffect_flags,
-                            SUB_SP_minus_immediate(
-                                encoding=Encoding.T2,
-                                d=d,
-                                setflags=setflags,
-                                imm32=imm32,
-                            ),
+                        return SUB_SP_minus_immediate(
+                            encoding=Encoding.T2,
+                            sideeffects=sideffect_flags,
+                            d=d,
+                            setflags=setflags,
+                            imm32=imm32,
                         )
                     elif (instr & 0x0) == 0x0:  # xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
                         # sub_immediate_t3
@@ -5155,15 +5531,13 @@ def decode_32bit(instr: int, ctx: Context):
                         )
                         if ((d == 13) or ((d == 15) and (S == 0))) or (n == 15):
                             sideffect_flags |= SIDEFFECT_UNPREDICTABLE
-                        return _apply_sideeffect(
-                            sideffect_flags,
-                            SUB_immediate(
-                                encoding=Encoding.T3,
-                                d=d,
-                                n=n,
-                                setflags=setflags,
-                                imm32=imm32,
-                            ),
+                        return SUB_immediate(
+                            encoding=Encoding.T3,
+                            sideeffects=sideffect_flags,
+                            d=d,
+                            n=n,
+                            setflags=setflags,
+                            imm32=imm32,
                         )
                     return NoMatch()  # no match
                 return NoMatch()  # no match
@@ -5188,15 +5562,13 @@ def decode_32bit(instr: int, ctx: Context):
                         )
                         if (d == 13) or (d == 15):
                             sideffect_flags |= SIDEFFECT_UNPREDICTABLE
-                        return _apply_sideeffect(
-                            sideffect_flags,
-                            MOV_immediate(
-                                encoding=Encoding.T2,
-                                d=d,
-                                setflags=setflags,
-                                imm32=imm32,
-                                carry=carry,
-                            ),
+                        return MOV_immediate(
+                            encoding=Encoding.T2,
+                            sideeffects=sideffect_flags,
+                            d=d,
+                            setflags=setflags,
+                            imm32=imm32,
+                            carry=carry,
                         )
                     elif (instr & 0x0) == 0x0:  # xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
                         # orr_immediate_t1
@@ -5221,16 +5593,14 @@ def decode_32bit(instr: int, ctx: Context):
                         )
                         if ((d == 13) or (d == 15)) or (n == 13):
                             sideffect_flags |= SIDEFFECT_UNPREDICTABLE
-                        return _apply_sideeffect(
-                            sideffect_flags,
-                            ORR_immediate(
-                                encoding=Encoding.T1,
-                                d=d,
-                                n=n,
-                                setflags=setflags,
-                                imm32=imm32,
-                                carry=carry,
-                            ),
+                        return ORR_immediate(
+                            encoding=Encoding.T1,
+                            sideeffects=sideffect_flags,
+                            d=d,
+                            n=n,
+                            setflags=setflags,
+                            imm32=imm32,
+                            carry=carry,
                         )
                     return NoMatch()  # no match
                 elif (instr & 0x200000) == 0x200000:  # xxxxxxxxxx1xxxxxxxxxxxxxxxxxxxxx
@@ -5253,15 +5623,13 @@ def decode_32bit(instr: int, ctx: Context):
                         )
                         if (d == 13) or (d == 15):
                             sideffect_flags |= SIDEFFECT_UNPREDICTABLE
-                        return _apply_sideeffect(
-                            sideffect_flags,
-                            MVN_immediate(
-                                encoding=Encoding.T1,
-                                d=d,
-                                setflags=setflags,
-                                imm32=imm32,
-                                carry=carry,
-                            ),
+                        return MVN_immediate(
+                            encoding=Encoding.T1,
+                            sideeffects=sideffect_flags,
+                            d=d,
+                            setflags=setflags,
+                            imm32=imm32,
+                            carry=carry,
                         )
                     elif (instr & 0x0) == 0x0:  # xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
                         # orn_immediate_t1
@@ -5286,16 +5654,14 @@ def decode_32bit(instr: int, ctx: Context):
                         )
                         if ((d == 13) or (d == 15)) or (n == 13):
                             sideffect_flags |= SIDEFFECT_UNPREDICTABLE
-                        return _apply_sideeffect(
-                            sideffect_flags,
-                            ORN_immediate(
-                                encoding=Encoding.T1,
-                                d=d,
-                                n=n,
-                                setflags=setflags,
-                                imm32=imm32,
-                                carry=carry,
-                            ),
+                        return ORN_immediate(
+                            encoding=Encoding.T1,
+                            sideeffects=sideffect_flags,
+                            d=d,
+                            n=n,
+                            setflags=setflags,
+                            imm32=imm32,
+                            carry=carry,
                         )
                     return NoMatch()  # no match
                 return NoMatch()  # no match
@@ -5320,11 +5686,12 @@ def decode_32bit(instr: int, ctx: Context):
                         )
                         if (n == 13) or (n == 15):
                             sideffect_flags |= SIDEFFECT_UNPREDICTABLE
-                        return _apply_sideeffect(
-                            sideffect_flags,
-                            TST_immediate(
-                                encoding=Encoding.T1, n=n, imm32=imm32, carry=carry
-                            ),
+                        return TST_immediate(
+                            encoding=Encoding.T1,
+                            sideeffects=sideffect_flags,
+                            n=n,
+                            imm32=imm32,
+                            carry=carry,
                         )
                     elif (instr & 0x0) == 0x0:  # xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
                         # and_immediate_t1
@@ -5351,16 +5718,14 @@ def decode_32bit(instr: int, ctx: Context):
                             (n == 13) or (n == 15)
                         ):
                             sideffect_flags |= SIDEFFECT_UNPREDICTABLE
-                        return _apply_sideeffect(
-                            sideffect_flags,
-                            AND_immediate(
-                                encoding=Encoding.T1,
-                                d=d,
-                                n=n,
-                                setflags=setflags,
-                                imm32=imm32,
-                                carry=carry,
-                            ),
+                        return AND_immediate(
+                            encoding=Encoding.T1,
+                            sideeffects=sideffect_flags,
+                            d=d,
+                            n=n,
+                            setflags=setflags,
+                            imm32=imm32,
+                            carry=carry,
                         )
                     return NoMatch()  # no match
                 elif (instr & 0x200000) == 0x200000:  # xxxxxxxxxx1xxxxxxxxxxxxxxxxxxxxx
@@ -5384,16 +5749,14 @@ def decode_32bit(instr: int, ctx: Context):
                     )
                     if ((d == 13) or (d == 15)) or ((n == 13) or (n == 15)):
                         sideffect_flags |= SIDEFFECT_UNPREDICTABLE
-                    return _apply_sideeffect(
-                        sideffect_flags,
-                        BIC_immediate(
-                            encoding=Encoding.T1,
-                            d=d,
-                            n=n,
-                            setflags=setflags,
-                            imm32=imm32,
-                            carry=carry,
-                        ),
+                    return BIC_immediate(
+                        encoding=Encoding.T1,
+                        sideeffects=sideffect_flags,
+                        d=d,
+                        n=n,
+                        setflags=setflags,
+                        imm32=imm32,
+                        carry=carry,
                     )
                 return NoMatch()  # no match
             elif (instr & 0x3C00000) == 0x800000:  # xxxxxx0010xxxxxxxxxxxxxxxxxxxxxx
@@ -5417,11 +5780,12 @@ def decode_32bit(instr: int, ctx: Context):
                         )
                         if (n == 13) or (n == 15):
                             sideffect_flags |= SIDEFFECT_UNPREDICTABLE
-                        return _apply_sideeffect(
-                            sideffect_flags,
-                            TEQ_immediate(
-                                encoding=Encoding.T1, n=n, imm32=imm32, carry=carry
-                            ),
+                        return TEQ_immediate(
+                            encoding=Encoding.T1,
+                            sideeffects=sideffect_flags,
+                            n=n,
+                            imm32=imm32,
+                            carry=carry,
                         )
                     elif (instr & 0x0) == 0x0:  # xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
                         # eor_immediate_t1
@@ -5448,16 +5812,14 @@ def decode_32bit(instr: int, ctx: Context):
                             (n == 13) or (n == 15)
                         ):
                             sideffect_flags |= SIDEFFECT_UNPREDICTABLE
-                        return _apply_sideeffect(
-                            sideffect_flags,
-                            EOR_immediate(
-                                encoding=Encoding.T1,
-                                d=d,
-                                n=n,
-                                setflags=setflags,
-                                imm32=imm32,
-                                carry=carry,
-                            ),
+                        return EOR_immediate(
+                            encoding=Encoding.T1,
+                            sideeffects=sideffect_flags,
+                            d=d,
+                            n=n,
+                            setflags=setflags,
+                            imm32=imm32,
+                            carry=carry,
                         )
                     return NoMatch()  # no match
                 return NoMatch()  # no match
@@ -5477,9 +5839,12 @@ def decode_32bit(instr: int, ctx: Context):
                         lsbit = UInt(concat_bits(imm3, imm2, 2))
                         if (d == 13) or (d == 15):
                             sideffect_flags |= SIDEFFECT_UNPREDICTABLE
-                        return _apply_sideeffect(
-                            sideffect_flags,
-                            BFC(encoding=Encoding.T1, d=d, msbit=msbit, lsbit=lsbit),
+                        return BFC(
+                            encoding=Encoding.T1,
+                            sideeffects=sideffect_flags,
+                            d=d,
+                            msbit=msbit,
+                            lsbit=lsbit,
                         )
                     elif (instr & 0x0) == 0x0:  # xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
                         # bfi_t1
@@ -5499,11 +5864,13 @@ def decode_32bit(instr: int, ctx: Context):
                         lsbit = UInt(concat_bits(imm3, imm2, 2))
                         if ((d == 13) or (d == 15)) or (n == 13):
                             sideffect_flags |= SIDEFFECT_UNPREDICTABLE
-                        return _apply_sideeffect(
-                            sideffect_flags,
-                            BFI(
-                                encoding=Encoding.T1, d=d, n=n, msbit=msbit, lsbit=lsbit
-                            ),
+                        return BFI(
+                            encoding=Encoding.T1,
+                            sideeffects=sideffect_flags,
+                            d=d,
+                            n=n,
+                            msbit=msbit,
+                            lsbit=lsbit,
                         )
                     return NoMatch()  # no match
                 elif (instr & 0x4300020) == 0x0:  # xxxxx0xxxx00xxxxxxxxxxxxxx0xxxxx
@@ -5522,15 +5889,13 @@ def decode_32bit(instr: int, ctx: Context):
                     widthminus1 = UInt(widthm1)
                     if ((d == 13) or (d == 15)) or ((n == 13) or (n == 15)):
                         sideffect_flags |= SIDEFFECT_UNPREDICTABLE
-                    return _apply_sideeffect(
-                        sideffect_flags,
-                        SBFX(
-                            encoding=Encoding.T1,
-                            d=d,
-                            n=n,
-                            lsbit=lsbit,
-                            widthminus1=widthminus1,
-                        ),
+                    return SBFX(
+                        encoding=Encoding.T1,
+                        sideeffects=sideffect_flags,
+                        d=d,
+                        n=n,
+                        lsbit=lsbit,
+                        widthminus1=widthminus1,
                     )
                 return NoMatch()  # no match
             elif (instr & 0x3C00000) == 0x3000000:  # xxxxxx1100xxxxxxxxxxxxxxxxxxxxxx
@@ -5550,11 +5915,12 @@ def decode_32bit(instr: int, ctx: Context):
                         saturate_to = UInt(sat_imm) + 1
                         if ((d == 13) or (d == 15)) or ((n == 13) or (n == 15)):
                             sideffect_flags |= SIDEFFECT_UNPREDICTABLE
-                        return _apply_sideeffect(
-                            sideffect_flags,
-                            SSAT16(
-                                encoding=Encoding.T1, d=d, n=n, saturate_to=saturate_to
-                            ),
+                        return SSAT16(
+                            encoding=Encoding.T1,
+                            sideeffects=sideffect_flags,
+                            d=d,
+                            n=n,
+                            saturate_to=saturate_to,
                         )
                     elif (instr & 0x0) == 0x0:  # xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
                         # ssat_t1
@@ -5580,16 +5946,14 @@ def decode_32bit(instr: int, ctx: Context):
                         )
                         if ((d == 13) or (d == 15)) or ((n == 13) or (n == 15)):
                             sideffect_flags |= SIDEFFECT_UNPREDICTABLE
-                        return _apply_sideeffect(
-                            sideffect_flags,
-                            SSAT(
-                                encoding=Encoding.T1,
-                                d=d,
-                                n=n,
-                                saturate_to=saturate_to,
-                                shift_t=shift_t,
-                                shift_n=shift_n,
-                            ),
+                        return SSAT(
+                            encoding=Encoding.T1,
+                            sideeffects=sideffect_flags,
+                            d=d,
+                            n=n,
+                            saturate_to=saturate_to,
+                            shift_t=shift_t,
+                            shift_n=shift_n,
                         )
                     return NoMatch()  # no match
                 return NoMatch()  # no match
@@ -5610,11 +5974,12 @@ def decode_32bit(instr: int, ctx: Context):
                         saturate_to = UInt(sat_imm)
                         if ((d == 13) or (d == 15)) or ((n == 13) or (n == 15)):
                             sideffect_flags |= SIDEFFECT_UNPREDICTABLE
-                        return _apply_sideeffect(
-                            sideffect_flags,
-                            USAT16(
-                                encoding=Encoding.T1, d=d, n=n, saturate_to=saturate_to
-                            ),
+                        return USAT16(
+                            encoding=Encoding.T1,
+                            sideeffects=sideffect_flags,
+                            d=d,
+                            n=n,
+                            saturate_to=saturate_to,
                         )
                     elif (instr & 0x0) == 0x0:  # xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
                         # usat_t1
@@ -5640,16 +6005,14 @@ def decode_32bit(instr: int, ctx: Context):
                         )
                         if ((d == 13) or (d == 15)) or ((n == 13) or (n == 15)):
                             sideffect_flags |= SIDEFFECT_UNPREDICTABLE
-                        return _apply_sideeffect(
-                            sideffect_flags,
-                            USAT(
-                                encoding=Encoding.T1,
-                                d=d,
-                                n=n,
-                                saturate_to=saturate_to,
-                                shift_t=shift_t,
-                                shift_n=shift_n,
-                            ),
+                        return USAT(
+                            encoding=Encoding.T1,
+                            sideeffects=sideffect_flags,
+                            d=d,
+                            n=n,
+                            saturate_to=saturate_to,
+                            shift_t=shift_t,
+                            shift_n=shift_n,
                         )
                     return NoMatch()  # no match
                 return NoMatch()  # no match
@@ -5661,7 +6024,7 @@ def decode_32bit(instr: int, ctx: Context):
                     # -> NOP
                     # decode
                     # No additional decoding required
-                    return NOP(encoding=Encoding.T2)
+                    return NOP(encoding=Encoding.T2, sideeffects=SIDEFFECT_NONE)
                 elif (
                     instr & 0x7FF2FFF
                 ) == 0x3BF0F2F:  # xxxxx01110111111xx0x111100101111
@@ -5669,7 +6032,7 @@ def decode_32bit(instr: int, ctx: Context):
                     # -> CLREX
                     # decode
                     # No additional decoding required
-                    return CLREX(encoding=Encoding.T1)
+                    return CLREX(encoding=Encoding.T1, sideeffects=SIDEFFECT_NONE)
                 elif (
                     instr & 0x7FF2FFF
                 ) == 0x3AF0014:  # xxxxx01110101111xx0x000000010100
@@ -5678,9 +6041,7 @@ def decode_32bit(instr: int, ctx: Context):
                     # decode
                     if InITBlock(ctx):
                         sideffect_flags |= SIDEFFECT_UNPREDICTABLE
-                    return _apply_sideeffect(
-                        sideffect_flags, CSDB(encoding=Encoding.T1)
-                    )
+                    return CSDB(encoding=Encoding.T1, sideeffects=sideffect_flags)
                 elif (
                     instr & 0x7FF2FFF
                 ) == 0x3AF0002:  # xxxxx01110101111xx0x000000000010
@@ -5688,7 +6049,7 @@ def decode_32bit(instr: int, ctx: Context):
                     # -> WFE
                     # decode
                     # No additional decoding required
-                    return WFE(encoding=Encoding.T2)
+                    return WFE(encoding=Encoding.T2, sideeffects=SIDEFFECT_NONE)
                 elif (
                     instr & 0x7FF2FFF
                 ) == 0x3AF0003:  # xxxxx01110101111xx0x000000000011
@@ -5696,7 +6057,7 @@ def decode_32bit(instr: int, ctx: Context):
                     # -> WFI
                     # decode
                     # No additional decoding required
-                    return WFI(encoding=Encoding.T2)
+                    return WFI(encoding=Encoding.T2, sideeffects=SIDEFFECT_NONE)
                 elif (
                     instr & 0x7FF2FFF
                 ) == 0x3BF0F44:  # xxxxx01110111111xx0x111101000100
@@ -5705,9 +6066,7 @@ def decode_32bit(instr: int, ctx: Context):
                     # decode
                     if InITBlock(ctx):
                         sideffect_flags |= SIDEFFECT_UNPREDICTABLE
-                    return _apply_sideeffect(
-                        sideffect_flags, PSSBB(encoding=Encoding.T1)
-                    )
+                    return PSSBB(encoding=Encoding.T1, sideeffects=sideffect_flags)
                 elif (
                     instr & 0x7FF2FFF
                 ) == 0x3BF0F40:  # xxxxx01110111111xx0x111101000000
@@ -5716,9 +6075,7 @@ def decode_32bit(instr: int, ctx: Context):
                     # decode
                     if InITBlock(ctx):
                         sideffect_flags |= SIDEFFECT_UNPREDICTABLE
-                    return _apply_sideeffect(
-                        sideffect_flags, SSBB(encoding=Encoding.T1)
-                    )
+                    return SSBB(encoding=Encoding.T1, sideeffects=sideffect_flags)
                 elif (
                     instr & 0x7FF2FFF
                 ) == 0x3AF0001:  # xxxxx01110101111xx0x000000000001
@@ -5726,7 +6083,7 @@ def decode_32bit(instr: int, ctx: Context):
                     # -> YIELD
                     # decode
                     # No additional decoding required
-                    return YIELD(encoding=Encoding.T2)
+                    return YIELD(encoding=Encoding.T2, sideeffects=SIDEFFECT_NONE)
                 elif (
                     instr & 0x7FF2FFF
                 ) == 0x3AF0004:  # xxxxx01110101111xx0x000000000100
@@ -5734,7 +6091,7 @@ def decode_32bit(instr: int, ctx: Context):
                     # -> SEV
                     # decode
                     # No additional decoding required
-                    return SEV(encoding=Encoding.T2)
+                    return SEV(encoding=Encoding.T2, sideeffects=SIDEFFECT_NONE)
                 elif (
                     instr & 0x7FF2FF0
                 ) == 0x3BF0F50:  # xxxxx01110111111xx0x11110101xxxx
@@ -5744,7 +6101,9 @@ def decode_32bit(instr: int, ctx: Context):
                     option = _bits(instr, 0, 4)
                     # decode
                     # No additional decoding required
-                    return DMB(encoding=Encoding.T1, option=option)
+                    return DMB(
+                        encoding=Encoding.T1, sideeffects=SIDEFFECT_NONE, option=option
+                    )
                 elif (
                     instr & 0x7FF2FF0
                 ) == 0x3BF0F60:  # xxxxx01110111111xx0x11110110xxxx
@@ -5755,8 +6114,8 @@ def decode_32bit(instr: int, ctx: Context):
                     # decode
                     if InITBlock(ctx):
                         sideffect_flags |= SIDEFFECT_UNPREDICTABLE
-                    return _apply_sideeffect(
-                        sideffect_flags, ISB(encoding=Encoding.T1, option=option)
+                    return ISB(
+                        encoding=Encoding.T1, sideeffects=sideffect_flags, option=option
                     )
                 elif (
                     instr & 0x7FF2FF0
@@ -5767,7 +6126,9 @@ def decode_32bit(instr: int, ctx: Context):
                     option = _bits(instr, 0, 4)
                     # decode
                     # Any decoding of 'option' is specified by the debug system
-                    return DBG(encoding=Encoding.T1, option=option)
+                    return DBG(
+                        encoding=Encoding.T1, sideeffects=SIDEFFECT_NONE, option=option
+                    )
                 elif (
                     instr & 0x7FF2FF0
                 ) == 0x3BF0F40:  # xxxxx01110111111xx0x11110100xxxx
@@ -5777,7 +6138,9 @@ def decode_32bit(instr: int, ctx: Context):
                     option = _bits(instr, 0, 4)
                     # decode
                     # No additional decoding required
-                    return DSB(encoding=Encoding.T1, option=option)
+                    return DSB(
+                        encoding=Encoding.T1, sideeffects=SIDEFFECT_NONE, option=option
+                    )
                 elif (
                     instr & 0x7FF2000
                 ) == 0x3EF0000:  # xxxxx01111101111xx0xxxxxxxxxxxxx
@@ -5796,8 +6159,11 @@ def decode_32bit(instr: int, ctx: Context):
                         )
                     ):
                         sideffect_flags |= SIDEFFECT_UNPREDICTABLE
-                    return _apply_sideeffect(
-                        sideffect_flags, MRS(encoding=Encoding.T1, d=d, SYSm=SYSm)
+                    return MRS(
+                        encoding=Encoding.T1,
+                        sideeffects=sideffect_flags,
+                        d=d,
+                        SYSm=SYSm,
                     )
                 elif (
                     instr & 0x7F02300
@@ -5822,9 +6188,12 @@ def decode_32bit(instr: int, ctx: Context):
                         )
                     ):
                         sideffect_flags |= SIDEFFECT_UNPREDICTABLE
-                    return _apply_sideeffect(
-                        sideffect_flags,
-                        MSR(encoding=Encoding.T1, n=n, mask=mask, SYSm=SYSm),
+                    return MSR(
+                        encoding=Encoding.T1,
+                        sideeffects=sideffect_flags,
+                        n=n,
+                        mask=mask,
+                        SYSm=SYSm,
                     )
                 elif (
                     instr & 0x7F02000
@@ -5837,7 +6206,9 @@ def decode_32bit(instr: int, ctx: Context):
                     # decode
                     imm32 = ZeroExtend(concat_bits(imm4, imm12, 12), 32)
                     # imm32 is for assembly and disassembly only, and is ignored by hardware.
-                    return UDF(encoding=Encoding.T2, imm32=imm32)
+                    return UDF(
+                        encoding=Encoding.T2, sideeffects=SIDEFFECT_NONE, imm32=imm32
+                    )
                 elif (instr & 0x0) == 0x0:  # xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
                     # b_t3
                     # -> B
@@ -5867,8 +6238,11 @@ def decode_32bit(instr: int, ctx: Context):
                     )
                     if InITBlock(ctx):
                         sideffect_flags |= SIDEFFECT_UNPREDICTABLE
-                    return _apply_sideeffect(
-                        sideffect_flags, B(encoding=Encoding.T3, imm32=imm32, cond=cond)
+                    return B(
+                        encoding=Encoding.T3,
+                        sideeffects=sideffect_flags,
+                        imm32=imm32,
+                        cond=cond,
                     )
                 return NoMatch()  # no match
             elif (instr & 0x5000) == 0x1000:  # xxxxxxxxxxxxxxxxx0x1xxxxxxxxxxxx
@@ -5900,8 +6274,11 @@ def decode_32bit(instr: int, ctx: Context):
                 )
                 if InITBlock(ctx) and (not (LastInITBlock(ctx))):
                     sideffect_flags |= SIDEFFECT_UNPREDICTABLE
-                return _apply_sideeffect(
-                    sideffect_flags, B(encoding=Encoding.T4, imm32=imm32, cond=cond)
+                return B(
+                    encoding=Encoding.T4,
+                    sideeffects=sideffect_flags,
+                    imm32=imm32,
+                    cond=cond,
                 )
             elif (instr & 0x5000) == 0x5000:  # xxxxxxxxxxxxxxxxx1x1xxxxxxxxxxxx
                 # bl_t1
@@ -5931,8 +6308,8 @@ def decode_32bit(instr: int, ctx: Context):
                 )
                 if InITBlock(ctx) and (not (LastInITBlock(ctx))):
                     sideffect_flags |= SIDEFFECT_UNPREDICTABLE
-                return _apply_sideeffect(
-                    sideffect_flags, BL(encoding=Encoding.T1, imm32=imm32)
+                return BL(
+                    encoding=Encoding.T1, sideeffects=sideffect_flags, imm32=imm32
                 )
             return NoMatch()  # no match
         return NoMatch()  # no match
@@ -5959,17 +6336,15 @@ def decode_32bit(instr: int, ctx: Context):
                     (m == 13) or (m == 15)
                 ):
                     sideffect_flags |= SIDEFFECT_UNPREDICTABLE
-                return _apply_sideeffect(
-                    sideffect_flags,
-                    ADC_register(
-                        encoding=Encoding.T2,
-                        d=d,
-                        n=n,
-                        m=m,
-                        setflags=setflags,
-                        shift_t=shift_t,
-                        shift_n=shift_n,
-                    ),
+                return ADC_register(
+                    encoding=Encoding.T2,
+                    sideeffects=sideffect_flags,
+                    d=d,
+                    n=n,
+                    m=m,
+                    setflags=setflags,
+                    shift_t=shift_t,
+                    shift_n=shift_n,
                 )
             elif (instr & 0x1E08000) == 0x1000000:  # xxxxxxx1000xxxxx0xxxxxxxxxxxxxxx
                 if (instr & 0x100F00) == 0x100F00:  # xxxxxxxxxxx1xxxxxxxx1111xxxxxxxx
@@ -5987,15 +6362,13 @@ def decode_32bit(instr: int, ctx: Context):
                     shift_t, shift_n = DecodeImmShift(type, concat_bits(imm3, imm2, 2))
                     if (n == 15) or ((m == 13) or (m == 15)):
                         sideffect_flags |= SIDEFFECT_UNPREDICTABLE
-                    return _apply_sideeffect(
-                        sideffect_flags,
-                        CMN_register(
-                            encoding=Encoding.T2,
-                            n=n,
-                            m=m,
-                            shift_t=shift_t,
-                            shift_n=shift_n,
-                        ),
+                    return CMN_register(
+                        encoding=Encoding.T2,
+                        sideeffects=sideffect_flags,
+                        n=n,
+                        m=m,
+                        shift_t=shift_t,
+                        shift_n=shift_n,
                     )
                 elif (instr & 0xF0000) == 0xD0000:  # xxxxxxxxxxxx1101xxxxxxxxxxxxxxxx
                     # add_sp_plus_register_t3
@@ -6018,16 +6391,14 @@ def decode_32bit(instr: int, ctx: Context):
                         sideffect_flags |= SIDEFFECT_UNPREDICTABLE
                     if ((d == 15) and (S == 0)) or ((m == 13) or (m == 15)):
                         sideffect_flags |= SIDEFFECT_UNPREDICTABLE
-                    return _apply_sideeffect(
-                        sideffect_flags,
-                        ADD_SP_plus_register(
-                            encoding=Encoding.T3,
-                            d=d,
-                            m=m,
-                            setflags=setflags,
-                            shift_t=shift_t,
-                            shift_n=shift_n,
-                        ),
+                    return ADD_SP_plus_register(
+                        encoding=Encoding.T3,
+                        sideeffects=sideffect_flags,
+                        d=d,
+                        m=m,
+                        setflags=setflags,
+                        shift_t=shift_t,
+                        shift_n=shift_n,
                     )
                 elif (instr & 0x0) == 0x0:  # xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
                     # add_register_t3
@@ -6054,17 +6425,15 @@ def decode_32bit(instr: int, ctx: Context):
                         (m == 13) or (m == 15)
                     ):
                         sideffect_flags |= SIDEFFECT_UNPREDICTABLE
-                    return _apply_sideeffect(
-                        sideffect_flags,
-                        ADD_register(
-                            encoding=Encoding.T3,
-                            d=d,
-                            n=n,
-                            m=m,
-                            setflags=setflags,
-                            shift_t=shift_t,
-                            shift_n=shift_n,
-                        ),
+                    return ADD_register(
+                        encoding=Encoding.T3,
+                        sideeffects=sideffect_flags,
+                        d=d,
+                        n=n,
+                        m=m,
+                        setflags=setflags,
+                        shift_t=shift_t,
+                        shift_n=shift_n,
                     )
                 return NoMatch()  # no match
             elif (instr & 0x1E08000) == 0x1A00000:  # xxxxxxx1101xxxxx0xxxxxxxxxxxxxxx
@@ -6083,15 +6452,13 @@ def decode_32bit(instr: int, ctx: Context):
                     shift_t, shift_n = DecodeImmShift(type, concat_bits(imm3, imm2, 2))
                     if (n == 15) or ((m == 13) or (m == 15)):
                         sideffect_flags |= SIDEFFECT_UNPREDICTABLE
-                    return _apply_sideeffect(
-                        sideffect_flags,
-                        CMP_register(
-                            encoding=Encoding.T3,
-                            n=n,
-                            m=m,
-                            shift_t=shift_t,
-                            shift_n=shift_n,
-                        ),
+                    return CMP_register(
+                        encoding=Encoding.T3,
+                        sideeffects=sideffect_flags,
+                        n=n,
+                        m=m,
+                        shift_t=shift_t,
+                        shift_n=shift_n,
                     )
                 elif (instr & 0xF0000) == 0xD0000:  # xxxxxxxxxxxx1101xxxxxxxxxxxxxxxx
                     # sub_sp_minus_register_t1
@@ -6114,16 +6481,14 @@ def decode_32bit(instr: int, ctx: Context):
                         sideffect_flags |= SIDEFFECT_UNPREDICTABLE
                     if ((d == 15) and (S == 0)) or ((m == 13) or (m == 15)):
                         sideffect_flags |= SIDEFFECT_UNPREDICTABLE
-                    return _apply_sideeffect(
-                        sideffect_flags,
-                        SUB_SP_minus_register(
-                            encoding=Encoding.T1,
-                            d=d,
-                            m=m,
-                            setflags=setflags,
-                            shift_t=shift_t,
-                            shift_n=shift_n,
-                        ),
+                    return SUB_SP_minus_register(
+                        encoding=Encoding.T1,
+                        sideeffects=sideffect_flags,
+                        d=d,
+                        m=m,
+                        setflags=setflags,
+                        shift_t=shift_t,
+                        shift_n=shift_n,
                     )
                 elif (instr & 0x0) == 0x0:  # xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
                     # sub_register_t2
@@ -6150,17 +6515,15 @@ def decode_32bit(instr: int, ctx: Context):
                         (m == 13) or (m == 15)
                     ):
                         sideffect_flags |= SIDEFFECT_UNPREDICTABLE
-                    return _apply_sideeffect(
-                        sideffect_flags,
-                        SUB_register(
-                            encoding=Encoding.T2,
-                            d=d,
-                            n=n,
-                            m=m,
-                            setflags=setflags,
-                            shift_t=shift_t,
-                            shift_n=shift_n,
-                        ),
+                    return SUB_register(
+                        encoding=Encoding.T2,
+                        sideeffects=sideffect_flags,
+                        d=d,
+                        n=n,
+                        m=m,
+                        setflags=setflags,
+                        shift_t=shift_t,
+                        shift_n=shift_n,
                     )
                 return NoMatch()  # no match
             elif (instr & 0x1E08000) == 0x400000:  # xxxxxxx0010xxxxx0xxxxxxxxxxxxxxx
@@ -6183,9 +6546,12 @@ def decode_32bit(instr: int, ctx: Context):
                         ((d == 15) or (m == 15)) or ((d == 13) and (m == 13))
                     ):
                         sideffect_flags |= SIDEFFECT_UNPREDICTABLE
-                    return _apply_sideeffect(
-                        sideffect_flags,
-                        MOV_register(encoding=Encoding.T3, d=d, m=m, setflags=setflags),
+                    return MOV_register(
+                        encoding=Encoding.T3,
+                        sideeffects=sideffect_flags,
+                        d=d,
+                        m=m,
+                        setflags=setflags,
                     )
                 elif (instr & 0xF70F0) == 0xF0030:  # xxxxxxxxxxxx1111x000xxxx0011xxxx
                     # rrx_t1
@@ -6200,9 +6566,12 @@ def decode_32bit(instr: int, ctx: Context):
                     setflags = S == 1
                     if ((d == 13) or (d == 15)) or ((m == 13) or (m == 15)):
                         sideffect_flags |= SIDEFFECT_UNPREDICTABLE
-                    return _apply_sideeffect(
-                        sideffect_flags,
-                        RRX(encoding=Encoding.T1, d=d, m=m, setflags=setflags),
+                    return RRX(
+                        encoding=Encoding.T1,
+                        sideeffects=sideffect_flags,
+                        d=d,
+                        m=m,
+                        setflags=setflags,
                     )
                 elif (instr & 0xF0030) == 0xF0000:  # xxxxxxxxxxxx1111xxxxxxxxxx00xxxx
                     # lsl_immediate_t2
@@ -6222,15 +6591,13 @@ def decode_32bit(instr: int, ctx: Context):
                     _, shift_n = DecodeImmShift(0x0, concat_bits(imm3, imm2, 2))
                     if ((d == 13) or (d == 15)) or ((m == 13) or (m == 15)):
                         sideffect_flags |= SIDEFFECT_UNPREDICTABLE
-                    return _apply_sideeffect(
-                        sideffect_flags,
-                        LSL_immediate(
-                            encoding=Encoding.T2,
-                            d=d,
-                            m=m,
-                            setflags=setflags,
-                            shift_n=shift_n,
-                        ),
+                    return LSL_immediate(
+                        encoding=Encoding.T2,
+                        sideeffects=sideffect_flags,
+                        d=d,
+                        m=m,
+                        setflags=setflags,
+                        shift_n=shift_n,
                     )
                 elif (instr & 0xF0030) == 0xF0010:  # xxxxxxxxxxxx1111xxxxxxxxxx01xxxx
                     # lsr_immediate_t2
@@ -6248,15 +6615,13 @@ def decode_32bit(instr: int, ctx: Context):
                     _, shift_n = DecodeImmShift(0x1, concat_bits(imm3, imm2, 2))
                     if ((d == 13) or (d == 15)) or ((m == 13) or (m == 15)):
                         sideffect_flags |= SIDEFFECT_UNPREDICTABLE
-                    return _apply_sideeffect(
-                        sideffect_flags,
-                        LSR_immediate(
-                            encoding=Encoding.T2,
-                            d=d,
-                            m=m,
-                            setflags=setflags,
-                            shift_n=shift_n,
-                        ),
+                    return LSR_immediate(
+                        encoding=Encoding.T2,
+                        sideeffects=sideffect_flags,
+                        d=d,
+                        m=m,
+                        setflags=setflags,
+                        shift_n=shift_n,
                     )
                 elif (instr & 0xF0030) == 0xF0020:  # xxxxxxxxxxxx1111xxxxxxxxxx10xxxx
                     # asr_immediate_t2
@@ -6274,15 +6639,13 @@ def decode_32bit(instr: int, ctx: Context):
                     _, shift_n = DecodeImmShift(0x2, concat_bits(imm3, imm2, 2))
                     if ((d == 13) or (d == 15)) or ((m == 13) or (m == 15)):
                         sideffect_flags |= SIDEFFECT_UNPREDICTABLE
-                    return _apply_sideeffect(
-                        sideffect_flags,
-                        ASR_immediate(
-                            encoding=Encoding.T2,
-                            d=d,
-                            m=m,
-                            setflags=setflags,
-                            shift_n=shift_n,
-                        ),
+                    return ASR_immediate(
+                        encoding=Encoding.T2,
+                        sideeffects=sideffect_flags,
+                        d=d,
+                        m=m,
+                        setflags=setflags,
+                        shift_n=shift_n,
                     )
                 elif (instr & 0xF0030) == 0xF0030:  # xxxxxxxxxxxx1111xxxxxxxxxx11xxxx
                     # ror_immediate_t1
@@ -6302,15 +6665,13 @@ def decode_32bit(instr: int, ctx: Context):
                     _, shift_n = DecodeImmShift(0x3, concat_bits(imm3, imm2, 2))
                     if ((d == 13) or (d == 15)) or ((m == 13) or (m == 15)):
                         sideffect_flags |= SIDEFFECT_UNPREDICTABLE
-                    return _apply_sideeffect(
-                        sideffect_flags,
-                        ROR_immediate(
-                            encoding=Encoding.T1,
-                            d=d,
-                            m=m,
-                            setflags=setflags,
-                            shift_n=shift_n,
-                        ),
+                    return ROR_immediate(
+                        encoding=Encoding.T1,
+                        sideeffects=sideffect_flags,
+                        d=d,
+                        m=m,
+                        setflags=setflags,
+                        shift_n=shift_n,
                     )
                 elif (instr & 0x0) == 0x0:  # xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
                     # orr_register_t2
@@ -6335,17 +6696,15 @@ def decode_32bit(instr: int, ctx: Context):
                         (m == 13) or (m == 15)
                     ):
                         sideffect_flags |= SIDEFFECT_UNPREDICTABLE
-                    return _apply_sideeffect(
-                        sideffect_flags,
-                        ORR_register(
-                            encoding=Encoding.T2,
-                            d=d,
-                            n=n,
-                            m=m,
-                            setflags=setflags,
-                            shift_t=shift_t,
-                            shift_n=shift_n,
-                        ),
+                    return ORR_register(
+                        encoding=Encoding.T2,
+                        sideeffects=sideffect_flags,
+                        d=d,
+                        n=n,
+                        m=m,
+                        setflags=setflags,
+                        shift_t=shift_t,
+                        shift_n=shift_n,
                     )
                 return NoMatch()  # no match
             elif (instr & 0x1E08000) == 0x0:  # xxxxxxx0000xxxxx0xxxxxxxxxxxxxxx
@@ -6364,15 +6723,13 @@ def decode_32bit(instr: int, ctx: Context):
                     shift_t, shift_n = DecodeImmShift(type, concat_bits(imm3, imm2, 2))
                     if ((n == 13) or (n == 15)) or ((m == 13) or (m == 15)):
                         sideffect_flags |= SIDEFFECT_UNPREDICTABLE
-                    return _apply_sideeffect(
-                        sideffect_flags,
-                        TST_register(
-                            encoding=Encoding.T2,
-                            n=n,
-                            m=m,
-                            shift_t=shift_t,
-                            shift_n=shift_n,
-                        ),
+                    return TST_register(
+                        encoding=Encoding.T2,
+                        sideeffects=sideffect_flags,
+                        n=n,
+                        m=m,
+                        shift_t=shift_t,
+                        shift_n=shift_n,
                     )
                 elif (instr & 0x0) == 0x0:  # xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
                     # and_register_t2
@@ -6398,17 +6755,15 @@ def decode_32bit(instr: int, ctx: Context):
                         or ((n == 13) or (n == 15))
                     ) or ((m == 13) or (m == 15)):
                         sideffect_flags |= SIDEFFECT_UNPREDICTABLE
-                    return _apply_sideeffect(
-                        sideffect_flags,
-                        AND_register(
-                            encoding=Encoding.T2,
-                            d=d,
-                            n=n,
-                            m=m,
-                            setflags=setflags,
-                            shift_t=shift_t,
-                            shift_n=shift_n,
-                        ),
+                    return AND_register(
+                        encoding=Encoding.T2,
+                        sideeffects=sideffect_flags,
+                        d=d,
+                        n=n,
+                        m=m,
+                        setflags=setflags,
+                        shift_t=shift_t,
+                        shift_n=shift_n,
                     )
                 return NoMatch()  # no match
             elif (instr & 0x1E08000) == 0x800000:  # xxxxxxx0100xxxxx0xxxxxxxxxxxxxxx
@@ -6427,15 +6782,13 @@ def decode_32bit(instr: int, ctx: Context):
                     shift_t, shift_n = DecodeImmShift(type, concat_bits(imm3, imm2, 2))
                     if ((n == 13) or (n == 15)) or ((m == 13) or (m == 15)):
                         sideffect_flags |= SIDEFFECT_UNPREDICTABLE
-                    return _apply_sideeffect(
-                        sideffect_flags,
-                        TEQ_register(
-                            encoding=Encoding.T1,
-                            n=n,
-                            m=m,
-                            shift_t=shift_t,
-                            shift_n=shift_n,
-                        ),
+                    return TEQ_register(
+                        encoding=Encoding.T1,
+                        sideeffects=sideffect_flags,
+                        n=n,
+                        m=m,
+                        shift_t=shift_t,
+                        shift_n=shift_n,
                     )
                 elif (instr & 0x0) == 0x0:  # xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
                     # eor_register_t2
@@ -6461,17 +6814,15 @@ def decode_32bit(instr: int, ctx: Context):
                         or ((n == 13) or (n == 15))
                     ) or ((m == 13) or (m == 15)):
                         sideffect_flags |= SIDEFFECT_UNPREDICTABLE
-                    return _apply_sideeffect(
-                        sideffect_flags,
-                        EOR_register(
-                            encoding=Encoding.T2,
-                            d=d,
-                            n=n,
-                            m=m,
-                            setflags=setflags,
-                            shift_t=shift_t,
-                            shift_n=shift_n,
-                        ),
+                    return EOR_register(
+                        encoding=Encoding.T2,
+                        sideeffects=sideffect_flags,
+                        d=d,
+                        n=n,
+                        m=m,
+                        setflags=setflags,
+                        shift_t=shift_t,
+                        shift_n=shift_n,
                     )
                 return NoMatch()  # no match
             elif (instr & 0x1E08000) == 0x600000:  # xxxxxxx0011xxxxx0xxxxxxxxxxxxxxx
@@ -6492,16 +6843,14 @@ def decode_32bit(instr: int, ctx: Context):
                     shift_t, shift_n = DecodeImmShift(type, concat_bits(imm3, imm2, 2))
                     if ((d == 13) or (d == 15)) or ((m == 13) or (m == 15)):
                         sideffect_flags |= SIDEFFECT_UNPREDICTABLE
-                    return _apply_sideeffect(
-                        sideffect_flags,
-                        MVN_register(
-                            encoding=Encoding.T2,
-                            d=d,
-                            m=m,
-                            setflags=setflags,
-                            shift_t=shift_t,
-                            shift_n=shift_n,
-                        ),
+                    return MVN_register(
+                        encoding=Encoding.T2,
+                        sideeffects=sideffect_flags,
+                        d=d,
+                        m=m,
+                        setflags=setflags,
+                        shift_t=shift_t,
+                        shift_n=shift_n,
                     )
                 elif (instr & 0x0) == 0x0:  # xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
                     # orn_register_t1
@@ -6526,17 +6875,15 @@ def decode_32bit(instr: int, ctx: Context):
                         (m == 13) or (m == 15)
                     ):
                         sideffect_flags |= SIDEFFECT_UNPREDICTABLE
-                    return _apply_sideeffect(
-                        sideffect_flags,
-                        ORN_register(
-                            encoding=Encoding.T1,
-                            d=d,
-                            n=n,
-                            m=m,
-                            setflags=setflags,
-                            shift_t=shift_t,
-                            shift_n=shift_n,
-                        ),
+                    return ORN_register(
+                        encoding=Encoding.T1,
+                        sideeffects=sideffect_flags,
+                        d=d,
+                        n=n,
+                        m=m,
+                        setflags=setflags,
+                        shift_t=shift_t,
+                        shift_n=shift_n,
                     )
                 return NoMatch()  # no match
             elif (instr & 0x1E08000) == 0x200000:  # xxxxxxx0001xxxxx0xxxxxxxxxxxxxxx
@@ -6560,17 +6907,15 @@ def decode_32bit(instr: int, ctx: Context):
                     (m == 13) or (m == 15)
                 ):
                     sideffect_flags |= SIDEFFECT_UNPREDICTABLE
-                return _apply_sideeffect(
-                    sideffect_flags,
-                    BIC_register(
-                        encoding=Encoding.T2,
-                        d=d,
-                        n=n,
-                        m=m,
-                        setflags=setflags,
-                        shift_t=shift_t,
-                        shift_n=shift_n,
-                    ),
+                return BIC_register(
+                    encoding=Encoding.T2,
+                    sideeffects=sideffect_flags,
+                    d=d,
+                    n=n,
+                    m=m,
+                    setflags=setflags,
+                    shift_t=shift_t,
+                    shift_n=shift_n,
                 )
             elif (instr & 0x1E08000) == 0x1C00000:  # xxxxxxx1110xxxxx0xxxxxxxxxxxxxxx
                 # rsb_register_t1
@@ -6593,17 +6938,15 @@ def decode_32bit(instr: int, ctx: Context):
                     (m == 13) or (m == 15)
                 ):
                     sideffect_flags |= SIDEFFECT_UNPREDICTABLE
-                return _apply_sideeffect(
-                    sideffect_flags,
-                    RSB_register(
-                        encoding=Encoding.T1,
-                        d=d,
-                        n=n,
-                        m=m,
-                        setflags=setflags,
-                        shift_t=shift_t,
-                        shift_n=shift_n,
-                    ),
+                return RSB_register(
+                    encoding=Encoding.T1,
+                    sideeffects=sideffect_flags,
+                    d=d,
+                    n=n,
+                    m=m,
+                    setflags=setflags,
+                    shift_t=shift_t,
+                    shift_n=shift_n,
                 )
             elif (instr & 0x1E08000) == 0x1600000:  # xxxxxxx1011xxxxx0xxxxxxxxxxxxxxx
                 # sbc_register_t2
@@ -6626,17 +6969,15 @@ def decode_32bit(instr: int, ctx: Context):
                     (m == 13) or (m == 15)
                 ):
                     sideffect_flags |= SIDEFFECT_UNPREDICTABLE
-                return _apply_sideeffect(
-                    sideffect_flags,
-                    SBC_register(
-                        encoding=Encoding.T2,
-                        d=d,
-                        n=n,
-                        m=m,
-                        setflags=setflags,
-                        shift_t=shift_t,
-                        shift_n=shift_n,
-                    ),
+                return SBC_register(
+                    encoding=Encoding.T2,
+                    sideeffects=sideffect_flags,
+                    d=d,
+                    n=n,
+                    m=m,
+                    setflags=setflags,
+                    shift_t=shift_t,
+                    shift_n=shift_n,
                 )
             elif (instr & 0x1E08000) == 0xC00000:  # xxxxxxx0110xxxxx0xxxxxxxxxxxxxxx
                 # pkhbt_pkhtb_t1
@@ -6664,19 +7005,17 @@ def decode_32bit(instr: int, ctx: Context):
                     (m == 13) or (m == 15)
                 ):
                     sideffect_flags |= SIDEFFECT_UNPREDICTABLE
-                return _apply_sideeffect(
-                    sideffect_flags,
-                    PKHBT_PKHTB(
-                        encoding=Encoding.T1,
-                        d=d,
-                        n=n,
-                        m=m,
-                        tbform=tbform,
-                        shift_t=shift_t,
-                        shift_n=shift_n,
-                        S=S,
-                        T=T,
-                    ),
+                return PKHBT_PKHTB(
+                    encoding=Encoding.T1,
+                    sideeffects=sideffect_flags,
+                    d=d,
+                    n=n,
+                    m=m,
+                    tbform=tbform,
+                    shift_t=shift_t,
+                    shift_n=shift_n,
+                    S=S,
+                    T=T,
                 )
             return NoMatch()  # no match
         elif (instr & 0x6000000) == 0x0:  # xxxxx00xxxxxxxxxxxxxxxxxxxxxxxxx
@@ -6704,14 +7043,12 @@ def decode_32bit(instr: int, ctx: Context):
                             not (LastInITBlock(ctx))
                         ):
                             sideffect_flags |= SIDEFFECT_UNPREDICTABLE
-                        return _apply_sideeffect(
-                            sideffect_flags,
-                            POP(
-                                encoding=Encoding.T2,
-                                registers=registers,
-                                UnalignedAllowed=UnalignedAllowed,
-                                t=t,
-                            ),
+                        return POP(
+                            encoding=Encoding.T2,
+                            sideeffects=sideffect_flags,
+                            registers=registers,
+                            UnalignedAllowed=UnalignedAllowed,
+                            t=t,
                         )
                     elif (instr & 0x0) == 0x0:  # xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
                         # ldm_t2
@@ -6740,14 +7077,12 @@ def decode_32bit(instr: int, ctx: Context):
                             sideffect_flags |= SIDEFFECT_UNPREDICTABLE
                         if wback and (((registers >> n) & 1) == 1):
                             sideffect_flags |= SIDEFFECT_UNPREDICTABLE
-                        return _apply_sideeffect(
-                            sideffect_flags,
-                            LDM(
-                                encoding=Encoding.T2,
-                                n=n,
-                                registers=registers,
-                                wback=wback,
-                            ),
+                        return LDM(
+                            encoding=Encoding.T2,
+                            sideeffects=sideffect_flags,
+                            n=n,
+                            registers=registers,
+                            wback=wback,
                         )
                     return NoMatch()  # no match
                 elif (
@@ -6777,11 +7112,12 @@ def decode_32bit(instr: int, ctx: Context):
                         sideffect_flags |= SIDEFFECT_UNPREDICTABLE
                     if wback and (((registers >> n) & 1) == 1):
                         sideffect_flags |= SIDEFFECT_UNPREDICTABLE
-                    return _apply_sideeffect(
-                        sideffect_flags,
-                        LDMDB(
-                            encoding=Encoding.T1, n=n, registers=registers, wback=wback
-                        ),
+                    return LDMDB(
+                        encoding=Encoding.T1,
+                        sideeffects=sideffect_flags,
+                        n=n,
+                        registers=registers,
+                        wback=wback,
                     )
                 return NoMatch()  # no match
             elif (instr & 0x500000) == 0x0:  # xxxxxxxxx0x0xxxxxxxxxxxxxxxxxxxx
@@ -6803,14 +7139,12 @@ def decode_32bit(instr: int, ctx: Context):
                         UnalignedAllowed = False
                         if BitCount(registers) < 2:
                             sideffect_flags |= SIDEFFECT_UNPREDICTABLE
-                        return _apply_sideeffect(
-                            sideffect_flags,
-                            PUSH(
-                                encoding=Encoding.T2,
-                                registers=registers,
-                                UnalignedAllowed=UnalignedAllowed,
-                                t=t,
-                            ),
+                        return PUSH(
+                            encoding=Encoding.T2,
+                            sideeffects=sideffect_flags,
+                            registers=registers,
+                            UnalignedAllowed=UnalignedAllowed,
+                            t=t,
                         )
                     elif (instr & 0x0) == 0x0:  # xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
                         # stmdb_t1
@@ -6832,14 +7166,12 @@ def decode_32bit(instr: int, ctx: Context):
                             sideffect_flags |= SIDEFFECT_UNPREDICTABLE
                         if wback and (((registers >> n) & 1) == 1):
                             sideffect_flags |= SIDEFFECT_UNPREDICTABLE
-                        return _apply_sideeffect(
-                            sideffect_flags,
-                            STMDB(
-                                encoding=Encoding.T1,
-                                n=n,
-                                registers=registers,
-                                wback=wback,
-                            ),
+                        return STMDB(
+                            encoding=Encoding.T1,
+                            sideeffects=sideffect_flags,
+                            n=n,
+                            registers=registers,
+                            wback=wback,
                         )
                     return NoMatch()  # no match
                 elif (
@@ -6862,11 +7194,12 @@ def decode_32bit(instr: int, ctx: Context):
                         sideffect_flags |= SIDEFFECT_UNPREDICTABLE
                     if wback and (((registers >> n) & 1) == 1):
                         sideffect_flags |= SIDEFFECT_UNPREDICTABLE
-                    return _apply_sideeffect(
-                        sideffect_flags,
-                        STM(
-                            encoding=Encoding.T2, n=n, registers=registers, wback=wback
-                        ),
+                    return STM(
+                        encoding=Encoding.T2,
+                        sideeffects=sideffect_flags,
+                        n=n,
+                        registers=registers,
+                        wback=wback,
                     )
                 return NoMatch()  # no match
             elif (instr & 0x500000) == 0x400000:  # xxxxxxxxx1x0xxxxxxxxxxxxxxxxxxxx
@@ -6887,8 +7220,8 @@ def decode_32bit(instr: int, ctx: Context):
                         sideffect_flags |= SIDEFFECT_UNPREDICTABLE
                     if (d == n) or (d == t):
                         sideffect_flags |= SIDEFFECT_UNPREDICTABLE
-                    return _apply_sideeffect(
-                        sideffect_flags, STREXB(encoding=Encoding.T1, d=d, t=t, n=n)
+                    return STREXB(
+                        encoding=Encoding.T1, sideeffects=sideffect_flags, d=d, t=t, n=n
                     )
                 elif (
                     instr & 0x1A00FF0
@@ -6909,8 +7242,8 @@ def decode_32bit(instr: int, ctx: Context):
                         sideffect_flags |= SIDEFFECT_UNPREDICTABLE
                     if (d == n) or (d == t):
                         sideffect_flags |= SIDEFFECT_UNPREDICTABLE
-                    return _apply_sideeffect(
-                        sideffect_flags, STREXH(encoding=Encoding.T1, d=d, t=t, n=n)
+                    return STREXH(
+                        encoding=Encoding.T1, sideeffects=sideffect_flags, d=d, t=t, n=n
                     )
                 elif (instr & 0x1A00000) == 0x0:  # xxxxxxx00x0xxxxxxxxxxxxxxxxxxxxx
                     # strex_t1
@@ -6931,9 +7264,13 @@ def decode_32bit(instr: int, ctx: Context):
                         sideffect_flags |= SIDEFFECT_UNPREDICTABLE
                     if (d == n) or (d == t):
                         sideffect_flags |= SIDEFFECT_UNPREDICTABLE
-                    return _apply_sideeffect(
-                        sideffect_flags,
-                        STREX(encoding=Encoding.T1, d=d, t=t, n=n, imm32=imm32),
+                    return STREX(
+                        encoding=Encoding.T1,
+                        sideeffects=sideffect_flags,
+                        d=d,
+                        t=t,
+                        n=n,
+                        imm32=imm32,
                     )
                 elif (instr & 0x0) == 0x0:  # xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
                     # strd_immediate_t1
@@ -6962,18 +7299,16 @@ def decode_32bit(instr: int, ctx: Context):
                         (t2 == 13) or (t2 == 15)
                     ):
                         sideffect_flags |= SIDEFFECT_UNPREDICTABLE
-                    return _apply_sideeffect(
-                        sideffect_flags,
-                        STRD_immediate(
-                            encoding=Encoding.T1,
-                            t=t,
-                            t2=t2,
-                            n=n,
-                            imm32=imm32,
-                            index=index,
-                            add=add,
-                            wback=wback,
-                        ),
+                    return STRD_immediate(
+                        encoding=Encoding.T1,
+                        sideeffects=sideffect_flags,
+                        t=t,
+                        t2=t2,
+                        n=n,
+                        imm32=imm32,
+                        index=index,
+                        add=add,
+                        wback=wback,
                     )
                 return NoMatch()  # no match
             elif (instr & 0x500000) == 0x500000:  # xxxxxxxxx1x1xxxxxxxxxxxxxxxxxxxx
@@ -6988,8 +7323,8 @@ def decode_32bit(instr: int, ctx: Context):
                     n = UInt(Rn)
                     if ((t == 13) or (t == 15)) or (n == 15):
                         sideffect_flags |= SIDEFFECT_UNPREDICTABLE
-                    return _apply_sideeffect(
-                        sideffect_flags, LDREXB(encoding=Encoding.T1, t=t, n=n)
+                    return LDREXB(
+                        encoding=Encoding.T1, sideeffects=sideffect_flags, t=t, n=n
                     )
                 elif (
                     instr & 0x1A00FFF
@@ -7004,8 +7339,8 @@ def decode_32bit(instr: int, ctx: Context):
                     n = UInt(Rn)
                     if ((t == 13) or (t == 15)) or (n == 15):
                         sideffect_flags |= SIDEFFECT_UNPREDICTABLE
-                    return _apply_sideeffect(
-                        sideffect_flags, LDREXH(encoding=Encoding.T1, t=t, n=n)
+                    return LDREXH(
+                        encoding=Encoding.T1, sideeffects=sideffect_flags, t=t, n=n
                     )
                 elif (
                     instr & 0x1A0FFE0
@@ -7024,9 +7359,12 @@ def decode_32bit(instr: int, ctx: Context):
                         sideffect_flags |= SIDEFFECT_UNPREDICTABLE
                     if InITBlock(ctx) and (not (LastInITBlock(ctx))):
                         sideffect_flags |= SIDEFFECT_UNPREDICTABLE
-                    return _apply_sideeffect(
-                        sideffect_flags,
-                        TBB_TBH(encoding=Encoding.T1, n=n, m=m, is_tbh=is_tbh),
+                    return TBB_TBH(
+                        encoding=Encoding.T1,
+                        sideeffects=sideffect_flags,
+                        n=n,
+                        m=m,
+                        is_tbh=is_tbh,
                     )
                 elif (instr & 0x1A00F00) == 0xF00:  # xxxxxxx00x0xxxxxxxxx1111xxxxxxxx
                     # ldrex_t1
@@ -7041,9 +7379,12 @@ def decode_32bit(instr: int, ctx: Context):
                     imm32 = ZeroExtend(concat_bits(imm8, 0x0, 2), 32)
                     if ((t == 13) or (t == 15)) or (n == 15):
                         sideffect_flags |= SIDEFFECT_UNPREDICTABLE
-                    return _apply_sideeffect(
-                        sideffect_flags,
-                        LDREX(encoding=Encoding.T1, t=t, n=n, imm32=imm32),
+                    return LDREX(
+                        encoding=Encoding.T1,
+                        sideeffects=sideffect_flags,
+                        t=t,
+                        n=n,
+                        imm32=imm32,
                     )
                 elif (instr & 0xF0000) == 0xF0000:  # xxxxxxxxxxxx1111xxxxxxxxxxxxxxxx
                     # ldrd_literal_t1
@@ -7068,17 +7409,15 @@ def decode_32bit(instr: int, ctx: Context):
                         sideffect_flags |= SIDEFFECT_UNPREDICTABLE
                     if W == 1:
                         sideffect_flags |= SIDEFFECT_UNPREDICTABLE
-                    return _apply_sideeffect(
-                        sideffect_flags,
-                        LDRD_literal(
-                            encoding=Encoding.T1,
-                            t=t,
-                            t2=t2,
-                            imm32=imm32,
-                            add=add,
-                            P=P,
-                            W=W,
-                        ),
+                    return LDRD_literal(
+                        encoding=Encoding.T1,
+                        sideeffects=sideffect_flags,
+                        t=t,
+                        t2=t2,
+                        imm32=imm32,
+                        add=add,
+                        P=P,
+                        W=W,
                     )
                 elif (instr & 0x0) == 0x0:  # xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
                     # ldrd_immediate_t1
@@ -7109,18 +7448,16 @@ def decode_32bit(instr: int, ctx: Context):
                         t == t2
                     ):
                         sideffect_flags |= SIDEFFECT_UNPREDICTABLE
-                    return _apply_sideeffect(
-                        sideffect_flags,
-                        LDRD_immediate(
-                            encoding=Encoding.T1,
-                            t=t,
-                            t2=t2,
-                            n=n,
-                            imm32=imm32,
-                            index=index,
-                            add=add,
-                            wback=wback,
-                        ),
+                    return LDRD_immediate(
+                        encoding=Encoding.T1,
+                        sideeffects=sideffect_flags,
+                        t=t,
+                        t2=t2,
+                        n=n,
+                        imm32=imm32,
+                        index=index,
+                        add=add,
+                        wback=wback,
                     )
                 return NoMatch()  # no match
             return NoMatch()  # no match
@@ -7147,6 +7484,7 @@ def decode_32bit(instr: int, ctx: Context):
                     )
                     return VCMP_VCMPE(
                         encoding=Encoding.T2,
+                        sideeffects=SIDEFFECT_NONE,
                         dp_operation=dp_operation,
                         quiet_nan_exc=quiet_nan_exc,
                         with_zero=with_zero,
@@ -7175,7 +7513,11 @@ def decode_32bit(instr: int, ctx: Context):
                         else UInt(concat_bits(Vm, M, 1))
                     )
                     return VABS(
-                        encoding=Encoding.T1, dp_operation=dp_operation, d=d, m=m
+                        encoding=Encoding.T1,
+                        sideeffects=SIDEFFECT_NONE,
+                        dp_operation=dp_operation,
+                        d=d,
+                        m=m,
                     )
                 elif (instr & 0xBF0EC0) == 0xB70AC0:  # xxxxxxxx1x110111xxxx101x11xxxxxx
                     # vcvt_double_single_t1
@@ -7200,6 +7542,7 @@ def decode_32bit(instr: int, ctx: Context):
                     )
                     return VCVT_double_single(
                         encoding=Encoding.T1,
+                        sideeffects=SIDEFFECT_NONE,
                         double_to_single=double_to_single,
                         d=d,
                         m=m,
@@ -7226,7 +7569,11 @@ def decode_32bit(instr: int, ctx: Context):
                         else UInt(concat_bits(Vm, M, 1))
                     )
                     return VMOV_register(
-                        encoding=Encoding.T1, dp_operation=dp_operation, d=d, m=m
+                        encoding=Encoding.T1,
+                        sideeffects=SIDEFFECT_NONE,
+                        dp_operation=dp_operation,
+                        d=d,
+                        m=m,
                     )
                 elif (instr & 0xBF0EC0) == 0xB10A40:  # xxxxxxxx1x110001xxxx101x01xxxxxx
                     # vneg_t1
@@ -7250,7 +7597,11 @@ def decode_32bit(instr: int, ctx: Context):
                         else UInt(concat_bits(Vm, M, 1))
                     )
                     return VNEG(
-                        encoding=Encoding.T1, dp_operation=dp_operation, d=d, m=m
+                        encoding=Encoding.T1,
+                        sideeffects=SIDEFFECT_NONE,
+                        dp_operation=dp_operation,
+                        d=d,
+                        m=m,
                     )
                 elif (instr & 0xBF0EC0) == 0xB70A40:  # xxxxxxxx1x110111xxxx101x01xxxxxx
                     # vrintx_t1
@@ -7274,7 +7625,11 @@ def decode_32bit(instr: int, ctx: Context):
                         else UInt(concat_bits(Vm, M, 1))
                     )
                     return VRINTX(
-                        encoding=Encoding.T1, dp_operation=dp_operation, d=d, m=m
+                        encoding=Encoding.T1,
+                        sideeffects=SIDEFFECT_NONE,
+                        dp_operation=dp_operation,
+                        d=d,
+                        m=m,
                     )
                 elif (instr & 0xBF0EC0) == 0xB10AC0:  # xxxxxxxx1x110001xxxx101x11xxxxxx
                     # vsqrt_t1
@@ -7298,7 +7653,11 @@ def decode_32bit(instr: int, ctx: Context):
                         else UInt(concat_bits(Vm, M, 1))
                     )
                     return VSQRT(
-                        encoding=Encoding.T1, dp_operation=dp_operation, d=d, m=m
+                        encoding=Encoding.T1,
+                        sideeffects=SIDEFFECT_NONE,
+                        dp_operation=dp_operation,
+                        d=d,
+                        m=m,
                     )
                 elif (instr & 0xBF0E40) == 0xB40A40:  # xxxxxxxx1x110100xxxx101xx1xxxxxx
                     # vcmp_vcmpe_t1
@@ -7326,6 +7685,7 @@ def decode_32bit(instr: int, ctx: Context):
                     )
                     return VCMP_VCMPE(
                         encoding=Encoding.T1,
+                        sideeffects=SIDEFFECT_NONE,
                         dp_operation=dp_operation,
                         quiet_nan_exc=quiet_nan_exc,
                         with_zero=with_zero,
@@ -7357,6 +7717,7 @@ def decode_32bit(instr: int, ctx: Context):
                     )
                     return VRINTZ_VRINTR(
                         encoding=Encoding.T1,
+                        sideeffects=SIDEFFECT_NONE,
                         dp_operation=dp_operation,
                         rmode=rmode,
                         d=d,
@@ -7389,6 +7750,7 @@ def decode_32bit(instr: int, ctx: Context):
                         m = UInt(concat_bits(Vm, M, 1))
                     return VCVTB_VCVTT(
                         encoding=Encoding.T1,
+                        sideeffects=SIDEFFECT_NONE,
                         dp_operation=dp_operation,
                         convert_from_half=convert_from_half,
                         lowbit=lowbit,
@@ -7427,19 +7789,17 @@ def decode_32bit(instr: int, ctx: Context):
                     )
                     if frac_bits < 0:
                         sideffect_flags |= SIDEFFECT_UNPREDICTABLE
-                    return _apply_sideeffect(
-                        sideffect_flags,
-                        VCVT_fixed_point(
-                            encoding=Encoding.T1,
-                            to_fixed=to_fixed,
-                            dp_operation=dp_operation,
-                            unsigned=unsigned,
-                            size=size,
-                            frac_bits=frac_bits,
-                            round_zero=round_zero,
-                            round_nearest=round_nearest,
-                            d=d,
-                        ),
+                    return VCVT_fixed_point(
+                        encoding=Encoding.T1,
+                        sideeffects=sideffect_flags,
+                        to_fixed=to_fixed,
+                        dp_operation=dp_operation,
+                        unsigned=unsigned,
+                        size=size,
+                        frac_bits=frac_bits,
+                        round_zero=round_zero,
+                        round_nearest=round_nearest,
+                        d=d,
                     )
                 elif (instr & 0xB00EE0) == 0xB00A00:  # xxxxxxxx1x11xxxxxxxx101x000xxxxx
                     # vmov_immediate_t1
@@ -7463,6 +7823,7 @@ def decode_32bit(instr: int, ctx: Context):
                         imm32 = VFPExpandImm(concat_bits(imm4H, imm4L, 4), 32)
                     return VMOV_immediate(
                         encoding=Encoding.T1,
+                        sideeffects=SIDEFFECT_NONE,
                         dp_operation=dp_operation,
                         d=d,
                         imm64=imm64,
@@ -7505,18 +7866,16 @@ def decode_32bit(instr: int, ctx: Context):
                             if dp_operation
                             else UInt(concat_bits(Vd, D, 1))
                         )
-                    return _apply_sideeffect(
-                        sideffect_flags,
-                        VCVT_VCVTR_integer(
-                            encoding=Encoding.T1,
-                            to_integer=to_integer,
-                            dp_operation=dp_operation,
-                            unsigned=unsigned,
-                            round_zero=round_zero,
-                            d=d,
-                            m=m,
-                            round_nearest=round_nearest,
-                        ),
+                    return VCVT_VCVTR_integer(
+                        encoding=Encoding.T1,
+                        sideeffects=sideffect_flags,
+                        to_integer=to_integer,
+                        dp_operation=dp_operation,
+                        unsigned=unsigned,
+                        round_zero=round_zero,
+                        d=d,
+                        m=m,
+                        round_nearest=round_nearest,
                     )
                 elif (instr & 0xB00E40) == 0x300A00:  # xxxxxxxx0x11xxxxxxxx101xx0xxxxxx
                     # vadd_t1
@@ -7547,7 +7906,12 @@ def decode_32bit(instr: int, ctx: Context):
                         else UInt(concat_bits(Vm, M, 1))
                     )
                     return VADD(
-                        encoding=Encoding.T1, dp_operation=dp_operation, d=d, n=n, m=m
+                        encoding=Encoding.T1,
+                        sideeffects=SIDEFFECT_NONE,
+                        dp_operation=dp_operation,
+                        d=d,
+                        n=n,
+                        m=m,
                     )
                 elif (instr & 0xB00E40) == 0x800A00:  # xxxxxxxx1x00xxxxxxxx101xx0xxxxxx
                     # vdiv_t1
@@ -7578,7 +7942,12 @@ def decode_32bit(instr: int, ctx: Context):
                         else UInt(concat_bits(Vm, M, 1))
                     )
                     return VDIV(
-                        encoding=Encoding.T1, dp_operation=dp_operation, d=d, n=n, m=m
+                        encoding=Encoding.T1,
+                        sideeffects=SIDEFFECT_NONE,
+                        dp_operation=dp_operation,
+                        d=d,
+                        n=n,
+                        m=m,
                     )
                 elif (instr & 0xB00E40) == 0x200A00:  # xxxxxxxx0x10xxxxxxxx101xx0xxxxxx
                     # vmul_t1
@@ -7609,7 +7978,12 @@ def decode_32bit(instr: int, ctx: Context):
                         else UInt(concat_bits(Vm, M, 1))
                     )
                     return VMUL(
-                        encoding=Encoding.T1, dp_operation=dp_operation, d=d, n=n, m=m
+                        encoding=Encoding.T1,
+                        sideeffects=SIDEFFECT_NONE,
+                        dp_operation=dp_operation,
+                        d=d,
+                        n=n,
+                        m=m,
                     )
                 elif (instr & 0xB00E40) == 0x200A40:  # xxxxxxxx0x10xxxxxxxx101xx1xxxxxx
                     # vnmla_vnmls_vnmul_t2
@@ -7642,6 +8016,7 @@ def decode_32bit(instr: int, ctx: Context):
                     )
                     return VNMLA_VNMLS_VNMUL(
                         encoding=Encoding.T2,
+                        sideeffects=SIDEFFECT_NONE,
                         type=type,
                         dp_operation=dp_operation,
                         d=d,
@@ -7677,7 +8052,12 @@ def decode_32bit(instr: int, ctx: Context):
                         else UInt(concat_bits(Vm, M, 1))
                     )
                     return VSUB(
-                        encoding=Encoding.T1, dp_operation=dp_operation, d=d, n=n, m=m
+                        encoding=Encoding.T1,
+                        sideeffects=SIDEFFECT_NONE,
+                        dp_operation=dp_operation,
+                        d=d,
+                        n=n,
+                        m=m,
                     )
                 elif (instr & 0xB00E00) == 0xA00A00:  # xxxxxxxx1x10xxxxxxxx101xxxxxxxxx
                     # vfma_vfms_t1
@@ -7711,6 +8091,7 @@ def decode_32bit(instr: int, ctx: Context):
                     )
                     return VFMA_VFMS(
                         encoding=Encoding.T1,
+                        sideeffects=SIDEFFECT_NONE,
                         dp_operation=dp_operation,
                         op1_neg=op1_neg,
                         d=d,
@@ -7749,6 +8130,7 @@ def decode_32bit(instr: int, ctx: Context):
                     )
                     return VFNMA_VFNMS(
                         encoding=Encoding.T1,
+                        sideeffects=SIDEFFECT_NONE,
                         op1_neg=op1_neg,
                         dp_operation=dp_operation,
                         d=d,
@@ -7787,6 +8169,7 @@ def decode_32bit(instr: int, ctx: Context):
                     )
                     return VMLA_VMLS(
                         encoding=Encoding.T1,
+                        sideeffects=SIDEFFECT_NONE,
                         dp_operation=dp_operation,
                         add=add,
                         d=d,
@@ -7825,6 +8208,7 @@ def decode_32bit(instr: int, ctx: Context):
                     )
                     return VNMLA_VNMLS_VNMUL(
                         encoding=Encoding.T1,
+                        sideeffects=SIDEFFECT_NONE,
                         type=type,
                         dp_operation=dp_operation,
                         d=d,
@@ -7845,6 +8229,7 @@ def decode_32bit(instr: int, ctx: Context):
                     cp = UInt(coproc)
                     return CDP_CDP2(
                         encoding=Encoding.T1,
+                        sideeffects=SIDEFFECT_NONE,
                         cp=cp,
                         opc1=opc1,
                         CRn=CRn,
@@ -7863,9 +8248,7 @@ def decode_32bit(instr: int, ctx: Context):
                     t = UInt(Rt)
                     if t == 13:
                         sideffect_flags |= SIDEFFECT_UNPREDICTABLE
-                    return _apply_sideeffect(
-                        sideffect_flags, VMRS(encoding=Encoding.T1, t=t)
-                    )
+                    return VMRS(encoding=Encoding.T1, sideeffects=sideffect_flags, t=t)
                 elif (instr & 0xFF0FEF) == 0xE10A00:  # xxxxxxxx11100001xxxx1010000x0000
                     # vmsr_t1
                     # -> VMSR
@@ -7875,9 +8258,7 @@ def decode_32bit(instr: int, ctx: Context):
                     t = UInt(Rt)
                     if (t == 15) or (t == 13):
                         sideffect_flags |= SIDEFFECT_UNPREDICTABLE
-                    return _apply_sideeffect(
-                        sideffect_flags, VMSR(encoding=Encoding.T1, t=t)
-                    )
+                    return VMSR(encoding=Encoding.T1, sideeffects=sideffect_flags, t=t)
                 elif (instr & 0xD00F6F) == 0xB00:  # xxxxxxxx00x0xxxxxxxx1011x00x0000
                     # vmov_core_to_scalar_t1
                     # -> VMOV_core_to_scalar
@@ -7891,9 +8272,8 @@ def decode_32bit(instr: int, ctx: Context):
                     t = UInt(Rt)
                     if (t == 15) or (t == 13):
                         sideffect_flags |= SIDEFFECT_UNPREDICTABLE
-                    return _apply_sideeffect(
-                        sideffect_flags,
-                        VMOV_core_to_scalar(encoding=Encoding.T1, d=d, t=t),
+                    return VMOV_core_to_scalar(
+                        encoding=Encoding.T1, sideeffects=sideffect_flags, d=d, t=t
                     )
                 elif (instr & 0xD00F6F) == 0x100B00:  # xxxxxxxx00x1xxxxxxxx1011x00x0000
                     # vmov_scalar_to_core_t1
@@ -7908,9 +8288,8 @@ def decode_32bit(instr: int, ctx: Context):
                     n = UInt(concat_bits(concat_bits(N, Vn, 4), H, 1))
                     if (t == 15) or (t == 13):
                         sideffect_flags |= SIDEFFECT_UNPREDICTABLE
-                    return _apply_sideeffect(
-                        sideffect_flags,
-                        VMOV_scalar_to_core(encoding=Encoding.T1, t=t, n=n),
+                    return VMOV_scalar_to_core(
+                        encoding=Encoding.T1, sideeffects=sideffect_flags, t=t, n=n
                     )
                 elif (instr & 0xE00F6F) == 0xA00:  # xxxxxxxx000xxxxxxxxx1010x00x0000
                     # vmov_core_and_single_t1
@@ -7926,14 +8305,12 @@ def decode_32bit(instr: int, ctx: Context):
                     n = UInt(concat_bits(Vn, N, 1))
                     if (t == 15) or (t == 13):
                         sideffect_flags |= SIDEFFECT_UNPREDICTABLE
-                    return _apply_sideeffect(
-                        sideffect_flags,
-                        VMOV_core_and_single(
-                            encoding=Encoding.T1,
-                            to_arm_register=to_arm_register,
-                            t=t,
-                            n=n,
-                        ),
+                    return VMOV_core_and_single(
+                        encoding=Encoding.T1,
+                        sideeffects=sideffect_flags,
+                        to_arm_register=to_arm_register,
+                        t=t,
+                        n=n,
                     )
                 elif (instr & 0x100000) == 0x0:  # xxxxxxxxxxx0xxxxxxxxxxxxxxxxxxxx
                     # mcr_mcr2_t1
@@ -7950,17 +8327,15 @@ def decode_32bit(instr: int, ctx: Context):
                     cp = UInt(coproc)
                     if (t == 15) or (t == 13):
                         sideffect_flags |= SIDEFFECT_UNPREDICTABLE
-                    return _apply_sideeffect(
-                        sideffect_flags,
-                        MCR_MCR2(
-                            encoding=Encoding.T1,
-                            t=t,
-                            cp=cp,
-                            opc1=opc1,
-                            CRn=CRn,
-                            opc2=opc2,
-                            CRm=CRm,
-                        ),
+                    return MCR_MCR2(
+                        encoding=Encoding.T1,
+                        sideeffects=sideffect_flags,
+                        t=t,
+                        cp=cp,
+                        opc1=opc1,
+                        CRn=CRn,
+                        opc2=opc2,
+                        CRm=CRm,
                     )
                 elif (instr & 0x100000) == 0x100000:  # xxxxxxxxxxx1xxxxxxxxxxxxxxxxxxxx
                     # mrc_mrc2_t1
@@ -7977,17 +8352,15 @@ def decode_32bit(instr: int, ctx: Context):
                     cp = UInt(coproc)
                     if t == 13:
                         sideffect_flags |= SIDEFFECT_UNPREDICTABLE
-                    return _apply_sideeffect(
-                        sideffect_flags,
-                        MRC_MRC2(
-                            encoding=Encoding.T1,
-                            t=t,
-                            cp=cp,
-                            opc1=opc1,
-                            CRn=CRn,
-                            opc2=opc2,
-                            CRm=CRm,
-                        ),
+                    return MRC_MRC2(
+                        encoding=Encoding.T1,
+                        sideeffects=sideffect_flags,
+                        t=t,
+                        cp=cp,
+                        opc1=opc1,
+                        CRn=CRn,
+                        opc2=opc2,
+                        CRm=CRm,
                     )
                 return NoMatch()  # no match
             return NoMatch()  # no match
@@ -8008,15 +8381,13 @@ def decode_32bit(instr: int, ctx: Context):
                     sideffect_flags |= SIDEFFECT_UNPREDICTABLE
                 if VFPSmallRegisterBank() and ((d + regs) > 16):
                     sideffect_flags |= SIDEFFECT_UNPREDICTABLE
-                return _apply_sideeffect(
-                    sideffect_flags,
-                    VPOP(
-                        encoding=Encoding.T1,
-                        single_regs=single_regs,
-                        d=d,
-                        imm32=imm32,
-                        regs=regs,
-                    ),
+                return VPOP(
+                    encoding=Encoding.T1,
+                    sideeffects=sideffect_flags,
+                    single_regs=single_regs,
+                    d=d,
+                    imm32=imm32,
+                    regs=regs,
                 )
             elif (instr & 0x1BF0F00) == 0xBD0A00:  # xxxxxxx01x111101xxxx1010xxxxxxxx
                 # vpop_t2
@@ -8032,15 +8403,13 @@ def decode_32bit(instr: int, ctx: Context):
                 regs = UInt(imm8)
                 if (regs == 0) or ((d + regs) > 32):
                     sideffect_flags |= SIDEFFECT_UNPREDICTABLE
-                return _apply_sideeffect(
-                    sideffect_flags,
-                    VPOP(
-                        encoding=Encoding.T2,
-                        single_regs=single_regs,
-                        d=d,
-                        imm32=imm32,
-                        regs=regs,
-                    ),
+                return VPOP(
+                    encoding=Encoding.T2,
+                    sideeffects=sideffect_flags,
+                    single_regs=single_regs,
+                    d=d,
+                    imm32=imm32,
+                    regs=regs,
                 )
             elif (instr & 0x1BF0F00) == 0x12D0B00:  # xxxxxxx10x101101xxxx1011xxxxxxxx
                 # vpush_t1
@@ -8058,15 +8427,13 @@ def decode_32bit(instr: int, ctx: Context):
                     sideffect_flags |= SIDEFFECT_UNPREDICTABLE
                 if VFPSmallRegisterBank() and ((d + regs) > 16):
                     sideffect_flags |= SIDEFFECT_UNPREDICTABLE
-                return _apply_sideeffect(
-                    sideffect_flags,
-                    VPUSH(
-                        encoding=Encoding.T1,
-                        single_regs=single_regs,
-                        d=d,
-                        imm32=imm32,
-                        regs=regs,
-                    ),
+                return VPUSH(
+                    encoding=Encoding.T1,
+                    sideeffects=sideffect_flags,
+                    single_regs=single_regs,
+                    d=d,
+                    imm32=imm32,
+                    regs=regs,
                 )
             elif (instr & 0x1BF0F00) == 0x12D0A00:  # xxxxxxx10x101101xxxx1010xxxxxxxx
                 # vpush_t2
@@ -8082,15 +8449,13 @@ def decode_32bit(instr: int, ctx: Context):
                 regs = UInt(imm8)
                 if (regs == 0) or ((d + regs) > 32):
                     sideffect_flags |= SIDEFFECT_UNPREDICTABLE
-                return _apply_sideeffect(
-                    sideffect_flags,
-                    VPUSH(
-                        encoding=Encoding.T2,
-                        single_regs=single_regs,
-                        d=d,
-                        imm32=imm32,
-                        regs=regs,
-                    ),
+                return VPUSH(
+                    encoding=Encoding.T2,
+                    sideeffects=sideffect_flags,
+                    single_regs=single_regs,
+                    d=d,
+                    imm32=imm32,
+                    regs=regs,
                 )
             elif (instr & 0x1E00FD0) == 0x400A10:  # xxxxxxx0010xxxxxxxxx101000x1xxxx
                 # vmov_two_core_and_two_single_t1
@@ -8112,15 +8477,13 @@ def decode_32bit(instr: int, ctx: Context):
                     sideffect_flags |= SIDEFFECT_UNPREDICTABLE
                 if to_arm_registers and (t == t2):
                     sideffect_flags |= SIDEFFECT_UNPREDICTABLE
-                return _apply_sideeffect(
-                    sideffect_flags,
-                    VMOV_two_core_and_two_single(
-                        encoding=Encoding.T1,
-                        to_arm_registers=to_arm_registers,
-                        t=t,
-                        t2=t2,
-                        m=m,
-                    ),
+                return VMOV_two_core_and_two_single(
+                    encoding=Encoding.T1,
+                    sideeffects=sideffect_flags,
+                    to_arm_registers=to_arm_registers,
+                    t=t,
+                    t2=t2,
+                    m=m,
                 )
             elif (instr & 0x1E00FD0) == 0x400B10:  # xxxxxxx0010xxxxxxxxx101100x1xxxx
                 # vmov_two_core_and_doubleword_t1
@@ -8142,15 +8505,13 @@ def decode_32bit(instr: int, ctx: Context):
                     sideffect_flags |= SIDEFFECT_UNPREDICTABLE
                 if to_arm_registers and (t == t2):
                     sideffect_flags |= SIDEFFECT_UNPREDICTABLE
-                return _apply_sideeffect(
-                    sideffect_flags,
-                    VMOV_two_core_and_doubleword(
-                        encoding=Encoding.T1,
-                        to_arm_registers=to_arm_registers,
-                        t=t,
-                        t2=t2,
-                        m=m,
-                    ),
+                return VMOV_two_core_and_doubleword(
+                    encoding=Encoding.T1,
+                    sideeffects=sideffect_flags,
+                    to_arm_registers=to_arm_registers,
+                    t=t,
+                    t2=t2,
+                    m=m,
                 )
             elif (instr & 0x1300F00) == 0x1100B00:  # xxxxxxx1xx01xxxxxxxx1011xxxxxxxx
                 # vldr_t1
@@ -8169,6 +8530,7 @@ def decode_32bit(instr: int, ctx: Context):
                 n = UInt(Rn)
                 return VLDR(
                     encoding=Encoding.T1,
+                    sideeffects=SIDEFFECT_NONE,
                     single_reg=single_reg,
                     add=add,
                     imm32=imm32,
@@ -8192,6 +8554,7 @@ def decode_32bit(instr: int, ctx: Context):
                 n = UInt(Rn)
                 return VLDR(
                     encoding=Encoding.T2,
+                    sideeffects=SIDEFFECT_NONE,
                     single_reg=single_reg,
                     add=add,
                     imm32=imm32,
@@ -8215,16 +8578,14 @@ def decode_32bit(instr: int, ctx: Context):
                 n = UInt(Rn)
                 if n == 15:
                     sideffect_flags |= SIDEFFECT_UNPREDICTABLE
-                return _apply_sideeffect(
-                    sideffect_flags,
-                    VSTR(
-                        encoding=Encoding.T1,
-                        single_reg=single_reg,
-                        add=add,
-                        imm32=imm32,
-                        d=d,
-                        n=n,
-                    ),
+                return VSTR(
+                    encoding=Encoding.T1,
+                    sideeffects=sideffect_flags,
+                    single_reg=single_reg,
+                    add=add,
+                    imm32=imm32,
+                    d=d,
+                    n=n,
                 )
             elif (instr & 0x1300F00) == 0x1000A00:  # xxxxxxx1xx00xxxxxxxx1010xxxxxxxx
                 # vstr_t2
@@ -8243,16 +8604,14 @@ def decode_32bit(instr: int, ctx: Context):
                 n = UInt(Rn)
                 if n == 15:
                     sideffect_flags |= SIDEFFECT_UNPREDICTABLE
-                return _apply_sideeffect(
-                    sideffect_flags,
-                    VSTR(
-                        encoding=Encoding.T2,
-                        single_reg=single_reg,
-                        add=add,
-                        imm32=imm32,
-                        d=d,
-                        n=n,
-                    ),
+                return VSTR(
+                    encoding=Encoding.T2,
+                    sideeffects=sideffect_flags,
+                    single_reg=single_reg,
+                    add=add,
+                    imm32=imm32,
+                    d=d,
+                    n=n,
                 )
             elif (instr & 0x1F0000) == 0x1F0000:  # xxxxxxxxxxx11111xxxxxxxxxxxxxxxx
                 # ldc_ldc2_literal_t1
@@ -8276,18 +8635,16 @@ def decode_32bit(instr: int, ctx: Context):
                 imm32 = ZeroExtend(concat_bits(imm8, 0x0, 2), 32)
                 if (W == 1) or (P == 0):
                     sideffect_flags |= SIDEFFECT_UNPREDICTABLE
-                return _apply_sideeffect(
-                    sideffect_flags,
-                    LDC_LDC2_literal(
-                        encoding=Encoding.T1,
-                        index=index,
-                        add=add,
-                        cp=cp,
-                        imm32=imm32,
-                        D=D,
-                        W=W,
-                        CRd=CRd,
-                    ),
+                return LDC_LDC2_literal(
+                    encoding=Encoding.T1,
+                    sideeffects=sideffect_flags,
+                    index=index,
+                    add=add,
+                    cp=cp,
+                    imm32=imm32,
+                    D=D,
+                    W=W,
+                    CRd=CRd,
                 )
             elif (instr & 0x1F00000) == 0x400000:  # xxxxxxx00100xxxxxxxxxxxxxxxxxxxx
                 # mcrr_mcrr2_t1
@@ -8306,11 +8663,14 @@ def decode_32bit(instr: int, ctx: Context):
                     sideffect_flags |= SIDEFFECT_UNPREDICTABLE
                 if (t == 13) or (t2 == 13):
                     sideffect_flags |= SIDEFFECT_UNPREDICTABLE
-                return _apply_sideeffect(
-                    sideffect_flags,
-                    MCRR_MCRR2(
-                        encoding=Encoding.T1, t=t, t2=t2, cp=cp, opc1=opc1, CRm=CRm
-                    ),
+                return MCRR_MCRR2(
+                    encoding=Encoding.T1,
+                    sideeffects=sideffect_flags,
+                    t=t,
+                    t2=t2,
+                    cp=cp,
+                    opc1=opc1,
+                    CRm=CRm,
                 )
             elif (instr & 0x1F00000) == 0x500000:  # xxxxxxx00101xxxxxxxxxxxxxxxxxxxx
                 # mrrc_mrrc2_t1
@@ -8329,11 +8689,14 @@ def decode_32bit(instr: int, ctx: Context):
                     sideffect_flags |= SIDEFFECT_UNPREDICTABLE
                 if (t == 13) or (t2 == 13):
                     sideffect_flags |= SIDEFFECT_UNPREDICTABLE
-                return _apply_sideeffect(
-                    sideffect_flags,
-                    MRRC_MRRC2(
-                        encoding=Encoding.T1, t=t, t2=t2, cp=cp, opc1=opc1, CRm=CRm
-                    ),
+                return MRRC_MRRC2(
+                    encoding=Encoding.T1,
+                    sideeffects=sideffect_flags,
+                    t=t,
+                    t2=t2,
+                    cp=cp,
+                    opc1=opc1,
+                    CRm=CRm,
                 )
             elif (instr & 0x100F00) == 0x100B00:  # xxxxxxxxxxx1xxxxxxxx1011xxxxxxxx
                 # vldm_t1
@@ -8371,19 +8734,17 @@ def decode_32bit(instr: int, ctx: Context):
                     sideffect_flags |= SIDEFFECT_UNPREDICTABLE
                 if VFPSmallRegisterBank() and ((d + regs) > 16):
                     sideffect_flags |= SIDEFFECT_UNPREDICTABLE
-                return _apply_sideeffect(
-                    sideffect_flags,
-                    VLDM(
-                        encoding=Encoding.T1,
-                        single_regs=single_regs,
-                        add=add,
-                        wback=wback,
-                        d=d,
-                        n=n,
-                        imm32=imm32,
-                        regs=regs,
-                        P=P,
-                    ),
+                return VLDM(
+                    encoding=Encoding.T1,
+                    sideeffects=sideffect_flags,
+                    single_regs=single_regs,
+                    add=add,
+                    wback=wback,
+                    d=d,
+                    n=n,
+                    imm32=imm32,
+                    regs=regs,
+                    P=P,
                 )
             elif (instr & 0x100F00) == 0x100A00:  # xxxxxxxxxxx1xxxxxxxx1010xxxxxxxx
                 # vldm_t2
@@ -8417,19 +8778,17 @@ def decode_32bit(instr: int, ctx: Context):
                     sideffect_flags |= SIDEFFECT_UNPREDICTABLE
                 if (regs == 0) or ((d + regs) > 32):
                     sideffect_flags |= SIDEFFECT_UNPREDICTABLE
-                return _apply_sideeffect(
-                    sideffect_flags,
-                    VLDM(
-                        encoding=Encoding.T2,
-                        single_regs=single_regs,
-                        add=add,
-                        wback=wback,
-                        d=d,
-                        n=n,
-                        imm32=imm32,
-                        regs=regs,
-                        P=P,
-                    ),
+                return VLDM(
+                    encoding=Encoding.T2,
+                    sideeffects=sideffect_flags,
+                    single_regs=single_regs,
+                    add=add,
+                    wback=wback,
+                    d=d,
+                    n=n,
+                    imm32=imm32,
+                    regs=regs,
+                    P=P,
                 )
             elif (instr & 0x100F00) == 0xB00:  # xxxxxxxxxxx0xxxxxxxx1011xxxxxxxx
                 # vstm_t1
@@ -8467,19 +8826,17 @@ def decode_32bit(instr: int, ctx: Context):
                     sideffect_flags |= SIDEFFECT_UNPREDICTABLE
                 if VFPSmallRegisterBank() and ((d + regs) > 16):
                     sideffect_flags |= SIDEFFECT_UNPREDICTABLE
-                return _apply_sideeffect(
-                    sideffect_flags,
-                    VSTM(
-                        encoding=Encoding.T1,
-                        single_regs=single_regs,
-                        add=add,
-                        wback=wback,
-                        d=d,
-                        n=n,
-                        imm32=imm32,
-                        regs=regs,
-                        P=P,
-                    ),
+                return VSTM(
+                    encoding=Encoding.T1,
+                    sideeffects=sideffect_flags,
+                    single_regs=single_regs,
+                    add=add,
+                    wback=wback,
+                    d=d,
+                    n=n,
+                    imm32=imm32,
+                    regs=regs,
+                    P=P,
                 )
             elif (instr & 0x100F00) == 0xA00:  # xxxxxxxxxxx0xxxxxxxx1010xxxxxxxx
                 # vstm_t2
@@ -8513,19 +8870,17 @@ def decode_32bit(instr: int, ctx: Context):
                     sideffect_flags |= SIDEFFECT_UNPREDICTABLE
                 if (regs == 0) or ((d + regs) > 32):
                     sideffect_flags |= SIDEFFECT_UNPREDICTABLE
-                return _apply_sideeffect(
-                    sideffect_flags,
-                    VSTM(
-                        encoding=Encoding.T2,
-                        single_regs=single_regs,
-                        add=add,
-                        wback=wback,
-                        d=d,
-                        n=n,
-                        imm32=imm32,
-                        regs=regs,
-                        P=P,
-                    ),
+                return VSTM(
+                    encoding=Encoding.T2,
+                    sideeffects=sideffect_flags,
+                    single_regs=single_regs,
+                    add=add,
+                    wback=wback,
+                    d=d,
+                    n=n,
+                    imm32=imm32,
+                    regs=regs,
+                    P=P,
                 )
             elif (instr & 0x100000) == 0x0:  # xxxxxxxxxxx0xxxxxxxxxxxxxxxxxxxx
                 # stc_stc2_t1
@@ -8552,19 +8907,17 @@ def decode_32bit(instr: int, ctx: Context):
                 wback = W == 1
                 if n == 15:
                     sideffect_flags |= SIDEFFECT_UNPREDICTABLE
-                return _apply_sideeffect(
-                    sideffect_flags,
-                    STC_STC2(
-                        encoding=Encoding.T1,
-                        n=n,
-                        cp=cp,
-                        imm32=imm32,
-                        index=index,
-                        add=add,
-                        wback=wback,
-                        D=D,
-                        CRd=CRd,
-                    ),
+                return STC_STC2(
+                    encoding=Encoding.T1,
+                    sideeffects=sideffect_flags,
+                    n=n,
+                    cp=cp,
+                    imm32=imm32,
+                    index=index,
+                    add=add,
+                    wback=wback,
+                    D=D,
+                    CRd=CRd,
                 )
             elif (instr & 0x100000) == 0x100000:  # xxxxxxxxxxx1xxxxxxxxxxxxxxxxxxxx
                 # ldc_ldc2_immediate_t1
@@ -8591,19 +8944,17 @@ def decode_32bit(instr: int, ctx: Context):
                 index = P == 1
                 add = U == 1
                 wback = W == 1
-                return _apply_sideeffect(
-                    sideffect_flags,
-                    LDC_LDC2_immediate(
-                        encoding=Encoding.T1,
-                        n=n,
-                        cp=cp,
-                        imm32=imm32,
-                        index=index,
-                        add=add,
-                        wback=wback,
-                        D=D,
-                        CRd=CRd,
-                    ),
+                return LDC_LDC2_immediate(
+                    encoding=Encoding.T1,
+                    sideeffects=sideffect_flags,
+                    n=n,
+                    cp=cp,
+                    imm32=imm32,
+                    index=index,
+                    add=add,
+                    wback=wback,
+                    D=D,
+                    CRd=CRd,
                 )
             return NoMatch()  # no match
         return NoMatch()  # no match
@@ -8624,14 +8975,12 @@ def decode_32bit(instr: int, ctx: Context):
                         ((t == 15) and InITBlock(ctx)) and (not (LastInITBlock(ctx)))
                     ):
                         sideffect_flags |= SIDEFFECT_UNPREDICTABLE
-                    return _apply_sideeffect(
-                        sideffect_flags,
-                        POP(
-                            encoding=Encoding.T3,
-                            registers=registers,
-                            UnalignedAllowed=UnalignedAllowed,
-                            t=t,
-                        ),
+                    return POP(
+                        encoding=Encoding.T3,
+                        sideeffects=sideffect_flags,
+                        registers=registers,
+                        UnalignedAllowed=UnalignedAllowed,
+                        t=t,
                     )
                 elif (instr & 0x800FC0) == 0x0:  # xxxxxxxx0xxxxxxxxxxx000000xxxxxx
                     # ldr_register_t2
@@ -8656,19 +9005,17 @@ def decode_32bit(instr: int, ctx: Context):
                         sideffect_flags |= SIDEFFECT_UNPREDICTABLE
                     if ((t == 15) and InITBlock(ctx)) and (not (LastInITBlock(ctx))):
                         sideffect_flags |= SIDEFFECT_UNPREDICTABLE
-                    return _apply_sideeffect(
-                        sideffect_flags,
-                        LDR_register(
-                            encoding=Encoding.T2,
-                            t=t,
-                            n=n,
-                            m=m,
-                            index=index,
-                            add=add,
-                            wback=wback,
-                            shift_t=shift_t,
-                            shift_n=shift_n,
-                        ),
+                    return LDR_register(
+                        encoding=Encoding.T2,
+                        sideeffects=sideffect_flags,
+                        t=t,
+                        n=n,
+                        m=m,
+                        index=index,
+                        add=add,
+                        wback=wback,
+                        shift_t=shift_t,
+                        shift_n=shift_n,
                     )
                 elif (instr & 0x800F00) == 0xE00:  # xxxxxxxx0xxxxxxxxxxx1110xxxxxxxx
                     # ldrt_t1
@@ -8688,17 +9035,15 @@ def decode_32bit(instr: int, ctx: Context):
                     imm32 = ZeroExtend(imm8, 32)
                     if (t == 13) or (t == 15):
                         sideffect_flags |= SIDEFFECT_UNPREDICTABLE
-                    return _apply_sideeffect(
-                        sideffect_flags,
-                        LDRT(
-                            encoding=Encoding.T1,
-                            t=t,
-                            n=n,
-                            postindex=postindex,
-                            add=add,
-                            register_form=register_form,
-                            imm32=imm32,
-                        ),
+                    return LDRT(
+                        encoding=Encoding.T1,
+                        sideeffects=sideffect_flags,
+                        t=t,
+                        n=n,
+                        postindex=postindex,
+                        add=add,
+                        register_form=register_form,
+                        imm32=imm32,
                     )
                 elif (instr & 0xF0000) == 0xF0000:  # xxxxxxxxxxxx1111xxxxxxxxxxxxxxxx
                     # ldr_literal_t2
@@ -8713,9 +9058,12 @@ def decode_32bit(instr: int, ctx: Context):
                     add = U == 1
                     if ((t == 15) and InITBlock(ctx)) and (not (LastInITBlock(ctx))):
                         sideffect_flags |= SIDEFFECT_UNPREDICTABLE
-                    return _apply_sideeffect(
-                        sideffect_flags,
-                        LDR_literal(encoding=Encoding.T2, t=t, imm32=imm32, add=add),
+                    return LDR_literal(
+                        encoding=Encoding.T2,
+                        sideeffects=sideffect_flags,
+                        t=t,
+                        imm32=imm32,
+                        add=add,
                     )
                 elif (instr & 0x800800) == 0x800:  # xxxxxxxx0xxxxxxxxxxx1xxxxxxxxxxx
                     # ldr_immediate_t4
@@ -8748,17 +9096,15 @@ def decode_32bit(instr: int, ctx: Context):
                         ((t == 15) and InITBlock(ctx)) and (not (LastInITBlock(ctx)))
                     ):
                         sideffect_flags |= SIDEFFECT_UNPREDICTABLE
-                    return _apply_sideeffect(
-                        sideffect_flags,
-                        LDR_immediate(
-                            encoding=Encoding.T4,
-                            t=t,
-                            n=n,
-                            imm32=imm32,
-                            index=index,
-                            add=add,
-                            wback=wback,
-                        ),
+                    return LDR_immediate(
+                        encoding=Encoding.T4,
+                        sideeffects=sideffect_flags,
+                        t=t,
+                        n=n,
+                        imm32=imm32,
+                        index=index,
+                        add=add,
+                        wback=wback,
                     )
                 elif (instr & 0x800000) == 0x800000:  # xxxxxxxx1xxxxxxxxxxxxxxxxxxxxxxx
                     # ldr_immediate_t3
@@ -8778,17 +9124,15 @@ def decode_32bit(instr: int, ctx: Context):
                     wback = False
                     if ((t == 15) and InITBlock(ctx)) and (not (LastInITBlock(ctx))):
                         sideffect_flags |= SIDEFFECT_UNPREDICTABLE
-                    return _apply_sideeffect(
-                        sideffect_flags,
-                        LDR_immediate(
-                            encoding=Encoding.T3,
-                            t=t,
-                            n=n,
-                            imm32=imm32,
-                            index=index,
-                            add=add,
-                            wback=wback,
-                        ),
+                    return LDR_immediate(
+                        encoding=Encoding.T3,
+                        sideeffects=sideffect_flags,
+                        t=t,
+                        n=n,
+                        imm32=imm32,
+                        index=index,
+                        add=add,
+                        wback=wback,
                     )
                 return NoMatch()  # no match
             elif (instr & 0x1700000) == 0x100000:  # xxxxxxx0x001xxxxxxxxxxxxxxxxxxxx
@@ -8808,16 +9152,14 @@ def decode_32bit(instr: int, ctx: Context):
                     shift_t, shift_n = (SRType_LSL, UInt(imm2))
                     if (m == 13) or (m == 15):
                         sideffect_flags |= SIDEFFECT_UNPREDICTABLE
-                    return _apply_sideeffect(
-                        sideffect_flags,
-                        PLD_register(
-                            encoding=Encoding.T1,
-                            n=n,
-                            m=m,
-                            add=add,
-                            shift_t=shift_t,
-                            shift_n=shift_n,
-                        ),
+                    return PLD_register(
+                        encoding=Encoding.T1,
+                        sideeffects=sideffect_flags,
+                        n=n,
+                        m=m,
+                        add=add,
+                        shift_t=shift_t,
+                        shift_n=shift_n,
                     )
                 elif (instr & 0x80FF00) == 0xFC00:  # xxxxxxxx0xxxxxxx11111100xxxxxxxx
                     # pld_immediate_t2
@@ -8831,9 +9173,12 @@ def decode_32bit(instr: int, ctx: Context):
                     n = UInt(Rn)
                     imm32 = ZeroExtend(imm8, 32)
                     add = False
-                    return _apply_sideeffect(
-                        sideffect_flags,
-                        PLD_immediate(encoding=Encoding.T2, n=n, imm32=imm32, add=add),
+                    return PLD_immediate(
+                        encoding=Encoding.T2,
+                        sideeffects=sideffect_flags,
+                        n=n,
+                        imm32=imm32,
+                        add=add,
                     )
                 elif (instr & 0xFF000) == 0xFF000:  # xxxxxxxxxxxx11111111xxxxxxxxxxxx
                     # pld_literal_t1
@@ -8844,7 +9189,12 @@ def decode_32bit(instr: int, ctx: Context):
                     # decode
                     imm32 = ZeroExtend(imm12, 32)
                     add = U == 1
-                    return PLD_literal(encoding=Encoding.T1, imm32=imm32, add=add)
+                    return PLD_literal(
+                        encoding=Encoding.T1,
+                        sideeffects=SIDEFFECT_NONE,
+                        imm32=imm32,
+                        add=add,
+                    )
                 elif (instr & 0x800FC0) == 0x0:  # xxxxxxxx0xxxxxxxxxxx000000xxxxxx
                     # ldrb_register_t2
                     # -> LDRB_register
@@ -8867,19 +9217,17 @@ def decode_32bit(instr: int, ctx: Context):
                     shift_t, shift_n = (SRType_LSL, UInt(imm2))
                     if (t == 13) or ((m == 13) or (m == 15)):
                         sideffect_flags |= SIDEFFECT_UNPREDICTABLE
-                    return _apply_sideeffect(
-                        sideffect_flags,
-                        LDRB_register(
-                            encoding=Encoding.T2,
-                            t=t,
-                            n=n,
-                            m=m,
-                            index=index,
-                            add=add,
-                            wback=wback,
-                            shift_t=shift_t,
-                            shift_n=shift_n,
-                        ),
+                    return LDRB_register(
+                        encoding=Encoding.T2,
+                        sideeffects=sideffect_flags,
+                        t=t,
+                        n=n,
+                        m=m,
+                        index=index,
+                        add=add,
+                        wback=wback,
+                        shift_t=shift_t,
+                        shift_n=shift_n,
                     )
                 elif (instr & 0x80F000) == 0x80F000:  # xxxxxxxx1xxxxxxx1111xxxxxxxxxxxx
                     # pld_immediate_t1
@@ -8893,9 +9241,12 @@ def decode_32bit(instr: int, ctx: Context):
                     n = UInt(Rn)
                     imm32 = ZeroExtend(imm12, 32)
                     add = True
-                    return _apply_sideeffect(
-                        sideffect_flags,
-                        PLD_immediate(encoding=Encoding.T1, n=n, imm32=imm32, add=add),
+                    return PLD_immediate(
+                        encoding=Encoding.T1,
+                        sideeffects=sideffect_flags,
+                        n=n,
+                        imm32=imm32,
+                        add=add,
                     )
                 elif (instr & 0x800F00) == 0xE00:  # xxxxxxxx0xxxxxxxxxxx1110xxxxxxxx
                     # ldrbt_t1
@@ -8915,17 +9266,15 @@ def decode_32bit(instr: int, ctx: Context):
                     imm32 = ZeroExtend(imm8, 32)
                     if (t == 13) or (t == 15):
                         sideffect_flags |= SIDEFFECT_UNPREDICTABLE
-                    return _apply_sideeffect(
-                        sideffect_flags,
-                        LDRBT(
-                            encoding=Encoding.T1,
-                            t=t,
-                            n=n,
-                            postindex=postindex,
-                            add=add,
-                            register_form=register_form,
-                            imm32=imm32,
-                        ),
+                    return LDRBT(
+                        encoding=Encoding.T1,
+                        sideeffects=sideffect_flags,
+                        t=t,
+                        n=n,
+                        postindex=postindex,
+                        add=add,
+                        register_form=register_form,
+                        imm32=imm32,
                     )
                 elif (instr & 0xF0000) == 0xF0000:  # xxxxxxxxxxxx1111xxxxxxxxxxxxxxxx
                     # ldrb_literal_t1
@@ -8942,9 +9291,12 @@ def decode_32bit(instr: int, ctx: Context):
                     add = U == 1
                     if t == 13:
                         sideffect_flags |= SIDEFFECT_UNPREDICTABLE
-                    return _apply_sideeffect(
-                        sideffect_flags,
-                        LDRB_literal(encoding=Encoding.T1, t=t, imm32=imm32, add=add),
+                    return LDRB_literal(
+                        encoding=Encoding.T1,
+                        sideeffects=sideffect_flags,
+                        t=t,
+                        imm32=imm32,
+                        add=add,
                     )
                 elif (instr & 0x800800) == 0x800:  # xxxxxxxx0xxxxxxxxxxx1xxxxxxxxxxx
                     # ldrb_immediate_t3
@@ -8975,17 +9327,15 @@ def decode_32bit(instr: int, ctx: Context):
                         sideffect_flags |= SIDEFFECT_UNPREDICTABLE
                     if (t == 15) and (((P == 0) or (U == 1)) or (W == 1)):
                         sideffect_flags |= SIDEFFECT_UNPREDICTABLE
-                    return _apply_sideeffect(
-                        sideffect_flags,
-                        LDRB_immediate(
-                            encoding=Encoding.T3,
-                            t=t,
-                            n=n,
-                            imm32=imm32,
-                            index=index,
-                            add=add,
-                            wback=wback,
-                        ),
+                    return LDRB_immediate(
+                        encoding=Encoding.T3,
+                        sideeffects=sideffect_flags,
+                        t=t,
+                        n=n,
+                        imm32=imm32,
+                        index=index,
+                        add=add,
+                        wback=wback,
                     )
                 elif (instr & 0x800000) == 0x800000:  # xxxxxxxx1xxxxxxxxxxxxxxxxxxxxxxx
                     # ldrb_immediate_t2
@@ -9007,17 +9357,15 @@ def decode_32bit(instr: int, ctx: Context):
                     wback = False
                     if t == 13:
                         sideffect_flags |= SIDEFFECT_UNPREDICTABLE
-                    return _apply_sideeffect(
-                        sideffect_flags,
-                        LDRB_immediate(
-                            encoding=Encoding.T2,
-                            t=t,
-                            n=n,
-                            imm32=imm32,
-                            index=index,
-                            add=add,
-                            wback=wback,
-                        ),
+                    return LDRB_immediate(
+                        encoding=Encoding.T2,
+                        sideeffects=sideffect_flags,
+                        t=t,
+                        n=n,
+                        imm32=imm32,
+                        index=index,
+                        add=add,
+                        wback=wback,
                     )
                 return NoMatch()  # no match
             elif (instr & 0x1700000) == 0x300000:  # xxxxxxx0x011xxxxxxxxxxxxxxxxxxxx
@@ -9043,19 +9391,17 @@ def decode_32bit(instr: int, ctx: Context):
                     shift_t, shift_n = (SRType_LSL, UInt(imm2))
                     if (t == 13) or ((m == 13) or (m == 15)):
                         sideffect_flags |= SIDEFFECT_UNPREDICTABLE
-                    return _apply_sideeffect(
-                        sideffect_flags,
-                        LDRH_register(
-                            encoding=Encoding.T2,
-                            t=t,
-                            n=n,
-                            m=m,
-                            index=index,
-                            add=add,
-                            wback=wback,
-                            shift_t=shift_t,
-                            shift_n=shift_n,
-                        ),
+                    return LDRH_register(
+                        encoding=Encoding.T2,
+                        sideeffects=sideffect_flags,
+                        t=t,
+                        n=n,
+                        m=m,
+                        index=index,
+                        add=add,
+                        wback=wback,
+                        shift_t=shift_t,
+                        shift_n=shift_n,
                     )
                 elif (instr & 0x800F00) == 0xE00:  # xxxxxxxx0xxxxxxxxxxx1110xxxxxxxx
                     # ldrht_t1
@@ -9075,17 +9421,15 @@ def decode_32bit(instr: int, ctx: Context):
                     imm32 = ZeroExtend(imm8, 32)
                     if (t == 13) or (t == 15):
                         sideffect_flags |= SIDEFFECT_UNPREDICTABLE
-                    return _apply_sideeffect(
-                        sideffect_flags,
-                        LDRHT(
-                            encoding=Encoding.T1,
-                            t=t,
-                            n=n,
-                            postindex=postindex,
-                            add=add,
-                            register_form=register_form,
-                            imm32=imm32,
-                        ),
+                    return LDRHT(
+                        encoding=Encoding.T1,
+                        sideeffects=sideffect_flags,
+                        t=t,
+                        n=n,
+                        postindex=postindex,
+                        add=add,
+                        register_form=register_form,
+                        imm32=imm32,
                     )
                 elif (instr & 0xF0000) == 0xF0000:  # xxxxxxxxxxxx1111xxxxxxxxxxxxxxxx
                     # ldrh_literal_t1
@@ -9102,9 +9446,12 @@ def decode_32bit(instr: int, ctx: Context):
                     add = U == 1
                     if t == 13:
                         sideffect_flags |= SIDEFFECT_UNPREDICTABLE
-                    return _apply_sideeffect(
-                        sideffect_flags,
-                        LDRH_literal(encoding=Encoding.T1, t=t, imm32=imm32, add=add),
+                    return LDRH_literal(
+                        encoding=Encoding.T1,
+                        sideeffects=sideffect_flags,
+                        t=t,
+                        imm32=imm32,
+                        add=add,
                     )
                 elif (instr & 0x800800) == 0x800:  # xxxxxxxx0xxxxxxxxxxx1xxxxxxxxxxx
                     # ldrh_immediate_t3
@@ -9133,17 +9480,15 @@ def decode_32bit(instr: int, ctx: Context):
                     wback = W == 1
                     if ((t == 13) or ((t == 15) and (W == 1))) or (wback and (n == t)):
                         sideffect_flags |= SIDEFFECT_UNPREDICTABLE
-                    return _apply_sideeffect(
-                        sideffect_flags,
-                        LDRH_immediate(
-                            encoding=Encoding.T3,
-                            t=t,
-                            n=n,
-                            imm32=imm32,
-                            index=index,
-                            add=add,
-                            wback=wback,
-                        ),
+                    return LDRH_immediate(
+                        encoding=Encoding.T3,
+                        sideeffects=sideffect_flags,
+                        t=t,
+                        n=n,
+                        imm32=imm32,
+                        index=index,
+                        add=add,
+                        wback=wback,
                     )
                 elif (instr & 0x800000) == 0x800000:  # xxxxxxxx1xxxxxxxxxxxxxxxxxxxxxxx
                     # ldrh_immediate_t2
@@ -9165,17 +9510,15 @@ def decode_32bit(instr: int, ctx: Context):
                     wback = False
                     if t == 13:
                         sideffect_flags |= SIDEFFECT_UNPREDICTABLE
-                    return _apply_sideeffect(
-                        sideffect_flags,
-                        LDRH_immediate(
-                            encoding=Encoding.T2,
-                            t=t,
-                            n=n,
-                            imm32=imm32,
-                            index=index,
-                            add=add,
-                            wback=wback,
-                        ),
+                    return LDRH_immediate(
+                        encoding=Encoding.T2,
+                        sideeffects=sideffect_flags,
+                        t=t,
+                        n=n,
+                        imm32=imm32,
+                        index=index,
+                        add=add,
+                        wback=wback,
                     )
                 return NoMatch()  # no match
             elif (instr & 0x1700000) == 0x400000:  # xxxxxxx0x100xxxxxxxxxxxxxxxxxxxx
@@ -9200,19 +9543,17 @@ def decode_32bit(instr: int, ctx: Context):
                         shift_t, shift_n = (SRType_LSL, UInt(imm2))
                         if (t == 15) or ((m == 13) or (m == 15)):
                             sideffect_flags |= SIDEFFECT_UNPREDICTABLE
-                        return _apply_sideeffect(
-                            sideffect_flags,
-                            STR_register(
-                                encoding=Encoding.T2,
-                                t=t,
-                                n=n,
-                                m=m,
-                                index=index,
-                                add=add,
-                                wback=wback,
-                                shift_t=shift_t,
-                                shift_n=shift_n,
-                            ),
+                        return STR_register(
+                            encoding=Encoding.T2,
+                            sideeffects=sideffect_flags,
+                            t=t,
+                            n=n,
+                            m=m,
+                            index=index,
+                            add=add,
+                            wback=wback,
+                            shift_t=shift_t,
+                            shift_n=shift_n,
                         )
                     elif (instr & 0x800) == 0x800:  # xxxxxxxxxxxxxxxxxxxx1xxxxxxxxxxx
                         if (
@@ -9229,14 +9570,12 @@ def decode_32bit(instr: int, ctx: Context):
                             UnalignedAllowed = True
                             if (t == 13) or (t == 15):
                                 sideffect_flags |= SIDEFFECT_UNPREDICTABLE
-                            return _apply_sideeffect(
-                                sideffect_flags,
-                                PUSH(
-                                    encoding=Encoding.T3,
-                                    registers=registers,
-                                    UnalignedAllowed=UnalignedAllowed,
-                                    t=t,
-                                ),
+                            return PUSH(
+                                encoding=Encoding.T3,
+                                sideeffects=sideffect_flags,
+                                registers=registers,
+                                UnalignedAllowed=UnalignedAllowed,
+                                t=t,
                             )
                         elif (
                             instr & 0x700
@@ -9258,17 +9597,15 @@ def decode_32bit(instr: int, ctx: Context):
                             imm32 = ZeroExtend(imm8, 32)
                             if (t == 13) or (t == 15):
                                 sideffect_flags |= SIDEFFECT_UNPREDICTABLE
-                            return _apply_sideeffect(
-                                sideffect_flags,
-                                STRT(
-                                    encoding=Encoding.T1,
-                                    t=t,
-                                    n=n,
-                                    postindex=postindex,
-                                    add=add,
-                                    register_form=register_form,
-                                    imm32=imm32,
-                                ),
+                            return STRT(
+                                encoding=Encoding.T1,
+                                sideeffects=sideffect_flags,
+                                t=t,
+                                n=n,
+                                postindex=postindex,
+                                add=add,
+                                register_form=register_form,
+                                imm32=imm32,
                             )
                         elif (instr & 0x0) == 0x0:  # xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
                             # str_immediate_t4
@@ -9297,17 +9634,15 @@ def decode_32bit(instr: int, ctx: Context):
                             wback = W == 1
                             if (t == 15) or (wback and (n == t)):
                                 sideffect_flags |= SIDEFFECT_UNPREDICTABLE
-                            return _apply_sideeffect(
-                                sideffect_flags,
-                                STR_immediate(
-                                    encoding=Encoding.T4,
-                                    t=t,
-                                    n=n,
-                                    imm32=imm32,
-                                    index=index,
-                                    add=add,
-                                    wback=wback,
-                                ),
+                            return STR_immediate(
+                                encoding=Encoding.T4,
+                                sideeffects=sideffect_flags,
+                                t=t,
+                                n=n,
+                                imm32=imm32,
+                                index=index,
+                                add=add,
+                                wback=wback,
                             )
                         return NoMatch()  # no match
                     return NoMatch()  # no match
@@ -9329,17 +9664,15 @@ def decode_32bit(instr: int, ctx: Context):
                     wback = False
                     if t == 15:
                         sideffect_flags |= SIDEFFECT_UNPREDICTABLE
-                    return _apply_sideeffect(
-                        sideffect_flags,
-                        STR_immediate(
-                            encoding=Encoding.T3,
-                            t=t,
-                            n=n,
-                            imm32=imm32,
-                            index=index,
-                            add=add,
-                            wback=wback,
-                        ),
+                    return STR_immediate(
+                        encoding=Encoding.T3,
+                        sideeffects=sideffect_flags,
+                        t=t,
+                        n=n,
+                        imm32=imm32,
+                        index=index,
+                        add=add,
+                        wback=wback,
                     )
                 return NoMatch()  # no match
             elif (instr & 0x1700000) == 0x1100000:  # xxxxxxx1x001xxxxxxxxxxxxxxxxxxxx
@@ -9359,16 +9692,14 @@ def decode_32bit(instr: int, ctx: Context):
                     shift_t, shift_n = (SRType_LSL, UInt(imm2))
                     if (m == 13) or (m == 15):
                         sideffect_flags |= SIDEFFECT_UNPREDICTABLE
-                    return _apply_sideeffect(
-                        sideffect_flags,
-                        PLI_register(
-                            encoding=Encoding.T1,
-                            n=n,
-                            m=m,
-                            add=add,
-                            shift_t=shift_t,
-                            shift_n=shift_n,
-                        ),
+                    return PLI_register(
+                        encoding=Encoding.T1,
+                        sideeffects=sideffect_flags,
+                        n=n,
+                        m=m,
+                        add=add,
+                        shift_t=shift_t,
+                        shift_n=shift_n,
                     )
                 elif (instr & 0x80FF00) == 0xFC00:  # xxxxxxxx0xxxxxxx11111100xxxxxxxx
                     # pli_immediate_literal_t2
@@ -9382,11 +9713,12 @@ def decode_32bit(instr: int, ctx: Context):
                     n = UInt(Rn)
                     imm32 = ZeroExtend(imm8, 32)
                     add = False
-                    return _apply_sideeffect(
-                        sideffect_flags,
-                        PLI_immediate_literal(
-                            encoding=Encoding.T2, n=n, imm32=imm32, add=add
-                        ),
+                    return PLI_immediate_literal(
+                        encoding=Encoding.T2,
+                        sideeffects=sideffect_flags,
+                        n=n,
+                        imm32=imm32,
+                        add=add,
                     )
                 elif (instr & 0xFF000) == 0xFF000:  # xxxxxxxxxxxx11111111xxxxxxxxxxxx
                     # pli_immediate_literal_t3
@@ -9399,7 +9731,11 @@ def decode_32bit(instr: int, ctx: Context):
                     imm32 = ZeroExtend(imm12, 32)
                     add = U == 1
                     return PLI_immediate_literal(
-                        encoding=Encoding.T3, n=n, imm32=imm32, add=add
+                        encoding=Encoding.T3,
+                        sideeffects=SIDEFFECT_NONE,
+                        n=n,
+                        imm32=imm32,
+                        add=add,
                     )
                 elif (instr & 0x800FC0) == 0x0:  # xxxxxxxx0xxxxxxxxxxx000000xxxxxx
                     # ldrsb_register_t2
@@ -9423,19 +9759,17 @@ def decode_32bit(instr: int, ctx: Context):
                     shift_t, shift_n = (SRType_LSL, UInt(imm2))
                     if (t == 13) or ((m == 13) or (m == 15)):
                         sideffect_flags |= SIDEFFECT_UNPREDICTABLE
-                    return _apply_sideeffect(
-                        sideffect_flags,
-                        LDRSB_register(
-                            encoding=Encoding.T2,
-                            t=t,
-                            n=n,
-                            m=m,
-                            index=index,
-                            add=add,
-                            wback=wback,
-                            shift_t=shift_t,
-                            shift_n=shift_n,
-                        ),
+                    return LDRSB_register(
+                        encoding=Encoding.T2,
+                        sideeffects=sideffect_flags,
+                        t=t,
+                        n=n,
+                        m=m,
+                        index=index,
+                        add=add,
+                        wback=wback,
+                        shift_t=shift_t,
+                        shift_n=shift_n,
                     )
                 elif (instr & 0x80F000) == 0x80F000:  # xxxxxxxx1xxxxxxx1111xxxxxxxxxxxx
                     # pli_immediate_literal_t1
@@ -9449,11 +9783,12 @@ def decode_32bit(instr: int, ctx: Context):
                     n = UInt(Rn)
                     imm32 = ZeroExtend(imm12, 32)
                     add = True
-                    return _apply_sideeffect(
-                        sideffect_flags,
-                        PLI_immediate_literal(
-                            encoding=Encoding.T1, n=n, imm32=imm32, add=add
-                        ),
+                    return PLI_immediate_literal(
+                        encoding=Encoding.T1,
+                        sideeffects=sideffect_flags,
+                        n=n,
+                        imm32=imm32,
+                        add=add,
                     )
                 elif (instr & 0x800F00) == 0xE00:  # xxxxxxxx0xxxxxxxxxxx1110xxxxxxxx
                     # ldrsbt_t1
@@ -9473,17 +9808,15 @@ def decode_32bit(instr: int, ctx: Context):
                     imm32 = ZeroExtend(imm8, 32)
                     if (t == 13) or (t == 15):
                         sideffect_flags |= SIDEFFECT_UNPREDICTABLE
-                    return _apply_sideeffect(
-                        sideffect_flags,
-                        LDRSBT(
-                            encoding=Encoding.T1,
-                            t=t,
-                            n=n,
-                            postindex=postindex,
-                            add=add,
-                            register_form=register_form,
-                            imm32=imm32,
-                        ),
+                    return LDRSBT(
+                        encoding=Encoding.T1,
+                        sideeffects=sideffect_flags,
+                        t=t,
+                        n=n,
+                        postindex=postindex,
+                        add=add,
+                        register_form=register_form,
+                        imm32=imm32,
                     )
                 elif (instr & 0xF0000) == 0xF0000:  # xxxxxxxxxxxx1111xxxxxxxxxxxxxxxx
                     # ldrsb_literal_t1
@@ -9500,9 +9833,12 @@ def decode_32bit(instr: int, ctx: Context):
                     add = U == 1
                     if t == 13:
                         sideffect_flags |= SIDEFFECT_UNPREDICTABLE
-                    return _apply_sideeffect(
-                        sideffect_flags,
-                        LDRSB_literal(encoding=Encoding.T1, t=t, imm32=imm32, add=add),
+                    return LDRSB_literal(
+                        encoding=Encoding.T1,
+                        sideeffects=sideffect_flags,
+                        t=t,
+                        imm32=imm32,
+                        add=add,
                     )
                 elif (instr & 0x800800) == 0x800:  # xxxxxxxx0xxxxxxxxxxx1xxxxxxxxxxx
                     # ldrsb_immediate_t2
@@ -9531,17 +9867,15 @@ def decode_32bit(instr: int, ctx: Context):
                     wback = W == 1
                     if ((t == 13) or ((t == 15) and (W == 1))) or (wback and (n == t)):
                         sideffect_flags |= SIDEFFECT_UNPREDICTABLE
-                    return _apply_sideeffect(
-                        sideffect_flags,
-                        LDRSB_immediate(
-                            encoding=Encoding.T2,
-                            t=t,
-                            n=n,
-                            imm32=imm32,
-                            index=index,
-                            add=add,
-                            wback=wback,
-                        ),
+                    return LDRSB_immediate(
+                        encoding=Encoding.T2,
+                        sideeffects=sideffect_flags,
+                        t=t,
+                        n=n,
+                        imm32=imm32,
+                        index=index,
+                        add=add,
+                        wback=wback,
                     )
                 elif (instr & 0x800000) == 0x800000:  # xxxxxxxx1xxxxxxxxxxxxxxxxxxxxxxx
                     # ldrsb_immediate_t1
@@ -9563,17 +9897,15 @@ def decode_32bit(instr: int, ctx: Context):
                     wback = False
                     if t == 13:
                         sideffect_flags |= SIDEFFECT_UNPREDICTABLE
-                    return _apply_sideeffect(
-                        sideffect_flags,
-                        LDRSB_immediate(
-                            encoding=Encoding.T1,
-                            t=t,
-                            n=n,
-                            imm32=imm32,
-                            index=index,
-                            add=add,
-                            wback=wback,
-                        ),
+                    return LDRSB_immediate(
+                        encoding=Encoding.T1,
+                        sideeffects=sideffect_flags,
+                        t=t,
+                        n=n,
+                        imm32=imm32,
+                        index=index,
+                        add=add,
+                        wback=wback,
                     )
                 return NoMatch()  # no match
             elif (instr & 0x1700000) == 0x1300000:  # xxxxxxx1x011xxxxxxxxxxxxxxxxxxxx
@@ -9599,19 +9931,17 @@ def decode_32bit(instr: int, ctx: Context):
                     shift_t, shift_n = (SRType_LSL, UInt(imm2))
                     if (t == 13) or ((m == 13) or (m == 15)):
                         sideffect_flags |= SIDEFFECT_UNPREDICTABLE
-                    return _apply_sideeffect(
-                        sideffect_flags,
-                        LDRSH_register(
-                            encoding=Encoding.T2,
-                            t=t,
-                            n=n,
-                            m=m,
-                            index=index,
-                            add=add,
-                            wback=wback,
-                            shift_t=shift_t,
-                            shift_n=shift_n,
-                        ),
+                    return LDRSH_register(
+                        encoding=Encoding.T2,
+                        sideeffects=sideffect_flags,
+                        t=t,
+                        n=n,
+                        m=m,
+                        index=index,
+                        add=add,
+                        wback=wback,
+                        shift_t=shift_t,
+                        shift_n=shift_n,
                     )
                 elif (instr & 0x800F00) == 0xE00:  # xxxxxxxx0xxxxxxxxxxx1110xxxxxxxx
                     # ldrsht_t1
@@ -9631,17 +9961,15 @@ def decode_32bit(instr: int, ctx: Context):
                     imm32 = ZeroExtend(imm8, 32)
                     if (t == 13) or (t == 15):
                         sideffect_flags |= SIDEFFECT_UNPREDICTABLE
-                    return _apply_sideeffect(
-                        sideffect_flags,
-                        LDRSHT(
-                            encoding=Encoding.T1,
-                            t=t,
-                            n=n,
-                            postindex=postindex,
-                            add=add,
-                            register_form=register_form,
-                            imm32=imm32,
-                        ),
+                    return LDRSHT(
+                        encoding=Encoding.T1,
+                        sideeffects=sideffect_flags,
+                        t=t,
+                        n=n,
+                        postindex=postindex,
+                        add=add,
+                        register_form=register_form,
+                        imm32=imm32,
                     )
                 elif (instr & 0xF0000) == 0xF0000:  # xxxxxxxxxxxx1111xxxxxxxxxxxxxxxx
                     # ldrsh_literal_t1
@@ -9658,9 +9986,12 @@ def decode_32bit(instr: int, ctx: Context):
                     add = U == 1
                     if t == 13:
                         sideffect_flags |= SIDEFFECT_UNPREDICTABLE
-                    return _apply_sideeffect(
-                        sideffect_flags,
-                        LDRSH_literal(encoding=Encoding.T1, t=t, imm32=imm32, add=add),
+                    return LDRSH_literal(
+                        encoding=Encoding.T1,
+                        sideeffects=sideffect_flags,
+                        t=t,
+                        imm32=imm32,
+                        add=add,
                     )
                 elif (instr & 0x800800) == 0x800:  # xxxxxxxx0xxxxxxxxxxx1xxxxxxxxxxx
                     # ldrsh_immediate_t2
@@ -9689,17 +10020,15 @@ def decode_32bit(instr: int, ctx: Context):
                     wback = W == 1
                     if ((t == 13) or ((t == 15) and (W == 1))) or (wback and (n == t)):
                         sideffect_flags |= SIDEFFECT_UNPREDICTABLE
-                    return _apply_sideeffect(
-                        sideffect_flags,
-                        LDRSH_immediate(
-                            encoding=Encoding.T2,
-                            t=t,
-                            n=n,
-                            imm32=imm32,
-                            index=index,
-                            add=add,
-                            wback=wback,
-                        ),
+                    return LDRSH_immediate(
+                        encoding=Encoding.T2,
+                        sideeffects=sideffect_flags,
+                        t=t,
+                        n=n,
+                        imm32=imm32,
+                        index=index,
+                        add=add,
+                        wback=wback,
                     )
                 elif (instr & 0x800000) == 0x800000:  # xxxxxxxx1xxxxxxxxxxxxxxxxxxxxxxx
                     # ldrsh_immediate_t1
@@ -9721,17 +10050,15 @@ def decode_32bit(instr: int, ctx: Context):
                     wback = False
                     if t == 13:
                         sideffect_flags |= SIDEFFECT_UNPREDICTABLE
-                    return _apply_sideeffect(
-                        sideffect_flags,
-                        LDRSH_immediate(
-                            encoding=Encoding.T1,
-                            t=t,
-                            n=n,
-                            imm32=imm32,
-                            index=index,
-                            add=add,
-                            wback=wback,
-                        ),
+                    return LDRSH_immediate(
+                        encoding=Encoding.T1,
+                        sideeffects=sideffect_flags,
+                        t=t,
+                        n=n,
+                        imm32=imm32,
+                        index=index,
+                        add=add,
+                        wback=wback,
                     )
                 return NoMatch()  # no match
             elif (instr & 0x1700000) == 0x0:  # xxxxxxx0x000xxxxxxxxxxxxxxxxxxxx
@@ -9753,17 +10080,15 @@ def decode_32bit(instr: int, ctx: Context):
                     wback = False
                     if (t == 13) or (t == 15):
                         sideffect_flags |= SIDEFFECT_UNPREDICTABLE
-                    return _apply_sideeffect(
-                        sideffect_flags,
-                        STRB_immediate(
-                            encoding=Encoding.T2,
-                            t=t,
-                            n=n,
-                            imm32=imm32,
-                            index=index,
-                            add=add,
-                            wback=wback,
-                        ),
+                    return STRB_immediate(
+                        encoding=Encoding.T2,
+                        sideeffects=sideffect_flags,
+                        t=t,
+                        n=n,
+                        imm32=imm32,
+                        index=index,
+                        add=add,
+                        wback=wback,
                     )
                 elif (instr & 0x800000) == 0x0:  # xxxxxxxx0xxxxxxxxxxxxxxxxxxxxxxx
                     if (instr & 0xFC0) == 0x0:  # xxxxxxxxxxxxxxxxxxxx000000xxxxxx
@@ -9786,19 +10111,17 @@ def decode_32bit(instr: int, ctx: Context):
                         shift_t, shift_n = (SRType_LSL, UInt(imm2))
                         if ((t == 13) or (t == 15)) or ((m == 13) or (m == 15)):
                             sideffect_flags |= SIDEFFECT_UNPREDICTABLE
-                        return _apply_sideeffect(
-                            sideffect_flags,
-                            STRB_register(
-                                encoding=Encoding.T2,
-                                t=t,
-                                n=n,
-                                m=m,
-                                index=index,
-                                add=add,
-                                wback=wback,
-                                shift_t=shift_t,
-                                shift_n=shift_n,
-                            ),
+                        return STRB_register(
+                            encoding=Encoding.T2,
+                            sideeffects=sideffect_flags,
+                            t=t,
+                            n=n,
+                            m=m,
+                            index=index,
+                            add=add,
+                            wback=wback,
+                            shift_t=shift_t,
+                            shift_n=shift_n,
                         )
                     elif (instr & 0x800) == 0x800:  # xxxxxxxxxxxxxxxxxxxx1xxxxxxxxxxx
                         if (instr & 0x700) == 0x600:  # xxxxxxxxxxxxxxxxxxxxx110xxxxxxxx
@@ -9819,17 +10142,15 @@ def decode_32bit(instr: int, ctx: Context):
                             imm32 = ZeroExtend(imm8, 32)
                             if (t == 13) or (t == 15):
                                 sideffect_flags |= SIDEFFECT_UNPREDICTABLE
-                            return _apply_sideeffect(
-                                sideffect_flags,
-                                STRBT(
-                                    encoding=Encoding.T1,
-                                    t=t,
-                                    n=n,
-                                    postindex=postindex,
-                                    add=add,
-                                    register_form=register_form,
-                                    imm32=imm32,
-                                ),
+                            return STRBT(
+                                encoding=Encoding.T1,
+                                sideeffects=sideffect_flags,
+                                t=t,
+                                n=n,
+                                postindex=postindex,
+                                add=add,
+                                register_form=register_form,
+                                imm32=imm32,
                             )
                         elif (instr & 0x0) == 0x0:  # xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
                             # strb_immediate_t3
@@ -9854,17 +10175,15 @@ def decode_32bit(instr: int, ctx: Context):
                             wback = W == 1
                             if ((t == 13) or (t == 15)) or (wback and (n == t)):
                                 sideffect_flags |= SIDEFFECT_UNPREDICTABLE
-                            return _apply_sideeffect(
-                                sideffect_flags,
-                                STRB_immediate(
-                                    encoding=Encoding.T3,
-                                    t=t,
-                                    n=n,
-                                    imm32=imm32,
-                                    index=index,
-                                    add=add,
-                                    wback=wback,
-                                ),
+                            return STRB_immediate(
+                                encoding=Encoding.T3,
+                                sideeffects=sideffect_flags,
+                                t=t,
+                                n=n,
+                                imm32=imm32,
+                                index=index,
+                                add=add,
+                                wback=wback,
                             )
                         return NoMatch()  # no match
                     return NoMatch()  # no match
@@ -9888,17 +10207,15 @@ def decode_32bit(instr: int, ctx: Context):
                     wback = False
                     if (t == 13) or (t == 15):
                         sideffect_flags |= SIDEFFECT_UNPREDICTABLE
-                    return _apply_sideeffect(
-                        sideffect_flags,
-                        STRH_immediate(
-                            encoding=Encoding.T2,
-                            t=t,
-                            n=n,
-                            imm32=imm32,
-                            index=index,
-                            add=add,
-                            wback=wback,
-                        ),
+                    return STRH_immediate(
+                        encoding=Encoding.T2,
+                        sideeffects=sideffect_flags,
+                        t=t,
+                        n=n,
+                        imm32=imm32,
+                        index=index,
+                        add=add,
+                        wback=wback,
                     )
                 elif (instr & 0x800000) == 0x0:  # xxxxxxxx0xxxxxxxxxxxxxxxxxxxxxxx
                     if (instr & 0xFC0) == 0x0:  # xxxxxxxxxxxxxxxxxxxx000000xxxxxx
@@ -9921,19 +10238,17 @@ def decode_32bit(instr: int, ctx: Context):
                         shift_t, shift_n = (SRType_LSL, UInt(imm2))
                         if ((t == 13) or (t == 15)) or ((m == 13) or (m == 15)):
                             sideffect_flags |= SIDEFFECT_UNPREDICTABLE
-                        return _apply_sideeffect(
-                            sideffect_flags,
-                            STRH_register(
-                                encoding=Encoding.T2,
-                                t=t,
-                                n=n,
-                                m=m,
-                                index=index,
-                                add=add,
-                                wback=wback,
-                                shift_t=shift_t,
-                                shift_n=shift_n,
-                            ),
+                        return STRH_register(
+                            encoding=Encoding.T2,
+                            sideeffects=sideffect_flags,
+                            t=t,
+                            n=n,
+                            m=m,
+                            index=index,
+                            add=add,
+                            wback=wback,
+                            shift_t=shift_t,
+                            shift_n=shift_n,
                         )
                     elif (instr & 0x800) == 0x800:  # xxxxxxxxxxxxxxxxxxxx1xxxxxxxxxxx
                         if (instr & 0x700) == 0x600:  # xxxxxxxxxxxxxxxxxxxxx110xxxxxxxx
@@ -9954,17 +10269,15 @@ def decode_32bit(instr: int, ctx: Context):
                             imm32 = ZeroExtend(imm8, 32)
                             if (t == 13) or (t == 15):
                                 sideffect_flags |= SIDEFFECT_UNPREDICTABLE
-                            return _apply_sideeffect(
-                                sideffect_flags,
-                                STRHT(
-                                    encoding=Encoding.T1,
-                                    t=t,
-                                    n=n,
-                                    postindex=postindex,
-                                    add=add,
-                                    register_form=register_form,
-                                    imm32=imm32,
-                                ),
+                            return STRHT(
+                                encoding=Encoding.T1,
+                                sideeffects=sideffect_flags,
+                                t=t,
+                                n=n,
+                                postindex=postindex,
+                                add=add,
+                                register_form=register_form,
+                                imm32=imm32,
                             )
                         elif (instr & 0x0) == 0x0:  # xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
                             # strh_immediate_t3
@@ -9989,17 +10302,15 @@ def decode_32bit(instr: int, ctx: Context):
                             wback = W == 1
                             if ((t == 13) or (t == 15)) or (wback and (n == t)):
                                 sideffect_flags |= SIDEFFECT_UNPREDICTABLE
-                            return _apply_sideeffect(
-                                sideffect_flags,
-                                STRH_immediate(
-                                    encoding=Encoding.T3,
-                                    t=t,
-                                    n=n,
-                                    imm32=imm32,
-                                    index=index,
-                                    add=add,
-                                    wback=wback,
-                                ),
+                            return STRH_immediate(
+                                encoding=Encoding.T3,
+                                sideeffects=sideffect_flags,
+                                t=t,
+                                n=n,
+                                imm32=imm32,
+                                index=index,
+                                add=add,
+                                wback=wback,
                             )
                         return NoMatch()  # no match
                     return NoMatch()  # no match
@@ -10021,8 +10332,8 @@ def decode_32bit(instr: int, ctx: Context):
                     (m == 13) or (m == 15)
                 ):
                     sideffect_flags |= SIDEFFECT_UNPREDICTABLE
-                return _apply_sideeffect(
-                    sideffect_flags, SDIV(encoding=Encoding.T1, d=d, n=n, m=m)
+                return SDIV(
+                    encoding=Encoding.T1, sideeffects=sideffect_flags, d=d, n=n, m=m
                 )
             elif (instr & 0x1F0F0F0) == 0x1B0F0F0:  # xxxxxxx11011xxxx1111xxxx1111xxxx
                 # udiv_t1
@@ -10039,8 +10350,8 @@ def decode_32bit(instr: int, ctx: Context):
                     (m == 13) or (m == 15)
                 ):
                     sideffect_flags |= SIDEFFECT_UNPREDICTABLE
-                return _apply_sideeffect(
-                    sideffect_flags, UDIV(encoding=Encoding.T1, d=d, n=n, m=m)
+                return UDIV(
+                    encoding=Encoding.T1, sideeffects=sideffect_flags, d=d, n=n, m=m
                 )
             elif (instr & 0x1E0F0F0) == 0xF000:  # xxxxxxx0000xxxxx1111xxxx0000xxxx
                 # lsl_register_t2
@@ -10059,11 +10370,13 @@ def decode_32bit(instr: int, ctx: Context):
                     (m == 13) or (m == 15)
                 ):
                     sideffect_flags |= SIDEFFECT_UNPREDICTABLE
-                return _apply_sideeffect(
-                    sideffect_flags,
-                    LSL_register(
-                        encoding=Encoding.T2, d=d, n=n, m=m, setflags=setflags
-                    ),
+                return LSL_register(
+                    encoding=Encoding.T2,
+                    sideeffects=sideffect_flags,
+                    d=d,
+                    n=n,
+                    m=m,
+                    setflags=setflags,
                 )
             elif (instr & 0x1E0F0F0) == 0x20F000:  # xxxxxxx0001xxxxx1111xxxx0000xxxx
                 # lsr_register_t2
@@ -10082,11 +10395,13 @@ def decode_32bit(instr: int, ctx: Context):
                     (m == 13) or (m == 15)
                 ):
                     sideffect_flags |= SIDEFFECT_UNPREDICTABLE
-                return _apply_sideeffect(
-                    sideffect_flags,
-                    LSR_register(
-                        encoding=Encoding.T2, d=d, n=n, m=m, setflags=setflags
-                    ),
+                return LSR_register(
+                    encoding=Encoding.T2,
+                    sideeffects=sideffect_flags,
+                    d=d,
+                    n=n,
+                    m=m,
+                    setflags=setflags,
                 )
             elif (instr & 0x1E0F0F0) == 0x40F000:  # xxxxxxx0010xxxxx1111xxxx0000xxxx
                 # asr_register_t2
@@ -10105,11 +10420,13 @@ def decode_32bit(instr: int, ctx: Context):
                     (m == 13) or (m == 15)
                 ):
                     sideffect_flags |= SIDEFFECT_UNPREDICTABLE
-                return _apply_sideeffect(
-                    sideffect_flags,
-                    ASR_register(
-                        encoding=Encoding.T2, d=d, n=n, m=m, setflags=setflags
-                    ),
+                return ASR_register(
+                    encoding=Encoding.T2,
+                    sideeffects=sideffect_flags,
+                    d=d,
+                    n=n,
+                    m=m,
+                    setflags=setflags,
                 )
             elif (instr & 0x1E0F0F0) == 0x60F000:  # xxxxxxx0011xxxxx1111xxxx0000xxxx
                 # ror_register_t2
@@ -10128,11 +10445,13 @@ def decode_32bit(instr: int, ctx: Context):
                     (m == 13) or (m == 15)
                 ):
                     sideffect_flags |= SIDEFFECT_UNPREDICTABLE
-                return _apply_sideeffect(
-                    sideffect_flags,
-                    ROR_register(
-                        encoding=Encoding.T2, d=d, n=n, m=m, setflags=setflags
-                    ),
+                return ROR_register(
+                    encoding=Encoding.T2,
+                    sideeffects=sideffect_flags,
+                    d=d,
+                    n=n,
+                    m=m,
+                    setflags=setflags,
                 )
             elif (instr & 0x1F000F0) == 0x1800000:  # xxxxxxx11000xxxxxxxxxxxx0000xxxx
                 # smull_t1
@@ -10155,16 +10474,14 @@ def decode_32bit(instr: int, ctx: Context):
                     sideffect_flags |= SIDEFFECT_UNPREDICTABLE
                 if dHi == dLo:
                     sideffect_flags |= SIDEFFECT_UNPREDICTABLE
-                return _apply_sideeffect(
-                    sideffect_flags,
-                    SMULL(
-                        encoding=Encoding.T1,
-                        dLo=dLo,
-                        dHi=dHi,
-                        n=n,
-                        m=m,
-                        setflags=setflags,
-                    ),
+                return SMULL(
+                    encoding=Encoding.T1,
+                    sideeffects=sideffect_flags,
+                    dLo=dLo,
+                    dHi=dHi,
+                    n=n,
+                    m=m,
+                    setflags=setflags,
                 )
             elif (instr & 0x1F000F0) == 0x1A00000:  # xxxxxxx11010xxxxxxxxxxxx0000xxxx
                 # umull_t1
@@ -10187,16 +10504,14 @@ def decode_32bit(instr: int, ctx: Context):
                     sideffect_flags |= SIDEFFECT_UNPREDICTABLE
                 if dHi == dLo:
                     sideffect_flags |= SIDEFFECT_UNPREDICTABLE
-                return _apply_sideeffect(
-                    sideffect_flags,
-                    UMULL(
-                        encoding=Encoding.T1,
-                        dLo=dLo,
-                        dHi=dHi,
-                        n=n,
-                        m=m,
-                        setflags=setflags,
-                    ),
+                return UMULL(
+                    encoding=Encoding.T1,
+                    sideeffects=sideffect_flags,
+                    dLo=dLo,
+                    dHi=dHi,
+                    n=n,
+                    m=m,
+                    setflags=setflags,
                 )
             elif (instr & 0x1F000F0) == 0x1E00000:  # xxxxxxx11110xxxxxxxxxxxx0000xxxx
                 # umlal_t1
@@ -10219,16 +10534,14 @@ def decode_32bit(instr: int, ctx: Context):
                     sideffect_flags |= SIDEFFECT_UNPREDICTABLE
                 if dHi == dLo:
                     sideffect_flags |= SIDEFFECT_UNPREDICTABLE
-                return _apply_sideeffect(
-                    sideffect_flags,
-                    UMLAL(
-                        encoding=Encoding.T1,
-                        dLo=dLo,
-                        dHi=dHi,
-                        n=n,
-                        m=m,
-                        setflags=setflags,
-                    ),
+                return UMLAL(
+                    encoding=Encoding.T1,
+                    sideeffects=sideffect_flags,
+                    dLo=dLo,
+                    dHi=dHi,
+                    n=n,
+                    m=m,
+                    setflags=setflags,
                 )
             elif (instr & 0x1F000F0) == 0x1C00000:  # xxxxxxx11100xxxxxxxxxxxx0000xxxx
                 # smlal_t1
@@ -10251,16 +10564,14 @@ def decode_32bit(instr: int, ctx: Context):
                     sideffect_flags |= SIDEFFECT_UNPREDICTABLE
                 if dHi == dLo:
                     sideffect_flags |= SIDEFFECT_UNPREDICTABLE
-                return _apply_sideeffect(
-                    sideffect_flags,
-                    SMLAL(
-                        encoding=Encoding.T1,
-                        dLo=dLo,
-                        dHi=dHi,
-                        n=n,
-                        m=m,
-                        setflags=setflags,
-                    ),
+                return SMLAL(
+                    encoding=Encoding.T1,
+                    sideeffects=sideffect_flags,
+                    dLo=dLo,
+                    dHi=dHi,
+                    n=n,
+                    m=m,
+                    setflags=setflags,
                 )
             elif (instr & 0x1F000F0) == 0x1E00060:  # xxxxxxx11110xxxxxxxxxxxx0110xxxx
                 # umaal_t1
@@ -10282,9 +10593,13 @@ def decode_32bit(instr: int, ctx: Context):
                     sideffect_flags |= SIDEFFECT_UNPREDICTABLE
                 if dHi == dLo:
                     sideffect_flags |= SIDEFFECT_UNPREDICTABLE
-                return _apply_sideeffect(
-                    sideffect_flags,
-                    UMAAL(encoding=Encoding.T1, dLo=dLo, dHi=dHi, n=n, m=m),
+                return UMAAL(
+                    encoding=Encoding.T1,
+                    sideeffects=sideffect_flags,
+                    dLo=dLo,
+                    dHi=dHi,
+                    n=n,
+                    m=m,
                 )
             elif (instr & 0x1F000C0) == 0x1C00080:  # xxxxxxx11100xxxxxxxxxxxx10xxxxxx
                 # smlalbb_smlalbt_smlaltb_smlaltt_t1
@@ -10310,17 +10625,15 @@ def decode_32bit(instr: int, ctx: Context):
                     sideffect_flags |= SIDEFFECT_UNPREDICTABLE
                 if dHi == dLo:
                     sideffect_flags |= SIDEFFECT_UNPREDICTABLE
-                return _apply_sideeffect(
-                    sideffect_flags,
-                    SMLALBB_SMLALBT_SMLALTB_SMLALTT(
-                        encoding=Encoding.T1,
-                        dLo=dLo,
-                        dHi=dHi,
-                        n=n,
-                        m=m,
-                        n_high=n_high,
-                        m_high=m_high,
-                    ),
+                return SMLALBB_SMLALBT_SMLALTB_SMLALTT(
+                    encoding=Encoding.T1,
+                    sideeffects=sideffect_flags,
+                    dLo=dLo,
+                    dHi=dHi,
+                    n=n,
+                    m=m,
+                    n_high=n_high,
+                    m_high=m_high,
                 )
             elif (instr & 0x1E000C0) == 0xA00080:  # xxxxxxx0101xxxxxxxxxxxxx10xxxxxx
                 if (instr & 0x10F030) == 0x10F000:  # xxxxxxxxxxx1xxxx1111xxxxxx00xxxx
@@ -10337,8 +10650,8 @@ def decode_32bit(instr: int, ctx: Context):
                     m = UInt(Rm)
                     if ((d == 13) or (d == 15)) or ((m == 13) or (m == 15)):
                         sideffect_flags |= SIDEFFECT_UNPREDICTABLE
-                    return _apply_sideeffect(
-                        sideffect_flags, CLZ(encoding=Encoding.T1, d=d, m=m)
+                    return CLZ(
+                        encoding=Encoding.T1, sideeffects=sideffect_flags, d=d, m=m
                     )
                 elif (instr & 0x10F030) == 0xF000:  # xxxxxxxxxxx0xxxx1111xxxxxx00xxxx
                     # sel_t1
@@ -10355,8 +10668,8 @@ def decode_32bit(instr: int, ctx: Context):
                         (m == 13) or (m == 15)
                     ):
                         sideffect_flags |= SIDEFFECT_UNPREDICTABLE
-                    return _apply_sideeffect(
-                        sideffect_flags, SEL(encoding=Encoding.T1, d=d, n=n, m=m)
+                    return SEL(
+                        encoding=Encoding.T1, sideeffects=sideffect_flags, d=d, n=n, m=m
                     )
                 return NoMatch()  # no match
             elif (instr & 0x1E000C0) == 0x1000000:  # xxxxxxx1000xxxxxxxxxxxxx00xxxxxx
@@ -10380,15 +10693,13 @@ def decode_32bit(instr: int, ctx: Context):
                                 ((d == 13) or (d == 15)) or ((n == 13) or (n == 15))
                             ) or ((m == 13) or (m == 15)):
                                 sideffect_flags |= SIDEFFECT_UNPREDICTABLE
-                            return _apply_sideeffect(
-                                sideffect_flags,
-                                MUL(
-                                    encoding=Encoding.T2,
-                                    d=d,
-                                    n=n,
-                                    m=m,
-                                    setflags=setflags,
-                                ),
+                            return MUL(
+                                encoding=Encoding.T2,
+                                sideeffects=sideffect_flags,
+                                d=d,
+                                n=n,
+                                m=m,
+                                setflags=setflags,
                             )
                         elif (instr & 0x0) == 0x0:  # xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
                             # mla_t1
@@ -10411,16 +10722,14 @@ def decode_32bit(instr: int, ctx: Context):
                                 or ((m == 13) or (m == 15))
                             ) or (a == 13):
                                 sideffect_flags |= SIDEFFECT_UNPREDICTABLE
-                            return _apply_sideeffect(
-                                sideffect_flags,
-                                MLA(
-                                    encoding=Encoding.T1,
-                                    d=d,
-                                    n=n,
-                                    m=m,
-                                    a=a,
-                                    setflags=setflags,
-                                ),
+                            return MLA(
+                                encoding=Encoding.T1,
+                                sideeffects=sideffect_flags,
+                                d=d,
+                                n=n,
+                                m=m,
+                                a=a,
+                                setflags=setflags,
                             )
                         return NoMatch()  # no match
                     elif (instr & 0x30) == 0x10:  # xxxxxxxxxxxxxxxxxxxxxxxxxx01xxxx
@@ -10441,9 +10750,13 @@ def decode_32bit(instr: int, ctx: Context):
                             or ((m == 13) or (m == 15))
                         ) or ((a == 13) or (a == 15)):
                             sideffect_flags |= SIDEFFECT_UNPREDICTABLE
-                        return _apply_sideeffect(
-                            sideffect_flags,
-                            MLS(encoding=Encoding.T1, d=d, n=n, m=m, a=a),
+                        return MLS(
+                            encoding=Encoding.T1,
+                            sideeffects=sideffect_flags,
+                            d=d,
+                            n=n,
+                            m=m,
+                            a=a,
                         )
                     return NoMatch()  # no match
                 elif (instr & 0x100000) == 0x100000:  # xxxxxxxxxxx1xxxxxxxxxxxxxxxxxxxx
@@ -10466,16 +10779,14 @@ def decode_32bit(instr: int, ctx: Context):
                             (m == 13) or (m == 15)
                         ):
                             sideffect_flags |= SIDEFFECT_UNPREDICTABLE
-                        return _apply_sideeffect(
-                            sideffect_flags,
-                            SMULBB_SMULBT_SMULTB_SMULTT(
-                                encoding=Encoding.T1,
-                                d=d,
-                                n=n,
-                                m=m,
-                                n_high=n_high,
-                                m_high=m_high,
-                            ),
+                        return SMULBB_SMULBT_SMULTB_SMULTT(
+                            encoding=Encoding.T1,
+                            sideeffects=sideffect_flags,
+                            d=d,
+                            n=n,
+                            m=m,
+                            n_high=n_high,
+                            m_high=m_high,
                         )
                     elif (instr & 0x0) == 0x0:  # xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
                         # smlabb_smlabt_smlatb_smlatt_t1
@@ -10503,17 +10814,15 @@ def decode_32bit(instr: int, ctx: Context):
                             or ((m == 13) or (m == 15))
                         ) or (a == 13):
                             sideffect_flags |= SIDEFFECT_UNPREDICTABLE
-                        return _apply_sideeffect(
-                            sideffect_flags,
-                            SMLABB_SMLABT_SMLATB_SMLATT(
-                                encoding=Encoding.T1,
-                                d=d,
-                                n=n,
-                                m=m,
-                                a=a,
-                                n_high=n_high,
-                                m_high=m_high,
-                            ),
+                        return SMLABB_SMLABT_SMLATB_SMLATT(
+                            encoding=Encoding.T1,
+                            sideeffects=sideffect_flags,
+                            d=d,
+                            n=n,
+                            m=m,
+                            a=a,
+                            n_high=n_high,
+                            m_high=m_high,
                         )
                     return NoMatch()  # no match
                 return NoMatch()  # no match
@@ -10532,9 +10841,12 @@ def decode_32bit(instr: int, ctx: Context):
                         rotation = UInt(concat_bits(rotate, 0x0, 3))
                         if ((d == 13) or (d == 15)) or ((m == 13) or (m == 15)):
                             sideffect_flags |= SIDEFFECT_UNPREDICTABLE
-                        return _apply_sideeffect(
-                            sideffect_flags,
-                            SXTB(encoding=Encoding.T2, d=d, m=m, rotation=rotation),
+                        return SXTB(
+                            encoding=Encoding.T2,
+                            sideeffects=sideffect_flags,
+                            d=d,
+                            m=m,
+                            rotation=rotation,
                         )
                     elif (instr & 0x0) == 0x0:  # xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
                         # sxtab_t1
@@ -10555,11 +10867,13 @@ def decode_32bit(instr: int, ctx: Context):
                             (m == 13) or (m == 15)
                         ):
                             sideffect_flags |= SIDEFFECT_UNPREDICTABLE
-                        return _apply_sideeffect(
-                            sideffect_flags,
-                            SXTAB(
-                                encoding=Encoding.T1, d=d, n=n, m=m, rotation=rotation
-                            ),
+                        return SXTAB(
+                            encoding=Encoding.T1,
+                            sideeffects=sideffect_flags,
+                            d=d,
+                            n=n,
+                            m=m,
+                            rotation=rotation,
                         )
                     return NoMatch()  # no match
                 elif (instr & 0x10F000) == 0x10F000:  # xxxxxxxxxxx1xxxx1111xxxxxxxxxxxx
@@ -10576,9 +10890,12 @@ def decode_32bit(instr: int, ctx: Context):
                         rotation = UInt(concat_bits(rotate, 0x0, 3))
                         if ((d == 13) or (d == 15)) or ((m == 13) or (m == 15)):
                             sideffect_flags |= SIDEFFECT_UNPREDICTABLE
-                        return _apply_sideeffect(
-                            sideffect_flags,
-                            UXTB(encoding=Encoding.T2, d=d, m=m, rotation=rotation),
+                        return UXTB(
+                            encoding=Encoding.T2,
+                            sideeffects=sideffect_flags,
+                            d=d,
+                            m=m,
+                            rotation=rotation,
                         )
                     elif (instr & 0x0) == 0x0:  # xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
                         # uxtab_t1
@@ -10599,11 +10916,13 @@ def decode_32bit(instr: int, ctx: Context):
                             (m == 13) or (m == 15)
                         ):
                             sideffect_flags |= SIDEFFECT_UNPREDICTABLE
-                        return _apply_sideeffect(
-                            sideffect_flags,
-                            UXTAB(
-                                encoding=Encoding.T1, d=d, n=n, m=m, rotation=rotation
-                            ),
+                        return UXTAB(
+                            encoding=Encoding.T1,
+                            sideeffects=sideffect_flags,
+                            d=d,
+                            n=n,
+                            m=m,
+                            rotation=rotation,
                         )
                     return NoMatch()  # no match
                 return NoMatch()  # no match
@@ -10622,9 +10941,12 @@ def decode_32bit(instr: int, ctx: Context):
                         rotation = UInt(concat_bits(rotate, 0x0, 3))
                         if ((d == 13) or (d == 15)) or ((m == 13) or (m == 15)):
                             sideffect_flags |= SIDEFFECT_UNPREDICTABLE
-                        return _apply_sideeffect(
-                            sideffect_flags,
-                            SXTB16(encoding=Encoding.T1, d=d, m=m, rotation=rotation),
+                        return SXTB16(
+                            encoding=Encoding.T1,
+                            sideeffects=sideffect_flags,
+                            d=d,
+                            m=m,
+                            rotation=rotation,
                         )
                     elif (instr & 0x0) == 0x0:  # xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
                         # sxtab16_t1
@@ -10645,11 +10967,13 @@ def decode_32bit(instr: int, ctx: Context):
                             (m == 13) or (m == 15)
                         ):
                             sideffect_flags |= SIDEFFECT_UNPREDICTABLE
-                        return _apply_sideeffect(
-                            sideffect_flags,
-                            SXTAB16(
-                                encoding=Encoding.T1, d=d, n=n, m=m, rotation=rotation
-                            ),
+                        return SXTAB16(
+                            encoding=Encoding.T1,
+                            sideeffects=sideffect_flags,
+                            d=d,
+                            n=n,
+                            m=m,
+                            rotation=rotation,
                         )
                     return NoMatch()  # no match
                 elif (instr & 0x10F000) == 0x10F000:  # xxxxxxxxxxx1xxxx1111xxxxxxxxxxxx
@@ -10666,9 +10990,12 @@ def decode_32bit(instr: int, ctx: Context):
                         rotation = UInt(concat_bits(rotate, 0x0, 3))
                         if ((d == 13) or (d == 15)) or ((m == 13) or (m == 15)):
                             sideffect_flags |= SIDEFFECT_UNPREDICTABLE
-                        return _apply_sideeffect(
-                            sideffect_flags,
-                            UXTB16(encoding=Encoding.T1, d=d, m=m, rotation=rotation),
+                        return UXTB16(
+                            encoding=Encoding.T1,
+                            sideeffects=sideffect_flags,
+                            d=d,
+                            m=m,
+                            rotation=rotation,
                         )
                     elif (instr & 0x0) == 0x0:  # xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
                         # uxtab16_t1
@@ -10689,11 +11016,13 @@ def decode_32bit(instr: int, ctx: Context):
                             (m == 13) or (m == 15)
                         ):
                             sideffect_flags |= SIDEFFECT_UNPREDICTABLE
-                        return _apply_sideeffect(
-                            sideffect_flags,
-                            UXTAB16(
-                                encoding=Encoding.T1, d=d, n=n, m=m, rotation=rotation
-                            ),
+                        return UXTAB16(
+                            encoding=Encoding.T1,
+                            sideeffects=sideffect_flags,
+                            d=d,
+                            n=n,
+                            m=m,
+                            rotation=rotation,
                         )
                     return NoMatch()  # no match
                 return NoMatch()  # no match
@@ -10712,9 +11041,12 @@ def decode_32bit(instr: int, ctx: Context):
                         rotation = UInt(concat_bits(rotate, 0x0, 3))
                         if ((d == 13) or (d == 15)) or ((m == 13) or (m == 15)):
                             sideffect_flags |= SIDEFFECT_UNPREDICTABLE
-                        return _apply_sideeffect(
-                            sideffect_flags,
-                            SXTH(encoding=Encoding.T2, d=d, m=m, rotation=rotation),
+                        return SXTH(
+                            encoding=Encoding.T2,
+                            sideeffects=sideffect_flags,
+                            d=d,
+                            m=m,
+                            rotation=rotation,
                         )
                     elif (instr & 0x0) == 0x0:  # xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
                         # sxtah_t1
@@ -10735,11 +11067,13 @@ def decode_32bit(instr: int, ctx: Context):
                             (m == 13) or (m == 15)
                         ):
                             sideffect_flags |= SIDEFFECT_UNPREDICTABLE
-                        return _apply_sideeffect(
-                            sideffect_flags,
-                            SXTAH(
-                                encoding=Encoding.T1, d=d, n=n, m=m, rotation=rotation
-                            ),
+                        return SXTAH(
+                            encoding=Encoding.T1,
+                            sideeffects=sideffect_flags,
+                            d=d,
+                            n=n,
+                            m=m,
+                            rotation=rotation,
                         )
                     return NoMatch()  # no match
                 elif (instr & 0x10F000) == 0x10F000:  # xxxxxxxxxxx1xxxx1111xxxxxxxxxxxx
@@ -10756,9 +11090,12 @@ def decode_32bit(instr: int, ctx: Context):
                         rotation = UInt(concat_bits(rotate, 0x0, 3))
                         if ((d == 13) or (d == 15)) or ((m == 13) or (m == 15)):
                             sideffect_flags |= SIDEFFECT_UNPREDICTABLE
-                        return _apply_sideeffect(
-                            sideffect_flags,
-                            UXTH(encoding=Encoding.T2, d=d, m=m, rotation=rotation),
+                        return UXTH(
+                            encoding=Encoding.T2,
+                            sideeffects=sideffect_flags,
+                            d=d,
+                            m=m,
+                            rotation=rotation,
                         )
                     elif (instr & 0x0) == 0x0:  # xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
                         # uxtah_t1
@@ -10779,11 +11116,13 @@ def decode_32bit(instr: int, ctx: Context):
                             (m == 13) or (m == 15)
                         ):
                             sideffect_flags |= SIDEFFECT_UNPREDICTABLE
-                        return _apply_sideeffect(
-                            sideffect_flags,
-                            UXTAH(
-                                encoding=Encoding.T1, d=d, n=n, m=m, rotation=rotation
-                            ),
+                        return UXTAH(
+                            encoding=Encoding.T1,
+                            sideeffects=sideffect_flags,
+                            d=d,
+                            n=n,
+                            m=m,
+                            rotation=rotation,
                         )
                     return NoMatch()  # no match
                 return NoMatch()  # no match
@@ -10802,8 +11141,8 @@ def decode_32bit(instr: int, ctx: Context):
                     m = UInt(Rm)
                     if ((d == 13) or (d == 15)) or ((m == 13) or (m == 15)):
                         sideffect_flags |= SIDEFFECT_UNPREDICTABLE
-                    return _apply_sideeffect(
-                        sideffect_flags, REV(encoding=Encoding.T2, d=d, m=m)
+                    return REV(
+                        encoding=Encoding.T2, sideeffects=sideffect_flags, d=d, m=m
                     )
                 elif (instr & 0x10F030) == 0x10F010:  # xxxxxxxxxxx1xxxx1111xxxxxx01xxxx
                     # rev16_t2
@@ -10819,8 +11158,8 @@ def decode_32bit(instr: int, ctx: Context):
                     m = UInt(Rm)
                     if ((d == 13) or (d == 15)) or ((m == 13) or (m == 15)):
                         sideffect_flags |= SIDEFFECT_UNPREDICTABLE
-                    return _apply_sideeffect(
-                        sideffect_flags, REV16(encoding=Encoding.T2, d=d, m=m)
+                    return REV16(
+                        encoding=Encoding.T2, sideeffects=sideffect_flags, d=d, m=m
                     )
                 elif (instr & 0x10F030) == 0x10F030:  # xxxxxxxxxxx1xxxx1111xxxxxx11xxxx
                     # revsh_t2
@@ -10836,8 +11175,8 @@ def decode_32bit(instr: int, ctx: Context):
                     m = UInt(Rm)
                     if ((d == 13) or (d == 15)) or ((m == 13) or (m == 15)):
                         sideffect_flags |= SIDEFFECT_UNPREDICTABLE
-                    return _apply_sideeffect(
-                        sideffect_flags, REVSH(encoding=Encoding.T2, d=d, m=m)
+                    return REVSH(
+                        encoding=Encoding.T2, sideeffects=sideffect_flags, d=d, m=m
                     )
                 elif (instr & 0x10F030) == 0xF000:  # xxxxxxxxxxx0xxxx1111xxxxxx00xxxx
                     # qadd_t1
@@ -10854,8 +11193,8 @@ def decode_32bit(instr: int, ctx: Context):
                         (m == 13) or (m == 15)
                     ):
                         sideffect_flags |= SIDEFFECT_UNPREDICTABLE
-                    return _apply_sideeffect(
-                        sideffect_flags, QADD(encoding=Encoding.T1, d=d, n=n, m=m)
+                    return QADD(
+                        encoding=Encoding.T1, sideeffects=sideffect_flags, d=d, n=n, m=m
                     )
                 elif (instr & 0x10F030) == 0xF010:  # xxxxxxxxxxx0xxxx1111xxxxxx01xxxx
                     # qdadd_t1
@@ -10872,8 +11211,8 @@ def decode_32bit(instr: int, ctx: Context):
                         (m == 13) or (m == 15)
                     ):
                         sideffect_flags |= SIDEFFECT_UNPREDICTABLE
-                    return _apply_sideeffect(
-                        sideffect_flags, QDADD(encoding=Encoding.T1, d=d, n=n, m=m)
+                    return QDADD(
+                        encoding=Encoding.T1, sideeffects=sideffect_flags, d=d, n=n, m=m
                     )
                 elif (instr & 0x10F030) == 0xF030:  # xxxxxxxxxxx0xxxx1111xxxxxx11xxxx
                     # qdsub_t1
@@ -10890,8 +11229,8 @@ def decode_32bit(instr: int, ctx: Context):
                         (m == 13) or (m == 15)
                     ):
                         sideffect_flags |= SIDEFFECT_UNPREDICTABLE
-                    return _apply_sideeffect(
-                        sideffect_flags, QDSUB(encoding=Encoding.T1, d=d, n=n, m=m)
+                    return QDSUB(
+                        encoding=Encoding.T1, sideeffects=sideffect_flags, d=d, n=n, m=m
                     )
                 elif (instr & 0x10F030) == 0xF020:  # xxxxxxxxxxx0xxxx1111xxxxxx10xxxx
                     # qsub_t1
@@ -10908,8 +11247,8 @@ def decode_32bit(instr: int, ctx: Context):
                         (m == 13) or (m == 15)
                     ):
                         sideffect_flags |= SIDEFFECT_UNPREDICTABLE
-                    return _apply_sideeffect(
-                        sideffect_flags, QSUB(encoding=Encoding.T1, d=d, n=n, m=m)
+                    return QSUB(
+                        encoding=Encoding.T1, sideeffects=sideffect_flags, d=d, n=n, m=m
                     )
                 elif (instr & 0x10F030) == 0x10F020:  # xxxxxxxxxxx1xxxx1111xxxxxx10xxxx
                     # rbit_t1
@@ -10925,8 +11264,8 @@ def decode_32bit(instr: int, ctx: Context):
                     m = UInt(Rm)
                     if ((d == 13) or (d == 15)) or ((m == 13) or (m == 15)):
                         sideffect_flags |= SIDEFFECT_UNPREDICTABLE
-                    return _apply_sideeffect(
-                        sideffect_flags, RBIT(encoding=Encoding.T1, d=d, m=m)
+                    return RBIT(
+                        encoding=Encoding.T1, sideeffects=sideffect_flags, d=d, m=m
                     )
                 return NoMatch()  # no match
             elif (instr & 0x1E000C0) == 0x800040:  # xxxxxxx0100xxxxxxxxxxxxx01xxxxxx
@@ -10945,8 +11284,8 @@ def decode_32bit(instr: int, ctx: Context):
                         (m == 13) or (m == 15)
                     ):
                         sideffect_flags |= SIDEFFECT_UNPREDICTABLE
-                    return _apply_sideeffect(
-                        sideffect_flags, UADD16(encoding=Encoding.T1, d=d, n=n, m=m)
+                    return UADD16(
+                        encoding=Encoding.T1, sideeffects=sideffect_flags, d=d, n=n, m=m
                     )
                 elif (instr & 0x10F030) == 0xF000:  # xxxxxxxxxxx0xxxx1111xxxxxx00xxxx
                     # uadd8_t1
@@ -10963,8 +11302,8 @@ def decode_32bit(instr: int, ctx: Context):
                         (m == 13) or (m == 15)
                     ):
                         sideffect_flags |= SIDEFFECT_UNPREDICTABLE
-                    return _apply_sideeffect(
-                        sideffect_flags, UADD8(encoding=Encoding.T1, d=d, n=n, m=m)
+                    return UADD8(
+                        encoding=Encoding.T1, sideeffects=sideffect_flags, d=d, n=n, m=m
                     )
                 elif (instr & 0x10F030) == 0x10F020:  # xxxxxxxxxxx1xxxx1111xxxxxx10xxxx
                     # uhadd16_t1
@@ -10981,8 +11320,8 @@ def decode_32bit(instr: int, ctx: Context):
                         (m == 13) or (m == 15)
                     ):
                         sideffect_flags |= SIDEFFECT_UNPREDICTABLE
-                    return _apply_sideeffect(
-                        sideffect_flags, UHADD16(encoding=Encoding.T1, d=d, n=n, m=m)
+                    return UHADD16(
+                        encoding=Encoding.T1, sideeffects=sideffect_flags, d=d, n=n, m=m
                     )
                 elif (instr & 0x10F030) == 0xF020:  # xxxxxxxxxxx0xxxx1111xxxxxx10xxxx
                     # uhadd8_t1
@@ -10999,8 +11338,8 @@ def decode_32bit(instr: int, ctx: Context):
                         (m == 13) or (m == 15)
                     ):
                         sideffect_flags |= SIDEFFECT_UNPREDICTABLE
-                    return _apply_sideeffect(
-                        sideffect_flags, UHADD8(encoding=Encoding.T1, d=d, n=n, m=m)
+                    return UHADD8(
+                        encoding=Encoding.T1, sideeffects=sideffect_flags, d=d, n=n, m=m
                     )
                 elif (instr & 0x10F030) == 0x10F010:  # xxxxxxxxxxx1xxxx1111xxxxxx01xxxx
                     # uqadd16_t1
@@ -11017,8 +11356,8 @@ def decode_32bit(instr: int, ctx: Context):
                         (m == 13) or (m == 15)
                     ):
                         sideffect_flags |= SIDEFFECT_UNPREDICTABLE
-                    return _apply_sideeffect(
-                        sideffect_flags, UQADD16(encoding=Encoding.T1, d=d, n=n, m=m)
+                    return UQADD16(
+                        encoding=Encoding.T1, sideeffects=sideffect_flags, d=d, n=n, m=m
                     )
                 elif (instr & 0x10F030) == 0xF010:  # xxxxxxxxxxx0xxxx1111xxxxxx01xxxx
                     # uqadd8_t1
@@ -11035,8 +11374,8 @@ def decode_32bit(instr: int, ctx: Context):
                         (m == 13) or (m == 15)
                     ):
                         sideffect_flags |= SIDEFFECT_UNPREDICTABLE
-                    return _apply_sideeffect(
-                        sideffect_flags, UQADD8(encoding=Encoding.T1, d=d, n=n, m=m)
+                    return UQADD8(
+                        encoding=Encoding.T1, sideeffects=sideffect_flags, d=d, n=n, m=m
                     )
                 return NoMatch()  # no match
             elif (instr & 0x1E000C0) == 0x800000:  # xxxxxxx0100xxxxxxxxxxxxx00xxxxxx
@@ -11055,8 +11394,8 @@ def decode_32bit(instr: int, ctx: Context):
                         (m == 13) or (m == 15)
                     ):
                         sideffect_flags |= SIDEFFECT_UNPREDICTABLE
-                    return _apply_sideeffect(
-                        sideffect_flags, QADD16(encoding=Encoding.T1, d=d, n=n, m=m)
+                    return QADD16(
+                        encoding=Encoding.T1, sideeffects=sideffect_flags, d=d, n=n, m=m
                     )
                 elif (instr & 0x10F030) == 0xF010:  # xxxxxxxxxxx0xxxx1111xxxxxx01xxxx
                     # qadd8_t1
@@ -11073,8 +11412,8 @@ def decode_32bit(instr: int, ctx: Context):
                         (m == 13) or (m == 15)
                     ):
                         sideffect_flags |= SIDEFFECT_UNPREDICTABLE
-                    return _apply_sideeffect(
-                        sideffect_flags, QADD8(encoding=Encoding.T1, d=d, n=n, m=m)
+                    return QADD8(
+                        encoding=Encoding.T1, sideeffects=sideffect_flags, d=d, n=n, m=m
                     )
                 elif (instr & 0x10F030) == 0x10F000:  # xxxxxxxxxxx1xxxx1111xxxxxx00xxxx
                     # sadd16_t1
@@ -11091,8 +11430,8 @@ def decode_32bit(instr: int, ctx: Context):
                         (m == 13) or (m == 15)
                     ):
                         sideffect_flags |= SIDEFFECT_UNPREDICTABLE
-                    return _apply_sideeffect(
-                        sideffect_flags, SADD16(encoding=Encoding.T1, d=d, n=n, m=m)
+                    return SADD16(
+                        encoding=Encoding.T1, sideeffects=sideffect_flags, d=d, n=n, m=m
                     )
                 elif (instr & 0x10F030) == 0xF000:  # xxxxxxxxxxx0xxxx1111xxxxxx00xxxx
                     # sadd8_t1
@@ -11109,8 +11448,8 @@ def decode_32bit(instr: int, ctx: Context):
                         (m == 13) or (m == 15)
                     ):
                         sideffect_flags |= SIDEFFECT_UNPREDICTABLE
-                    return _apply_sideeffect(
-                        sideffect_flags, SADD8(encoding=Encoding.T1, d=d, n=n, m=m)
+                    return SADD8(
+                        encoding=Encoding.T1, sideeffects=sideffect_flags, d=d, n=n, m=m
                     )
                 elif (instr & 0x10F030) == 0x10F020:  # xxxxxxxxxxx1xxxx1111xxxxxx10xxxx
                     # shadd16_t1
@@ -11127,8 +11466,8 @@ def decode_32bit(instr: int, ctx: Context):
                         (m == 13) or (m == 15)
                     ):
                         sideffect_flags |= SIDEFFECT_UNPREDICTABLE
-                    return _apply_sideeffect(
-                        sideffect_flags, SHADD16(encoding=Encoding.T1, d=d, n=n, m=m)
+                    return SHADD16(
+                        encoding=Encoding.T1, sideeffects=sideffect_flags, d=d, n=n, m=m
                     )
                 elif (instr & 0x10F030) == 0xF020:  # xxxxxxxxxxx0xxxx1111xxxxxx10xxxx
                     # shadd8_t1
@@ -11145,8 +11484,8 @@ def decode_32bit(instr: int, ctx: Context):
                         (m == 13) or (m == 15)
                     ):
                         sideffect_flags |= SIDEFFECT_UNPREDICTABLE
-                    return _apply_sideeffect(
-                        sideffect_flags, SHADD8(encoding=Encoding.T1, d=d, n=n, m=m)
+                    return SHADD8(
+                        encoding=Encoding.T1, sideeffects=sideffect_flags, d=d, n=n, m=m
                     )
                 return NoMatch()  # no match
             elif (instr & 0x1E000C0) == 0xA00000:  # xxxxxxx0101xxxxxxxxxxxxx00xxxxxx
@@ -11165,8 +11504,8 @@ def decode_32bit(instr: int, ctx: Context):
                         (m == 13) or (m == 15)
                     ):
                         sideffect_flags |= SIDEFFECT_UNPREDICTABLE
-                    return _apply_sideeffect(
-                        sideffect_flags, QASX(encoding=Encoding.T1, d=d, n=n, m=m)
+                    return QASX(
+                        encoding=Encoding.T1, sideeffects=sideffect_flags, d=d, n=n, m=m
                     )
                 elif (instr & 0x10F030) == 0xF000:  # xxxxxxxxxxx0xxxx1111xxxxxx00xxxx
                     # sasx_t1
@@ -11183,8 +11522,8 @@ def decode_32bit(instr: int, ctx: Context):
                         (m == 13) or (m == 15)
                     ):
                         sideffect_flags |= SIDEFFECT_UNPREDICTABLE
-                    return _apply_sideeffect(
-                        sideffect_flags, SASX(encoding=Encoding.T1, d=d, n=n, m=m)
+                    return SASX(
+                        encoding=Encoding.T1, sideeffects=sideffect_flags, d=d, n=n, m=m
                     )
                 elif (instr & 0x10F030) == 0xF020:  # xxxxxxxxxxx0xxxx1111xxxxxx10xxxx
                     # shasx_t1
@@ -11201,8 +11540,8 @@ def decode_32bit(instr: int, ctx: Context):
                         (m == 13) or (m == 15)
                     ):
                         sideffect_flags |= SIDEFFECT_UNPREDICTABLE
-                    return _apply_sideeffect(
-                        sideffect_flags, SHASX(encoding=Encoding.T1, d=d, n=n, m=m)
+                    return SHASX(
+                        encoding=Encoding.T1, sideeffects=sideffect_flags, d=d, n=n, m=m
                     )
                 return NoMatch()  # no match
             elif (instr & 0x1E000C0) == 0xE00000:  # xxxxxxx0111xxxxxxxxxxxxx00xxxxxx
@@ -11221,8 +11560,8 @@ def decode_32bit(instr: int, ctx: Context):
                         (m == 13) or (m == 15)
                     ):
                         sideffect_flags |= SIDEFFECT_UNPREDICTABLE
-                    return _apply_sideeffect(
-                        sideffect_flags, QSAX(encoding=Encoding.T1, d=d, n=n, m=m)
+                    return QSAX(
+                        encoding=Encoding.T1, sideeffects=sideffect_flags, d=d, n=n, m=m
                     )
                 elif (instr & 0x10F030) == 0xF000:  # xxxxxxxxxxx0xxxx1111xxxxxx00xxxx
                     # ssax_t1
@@ -11239,8 +11578,8 @@ def decode_32bit(instr: int, ctx: Context):
                         (m == 13) or (m == 15)
                     ):
                         sideffect_flags |= SIDEFFECT_UNPREDICTABLE
-                    return _apply_sideeffect(
-                        sideffect_flags, SSAX(encoding=Encoding.T1, d=d, n=n, m=m)
+                    return SSAX(
+                        encoding=Encoding.T1, sideeffects=sideffect_flags, d=d, n=n, m=m
                     )
                 elif (instr & 0x10F030) == 0xF020:  # xxxxxxxxxxx0xxxx1111xxxxxx10xxxx
                     # shsax_t1
@@ -11257,8 +11596,8 @@ def decode_32bit(instr: int, ctx: Context):
                         (m == 13) or (m == 15)
                     ):
                         sideffect_flags |= SIDEFFECT_UNPREDICTABLE
-                    return _apply_sideeffect(
-                        sideffect_flags, SHSAX(encoding=Encoding.T1, d=d, n=n, m=m)
+                    return SHSAX(
+                        encoding=Encoding.T1, sideeffects=sideffect_flags, d=d, n=n, m=m
                     )
                 return NoMatch()  # no match
             elif (instr & 0x1E000C0) == 0xC00000:  # xxxxxxx0110xxxxxxxxxxxxx00xxxxxx
@@ -11277,8 +11616,8 @@ def decode_32bit(instr: int, ctx: Context):
                         (m == 13) or (m == 15)
                     ):
                         sideffect_flags |= SIDEFFECT_UNPREDICTABLE
-                    return _apply_sideeffect(
-                        sideffect_flags, QSUB16(encoding=Encoding.T1, d=d, n=n, m=m)
+                    return QSUB16(
+                        encoding=Encoding.T1, sideeffects=sideffect_flags, d=d, n=n, m=m
                     )
                 elif (instr & 0x10F030) == 0xF010:  # xxxxxxxxxxx0xxxx1111xxxxxx01xxxx
                     # qsub8_t1
@@ -11295,8 +11634,8 @@ def decode_32bit(instr: int, ctx: Context):
                         (m == 13) or (m == 15)
                     ):
                         sideffect_flags |= SIDEFFECT_UNPREDICTABLE
-                    return _apply_sideeffect(
-                        sideffect_flags, QSUB8(encoding=Encoding.T1, d=d, n=n, m=m)
+                    return QSUB8(
+                        encoding=Encoding.T1, sideeffects=sideffect_flags, d=d, n=n, m=m
                     )
                 elif (instr & 0x10F030) == 0x10F000:  # xxxxxxxxxxx1xxxx1111xxxxxx00xxxx
                     # ssub16_t1
@@ -11313,8 +11652,8 @@ def decode_32bit(instr: int, ctx: Context):
                         (m == 13) or (m == 15)
                     ):
                         sideffect_flags |= SIDEFFECT_UNPREDICTABLE
-                    return _apply_sideeffect(
-                        sideffect_flags, SSUB16(encoding=Encoding.T1, d=d, n=n, m=m)
+                    return SSUB16(
+                        encoding=Encoding.T1, sideeffects=sideffect_flags, d=d, n=n, m=m
                     )
                 elif (instr & 0x10F030) == 0xF000:  # xxxxxxxxxxx0xxxx1111xxxxxx00xxxx
                     # ssub8_t1
@@ -11331,8 +11670,8 @@ def decode_32bit(instr: int, ctx: Context):
                         (m == 13) or (m == 15)
                     ):
                         sideffect_flags |= SIDEFFECT_UNPREDICTABLE
-                    return _apply_sideeffect(
-                        sideffect_flags, SSUB8(encoding=Encoding.T1, d=d, n=n, m=m)
+                    return SSUB8(
+                        encoding=Encoding.T1, sideeffects=sideffect_flags, d=d, n=n, m=m
                     )
                 elif (instr & 0x10F030) == 0x10F020:  # xxxxxxxxxxx1xxxx1111xxxxxx10xxxx
                     # shsub16_t1
@@ -11349,8 +11688,8 @@ def decode_32bit(instr: int, ctx: Context):
                         (m == 13) or (m == 15)
                     ):
                         sideffect_flags |= SIDEFFECT_UNPREDICTABLE
-                    return _apply_sideeffect(
-                        sideffect_flags, SHSUB16(encoding=Encoding.T1, d=d, n=n, m=m)
+                    return SHSUB16(
+                        encoding=Encoding.T1, sideeffects=sideffect_flags, d=d, n=n, m=m
                     )
                 elif (instr & 0x10F030) == 0xF020:  # xxxxxxxxxxx0xxxx1111xxxxxx10xxxx
                     # shsub8_t1
@@ -11367,8 +11706,8 @@ def decode_32bit(instr: int, ctx: Context):
                         (m == 13) or (m == 15)
                     ):
                         sideffect_flags |= SIDEFFECT_UNPREDICTABLE
-                    return _apply_sideeffect(
-                        sideffect_flags, SHSUB8(encoding=Encoding.T1, d=d, n=n, m=m)
+                    return SHSUB8(
+                        encoding=Encoding.T1, sideeffects=sideffect_flags, d=d, n=n, m=m
                     )
                 return NoMatch()  # no match
             elif (instr & 0x1E000C0) == 0x1200000:  # xxxxxxx1001xxxxxxxxxxxxx00xxxxxx
@@ -11390,11 +11729,13 @@ def decode_32bit(instr: int, ctx: Context):
                             (m == 13) or (m == 15)
                         ):
                             sideffect_flags |= SIDEFFECT_UNPREDICTABLE
-                        return _apply_sideeffect(
-                            sideffect_flags,
-                            SMUAD_SMUADX(
-                                encoding=Encoding.T1, d=d, n=n, m=m, m_swap=m_swap
-                            ),
+                        return SMUAD_SMUADX(
+                            encoding=Encoding.T1,
+                            sideeffects=sideffect_flags,
+                            d=d,
+                            n=n,
+                            m=m,
+                            m_swap=m_swap,
                         )
                     elif (instr & 0x0) == 0x0:  # xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
                         # smlad_smladx_t1
@@ -11418,11 +11759,14 @@ def decode_32bit(instr: int, ctx: Context):
                             or ((m == 13) or (m == 15))
                         ) or (a == 13):
                             sideffect_flags |= SIDEFFECT_UNPREDICTABLE
-                        return _apply_sideeffect(
-                            sideffect_flags,
-                            SMLAD_SMLADX(
-                                encoding=Encoding.T1, d=d, n=n, m=m, a=a, m_swap=m_swap
-                            ),
+                        return SMLAD_SMLADX(
+                            encoding=Encoding.T1,
+                            sideeffects=sideffect_flags,
+                            d=d,
+                            n=n,
+                            m=m,
+                            a=a,
+                            m_swap=m_swap,
                         )
                     return NoMatch()  # no match
                 elif (instr & 0x100020) == 0x100000:  # xxxxxxxxxxx1xxxxxxxxxxxxxx0xxxxx
@@ -11443,11 +11787,13 @@ def decode_32bit(instr: int, ctx: Context):
                             (m == 13) or (m == 15)
                         ):
                             sideffect_flags |= SIDEFFECT_UNPREDICTABLE
-                        return _apply_sideeffect(
-                            sideffect_flags,
-                            SMULWB_SMULWT(
-                                encoding=Encoding.T1, d=d, n=n, m=m, m_high=m_high
-                            ),
+                        return SMULWB_SMULWT(
+                            encoding=Encoding.T1,
+                            sideeffects=sideffect_flags,
+                            d=d,
+                            n=n,
+                            m=m,
+                            m_high=m_high,
                         )
                     elif (instr & 0x0) == 0x0:  # xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
                         # smlawb_smlawt_t1
@@ -11471,11 +11817,14 @@ def decode_32bit(instr: int, ctx: Context):
                             or ((m == 13) or (m == 15))
                         ) or (a == 13):
                             sideffect_flags |= SIDEFFECT_UNPREDICTABLE
-                        return _apply_sideeffect(
-                            sideffect_flags,
-                            SMLAWB_SMLAWT(
-                                encoding=Encoding.T1, d=d, n=n, m=m, a=a, m_high=m_high
-                            ),
+                        return SMLAWB_SMLAWT(
+                            encoding=Encoding.T1,
+                            sideeffects=sideffect_flags,
+                            d=d,
+                            n=n,
+                            m=m,
+                            a=a,
+                            m_high=m_high,
                         )
                     return NoMatch()  # no match
                 return NoMatch()  # no match
@@ -11502,16 +11851,14 @@ def decode_32bit(instr: int, ctx: Context):
                         sideffect_flags |= SIDEFFECT_UNPREDICTABLE
                     if dHi == dLo:
                         sideffect_flags |= SIDEFFECT_UNPREDICTABLE
-                    return _apply_sideeffect(
-                        sideffect_flags,
-                        SMLALD_SMLALDX(
-                            encoding=Encoding.T1,
-                            dLo=dLo,
-                            dHi=dHi,
-                            n=n,
-                            m=m,
-                            m_swap=m_swap,
-                        ),
+                    return SMLALD_SMLALDX(
+                        encoding=Encoding.T1,
+                        sideeffects=sideffect_flags,
+                        dLo=dLo,
+                        dHi=dHi,
+                        n=n,
+                        m=m,
+                        m_swap=m_swap,
                     )
                 elif (instr & 0x100020) == 0x100000:  # xxxxxxxxxxx1xxxxxxxxxxxxxx0xxxxx
                     # smlsld_smlsldx_t1
@@ -11535,16 +11882,14 @@ def decode_32bit(instr: int, ctx: Context):
                         sideffect_flags |= SIDEFFECT_UNPREDICTABLE
                     if dHi == dLo:
                         sideffect_flags |= SIDEFFECT_UNPREDICTABLE
-                    return _apply_sideeffect(
-                        sideffect_flags,
-                        SMLSLD_SMLSLDX(
-                            encoding=Encoding.T1,
-                            dLo=dLo,
-                            dHi=dHi,
-                            n=n,
-                            m=m,
-                            m_swap=m_swap,
-                        ),
+                    return SMLSLD_SMLSLDX(
+                        encoding=Encoding.T1,
+                        sideeffects=sideffect_flags,
+                        dLo=dLo,
+                        dHi=dHi,
+                        n=n,
+                        m=m,
+                        m_swap=m_swap,
                     )
                 return NoMatch()  # no match
             elif (instr & 0x1E000C0) == 0x1400000:  # xxxxxxx1010xxxxxxxxxxxxx00xxxxxx
@@ -11566,11 +11911,13 @@ def decode_32bit(instr: int, ctx: Context):
                             (m == 13) or (m == 15)
                         ):
                             sideffect_flags |= SIDEFFECT_UNPREDICTABLE
-                        return _apply_sideeffect(
-                            sideffect_flags,
-                            SMUSD_SMUSDX(
-                                encoding=Encoding.T1, d=d, n=n, m=m, m_swap=m_swap
-                            ),
+                        return SMUSD_SMUSDX(
+                            encoding=Encoding.T1,
+                            sideeffects=sideffect_flags,
+                            d=d,
+                            n=n,
+                            m=m,
+                            m_swap=m_swap,
                         )
                     elif (instr & 0x0) == 0x0:  # xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
                         # smlsd_smlsdx_t1
@@ -11594,11 +11941,14 @@ def decode_32bit(instr: int, ctx: Context):
                             or ((m == 13) or (m == 15))
                         ) or (a == 13):
                             sideffect_flags |= SIDEFFECT_UNPREDICTABLE
-                        return _apply_sideeffect(
-                            sideffect_flags,
-                            SMLSD_SMLSDX(
-                                encoding=Encoding.T1, d=d, n=n, m=m, a=a, m_swap=m_swap
-                            ),
+                        return SMLSD_SMLSDX(
+                            encoding=Encoding.T1,
+                            sideeffects=sideffect_flags,
+                            d=d,
+                            n=n,
+                            m=m,
+                            a=a,
+                            m_swap=m_swap,
                         )
                     return NoMatch()  # no match
                 elif (instr & 0x100020) == 0x100000:  # xxxxxxxxxxx1xxxxxxxxxxxxxx0xxxxx
@@ -11619,11 +11969,13 @@ def decode_32bit(instr: int, ctx: Context):
                             (m == 13) or (m == 15)
                         ):
                             sideffect_flags |= SIDEFFECT_UNPREDICTABLE
-                        return _apply_sideeffect(
-                            sideffect_flags,
-                            SMMUL_SMMULR(
-                                encoding=Encoding.T1, d=d, n=n, m=m, round=round
-                            ),
+                        return SMMUL_SMMULR(
+                            encoding=Encoding.T1,
+                            sideeffects=sideffect_flags,
+                            d=d,
+                            n=n,
+                            m=m,
+                            round=round,
                         )
                     elif (instr & 0x0) == 0x0:  # xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
                         # smmla_smmlar_t1
@@ -11647,11 +11999,14 @@ def decode_32bit(instr: int, ctx: Context):
                             or ((m == 13) or (m == 15))
                         ) or (a == 13):
                             sideffect_flags |= SIDEFFECT_UNPREDICTABLE
-                        return _apply_sideeffect(
-                            sideffect_flags,
-                            SMMLA_SMMLAR(
-                                encoding=Encoding.T1, d=d, n=n, m=m, a=a, round=round
-                            ),
+                        return SMMLA_SMMLAR(
+                            encoding=Encoding.T1,
+                            sideeffects=sideffect_flags,
+                            d=d,
+                            n=n,
+                            m=m,
+                            a=a,
+                            round=round,
                         )
                     return NoMatch()  # no match
                 return NoMatch()  # no match
@@ -11676,11 +12031,14 @@ def decode_32bit(instr: int, ctx: Context):
                         or ((m == 13) or (m == 15))
                     ) or ((a == 13) or (a == 15)):
                         sideffect_flags |= SIDEFFECT_UNPREDICTABLE
-                    return _apply_sideeffect(
-                        sideffect_flags,
-                        SMMLS_SMMLSR(
-                            encoding=Encoding.T1, d=d, n=n, m=m, a=a, round=round
-                        ),
+                    return SMMLS_SMMLSR(
+                        encoding=Encoding.T1,
+                        sideeffects=sideffect_flags,
+                        d=d,
+                        n=n,
+                        m=m,
+                        a=a,
+                        round=round,
                     )
                 elif (instr & 0x100020) == 0x100000:  # xxxxxxxxxxx1xxxxxxxxxxxxxx0xxxxx
                     if (instr & 0x10) == 0x0:  # xxxxxxxxxxxxxxxxxxxxxxxxxxx0xxxx
@@ -11701,9 +12059,12 @@ def decode_32bit(instr: int, ctx: Context):
                                 ((d == 13) or (d == 15)) or ((n == 13) or (n == 15))
                             ) or ((m == 13) or (m == 15)):
                                 sideffect_flags |= SIDEFFECT_UNPREDICTABLE
-                            return _apply_sideeffect(
-                                sideffect_flags,
-                                USAD8(encoding=Encoding.T1, d=d, n=n, m=m),
+                            return USAD8(
+                                encoding=Encoding.T1,
+                                sideeffects=sideffect_flags,
+                                d=d,
+                                n=n,
+                                m=m,
                             )
                         elif (instr & 0x0) == 0x0:  # xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
                             # usada8_t1
@@ -11725,9 +12086,13 @@ def decode_32bit(instr: int, ctx: Context):
                                 or ((m == 13) or (m == 15))
                             ) or (a == 13):
                                 sideffect_flags |= SIDEFFECT_UNPREDICTABLE
-                            return _apply_sideeffect(
-                                sideffect_flags,
-                                USADA8(encoding=Encoding.T1, d=d, n=n, m=m, a=a),
+                            return USADA8(
+                                encoding=Encoding.T1,
+                                sideeffects=sideffect_flags,
+                                d=d,
+                                n=n,
+                                m=m,
+                                a=a,
                             )
                         return NoMatch()  # no match
                     return NoMatch()  # no match
@@ -11748,8 +12113,8 @@ def decode_32bit(instr: int, ctx: Context):
                         (m == 13) or (m == 15)
                     ):
                         sideffect_flags |= SIDEFFECT_UNPREDICTABLE
-                    return _apply_sideeffect(
-                        sideffect_flags, UHASX(encoding=Encoding.T1, d=d, n=n, m=m)
+                    return UHASX(
+                        encoding=Encoding.T1, sideeffects=sideffect_flags, d=d, n=n, m=m
                     )
                 elif (instr & 0x10F030) == 0xF000:  # xxxxxxxxxxx0xxxx1111xxxxxx00xxxx
                     # uasx_t1
@@ -11766,8 +12131,8 @@ def decode_32bit(instr: int, ctx: Context):
                         (m == 13) or (m == 15)
                     ):
                         sideffect_flags |= SIDEFFECT_UNPREDICTABLE
-                    return _apply_sideeffect(
-                        sideffect_flags, UASX(encoding=Encoding.T1, d=d, n=n, m=m)
+                    return UASX(
+                        encoding=Encoding.T1, sideeffects=sideffect_flags, d=d, n=n, m=m
                     )
                 elif (instr & 0x10F030) == 0xF010:  # xxxxxxxxxxx0xxxx1111xxxxxx01xxxx
                     # uqasx_t1
@@ -11784,8 +12149,8 @@ def decode_32bit(instr: int, ctx: Context):
                         (m == 13) or (m == 15)
                     ):
                         sideffect_flags |= SIDEFFECT_UNPREDICTABLE
-                    return _apply_sideeffect(
-                        sideffect_flags, UQASX(encoding=Encoding.T1, d=d, n=n, m=m)
+                    return UQASX(
+                        encoding=Encoding.T1, sideeffects=sideffect_flags, d=d, n=n, m=m
                     )
                 return NoMatch()  # no match
             elif (instr & 0x1E000C0) == 0xE00040:  # xxxxxxx0111xxxxxxxxxxxxx01xxxxxx
@@ -11804,8 +12169,8 @@ def decode_32bit(instr: int, ctx: Context):
                         (m == 13) or (m == 15)
                     ):
                         sideffect_flags |= SIDEFFECT_UNPREDICTABLE
-                    return _apply_sideeffect(
-                        sideffect_flags, UHSAX(encoding=Encoding.T1, d=d, n=n, m=m)
+                    return UHSAX(
+                        encoding=Encoding.T1, sideeffects=sideffect_flags, d=d, n=n, m=m
                     )
                 elif (instr & 0x10F030) == 0xF010:  # xxxxxxxxxxx0xxxx1111xxxxxx01xxxx
                     # uqsax_t1
@@ -11822,8 +12187,8 @@ def decode_32bit(instr: int, ctx: Context):
                         (m == 13) or (m == 15)
                     ):
                         sideffect_flags |= SIDEFFECT_UNPREDICTABLE
-                    return _apply_sideeffect(
-                        sideffect_flags, UQSAX(encoding=Encoding.T1, d=d, n=n, m=m)
+                    return UQSAX(
+                        encoding=Encoding.T1, sideeffects=sideffect_flags, d=d, n=n, m=m
                     )
                 elif (instr & 0x10F030) == 0xF000:  # xxxxxxxxxxx0xxxx1111xxxxxx00xxxx
                     # usax_t1
@@ -11840,8 +12205,8 @@ def decode_32bit(instr: int, ctx: Context):
                         (m == 13) or (m == 15)
                     ):
                         sideffect_flags |= SIDEFFECT_UNPREDICTABLE
-                    return _apply_sideeffect(
-                        sideffect_flags, USAX(encoding=Encoding.T1, d=d, n=n, m=m)
+                    return USAX(
+                        encoding=Encoding.T1, sideeffects=sideffect_flags, d=d, n=n, m=m
                     )
                 return NoMatch()  # no match
             elif (instr & 0x1E000C0) == 0xC00040:  # xxxxxxx0110xxxxxxxxxxxxx01xxxxxx
@@ -11860,8 +12225,8 @@ def decode_32bit(instr: int, ctx: Context):
                         (m == 13) or (m == 15)
                     ):
                         sideffect_flags |= SIDEFFECT_UNPREDICTABLE
-                    return _apply_sideeffect(
-                        sideffect_flags, UHSUB16(encoding=Encoding.T1, d=d, n=n, m=m)
+                    return UHSUB16(
+                        encoding=Encoding.T1, sideeffects=sideffect_flags, d=d, n=n, m=m
                     )
                 elif (instr & 0x10F030) == 0xF020:  # xxxxxxxxxxx0xxxx1111xxxxxx10xxxx
                     # uhsub8_t1
@@ -11878,8 +12243,8 @@ def decode_32bit(instr: int, ctx: Context):
                         (m == 13) or (m == 15)
                     ):
                         sideffect_flags |= SIDEFFECT_UNPREDICTABLE
-                    return _apply_sideeffect(
-                        sideffect_flags, UHSUB8(encoding=Encoding.T1, d=d, n=n, m=m)
+                    return UHSUB8(
+                        encoding=Encoding.T1, sideeffects=sideffect_flags, d=d, n=n, m=m
                     )
                 elif (instr & 0x10F030) == 0x10F010:  # xxxxxxxxxxx1xxxx1111xxxxxx01xxxx
                     # uqsub16_t1
@@ -11896,8 +12261,8 @@ def decode_32bit(instr: int, ctx: Context):
                         (m == 13) or (m == 15)
                     ):
                         sideffect_flags |= SIDEFFECT_UNPREDICTABLE
-                    return _apply_sideeffect(
-                        sideffect_flags, UQSUB16(encoding=Encoding.T1, d=d, n=n, m=m)
+                    return UQSUB16(
+                        encoding=Encoding.T1, sideeffects=sideffect_flags, d=d, n=n, m=m
                     )
                 elif (instr & 0x10F030) == 0xF010:  # xxxxxxxxxxx0xxxx1111xxxxxx01xxxx
                     # uqsub8_t1
@@ -11914,8 +12279,8 @@ def decode_32bit(instr: int, ctx: Context):
                         (m == 13) or (m == 15)
                     ):
                         sideffect_flags |= SIDEFFECT_UNPREDICTABLE
-                    return _apply_sideeffect(
-                        sideffect_flags, UQSUB8(encoding=Encoding.T1, d=d, n=n, m=m)
+                    return UQSUB8(
+                        encoding=Encoding.T1, sideeffects=sideffect_flags, d=d, n=n, m=m
                     )
                 elif (instr & 0x10F030) == 0x10F000:  # xxxxxxxxxxx1xxxx1111xxxxxx00xxxx
                     # usub16_t1
@@ -11932,8 +12297,8 @@ def decode_32bit(instr: int, ctx: Context):
                         (m == 13) or (m == 15)
                     ):
                         sideffect_flags |= SIDEFFECT_UNPREDICTABLE
-                    return _apply_sideeffect(
-                        sideffect_flags, USUB16(encoding=Encoding.T1, d=d, n=n, m=m)
+                    return USUB16(
+                        encoding=Encoding.T1, sideeffects=sideffect_flags, d=d, n=n, m=m
                     )
                 elif (instr & 0x10F030) == 0xF000:  # xxxxxxxxxxx0xxxx1111xxxxxx00xxxx
                     # usub8_t1
@@ -11950,8 +12315,8 @@ def decode_32bit(instr: int, ctx: Context):
                         (m == 13) or (m == 15)
                     ):
                         sideffect_flags |= SIDEFFECT_UNPREDICTABLE
-                    return _apply_sideeffect(
-                        sideffect_flags, USUB8(encoding=Encoding.T1, d=d, n=n, m=m)
+                    return USUB8(
+                        encoding=Encoding.T1, sideeffects=sideffect_flags, d=d, n=n, m=m
                     )
                 return NoMatch()  # no match
             return NoMatch()  # no match
@@ -11993,17 +12358,15 @@ def decode_32bit(instr: int, ctx: Context):
                         if dp_operation
                         else UInt(concat_bits(Vm, M, 1))
                     )
-                    return _apply_sideeffect(
-                        sideffect_flags,
-                        VRINTA_VRINTN_VRINTP_VRINTM(
-                            encoding=Encoding.T1,
-                            dp_operation=dp_operation,
-                            rmode=rmode,
-                            away=away,
-                            d=d,
-                            m=m,
-                            RM=RM,
-                        ),
+                    return VRINTA_VRINTN_VRINTP_VRINTM(
+                        encoding=Encoding.T1,
+                        sideeffects=sideffect_flags,
+                        dp_operation=dp_operation,
+                        rmode=rmode,
+                        away=away,
+                        d=d,
+                        m=m,
+                        RM=RM,
                     )
                 elif (instr & 0xBC0E40) == 0xBC0A40:  # xxxxxxxx1x1111xxxxxx101xx1xxxxxx
                     # vcvta_vcvtn_vcvtp_vcvtm_t1
@@ -12028,16 +12391,14 @@ def decode_32bit(instr: int, ctx: Context):
                         if dp_operation
                         else UInt(concat_bits(Vm, M, 1))
                     )
-                    return _apply_sideeffect(
-                        sideffect_flags,
-                        VCVTA_VCVTN_VCVTP_VCVTM(
-                            encoding=Encoding.T1,
-                            dp_operation=dp_operation,
-                            unsigned=unsigned,
-                            round_mode=round_mode,
-                            d=d,
-                            m=m,
-                        ),
+                    return VCVTA_VCVTN_VCVTP_VCVTM(
+                        encoding=Encoding.T1,
+                        sideeffects=sideffect_flags,
+                        dp_operation=dp_operation,
+                        unsigned=unsigned,
+                        round_mode=round_mode,
+                        d=d,
+                        m=m,
                     )
                 elif (instr & 0xB00E00) == 0x800A00:  # xxxxxxxx1x00xxxxxxxx101xxxxxxxxx
                     # vmaxnm_vminnm_t1
@@ -12071,16 +12432,14 @@ def decode_32bit(instr: int, ctx: Context):
                         if dp_operation
                         else UInt(concat_bits(Vm, M, 1))
                     )
-                    return _apply_sideeffect(
-                        sideffect_flags,
-                        VMAXNM_VMINNM(
-                            encoding=Encoding.T1,
-                            dp_operation=dp_operation,
-                            maximum=maximum,
-                            d=d,
-                            n=n,
-                            m=m,
-                        ),
+                    return VMAXNM_VMINNM(
+                        encoding=Encoding.T1,
+                        sideeffects=sideffect_flags,
+                        dp_operation=dp_operation,
+                        maximum=maximum,
+                        d=d,
+                        n=n,
+                        m=m,
                     )
                 elif (instr & 0x800E40) == 0xA00:  # xxxxxxxx0xxxxxxxxxxx101xx0xxxxxx
                     # vsel_t1
@@ -12116,16 +12475,14 @@ def decode_32bit(instr: int, ctx: Context):
                         if dp_operation
                         else UInt(concat_bits(Vm, M, 1))
                     )
-                    return _apply_sideeffect(
-                        sideffect_flags,
-                        VSEL(
-                            encoding=Encoding.T1,
-                            dp_operation=dp_operation,
-                            cond=cond,
-                            d=d,
-                            n=n,
-                            m=m,
-                        ),
+                    return VSEL(
+                        encoding=Encoding.T1,
+                        sideeffects=sideffect_flags,
+                        dp_operation=dp_operation,
+                        cond=cond,
+                        d=d,
+                        n=n,
+                        m=m,
                     )
                 elif (instr & 0x0) == 0x0:  # xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
                     # cdp_cdp2_t2
@@ -12141,6 +12498,7 @@ def decode_32bit(instr: int, ctx: Context):
                     cp = UInt(coproc)
                     return CDP_CDP2(
                         encoding=Encoding.T2,
+                        sideeffects=SIDEFFECT_NONE,
                         cp=cp,
                         opc1=opc1,
                         CRn=CRn,
@@ -12165,17 +12523,15 @@ def decode_32bit(instr: int, ctx: Context):
                     cp = UInt(coproc)
                     if (t == 15) or (t == 13):
                         sideffect_flags |= SIDEFFECT_UNPREDICTABLE
-                    return _apply_sideeffect(
-                        sideffect_flags,
-                        MCR_MCR2(
-                            encoding=Encoding.T2,
-                            t=t,
-                            cp=cp,
-                            opc1=opc1,
-                            CRn=CRn,
-                            opc2=opc2,
-                            CRm=CRm,
-                        ),
+                    return MCR_MCR2(
+                        encoding=Encoding.T2,
+                        sideeffects=sideffect_flags,
+                        t=t,
+                        cp=cp,
+                        opc1=opc1,
+                        CRn=CRn,
+                        opc2=opc2,
+                        CRm=CRm,
                     )
                 elif (instr & 0x100000) == 0x100000:  # xxxxxxxxxxx1xxxxxxxxxxxxxxxxxxxx
                     # mrc_mrc2_t2
@@ -12192,17 +12548,15 @@ def decode_32bit(instr: int, ctx: Context):
                     cp = UInt(coproc)
                     if t == 13:
                         sideffect_flags |= SIDEFFECT_UNPREDICTABLE
-                    return _apply_sideeffect(
-                        sideffect_flags,
-                        MRC_MRC2(
-                            encoding=Encoding.T2,
-                            t=t,
-                            cp=cp,
-                            opc1=opc1,
-                            CRn=CRn,
-                            opc2=opc2,
-                            CRm=CRm,
-                        ),
+                    return MRC_MRC2(
+                        encoding=Encoding.T2,
+                        sideeffects=sideffect_flags,
+                        t=t,
+                        cp=cp,
+                        opc1=opc1,
+                        CRn=CRn,
+                        opc2=opc2,
+                        CRm=CRm,
                     )
                 return NoMatch()  # no match
             return NoMatch()  # no match
@@ -12225,11 +12579,14 @@ def decode_32bit(instr: int, ctx: Context):
                         sideffect_flags |= SIDEFFECT_UNPREDICTABLE
                     if (t == 13) or (t2 == 13):
                         sideffect_flags |= SIDEFFECT_UNPREDICTABLE
-                    return _apply_sideeffect(
-                        sideffect_flags,
-                        MCRR_MCRR2(
-                            encoding=Encoding.T2, t=t, t2=t2, cp=cp, opc1=opc1, CRm=CRm
-                        ),
+                    return MCRR_MCRR2(
+                        encoding=Encoding.T2,
+                        sideeffects=sideffect_flags,
+                        t=t,
+                        t2=t2,
+                        cp=cp,
+                        opc1=opc1,
+                        CRm=CRm,
                     )
                 elif (instr & 0x0) == 0x0:  # xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
                     # stc_stc2_t2
@@ -12256,19 +12613,17 @@ def decode_32bit(instr: int, ctx: Context):
                     wback = W == 1
                     if n == 15:
                         sideffect_flags |= SIDEFFECT_UNPREDICTABLE
-                    return _apply_sideeffect(
-                        sideffect_flags,
-                        STC_STC2(
-                            encoding=Encoding.T2,
-                            n=n,
-                            cp=cp,
-                            imm32=imm32,
-                            index=index,
-                            add=add,
-                            wback=wback,
-                            D=D,
-                            CRd=CRd,
-                        ),
+                    return STC_STC2(
+                        encoding=Encoding.T2,
+                        sideeffects=sideffect_flags,
+                        n=n,
+                        cp=cp,
+                        imm32=imm32,
+                        index=index,
+                        add=add,
+                        wback=wback,
+                        D=D,
+                        CRd=CRd,
                     )
                 return NoMatch()  # no match
             elif (instr & 0x100000) == 0x100000:  # xxxxxxxxxxx1xxxxxxxxxxxxxxxxxxxx
@@ -12294,18 +12649,16 @@ def decode_32bit(instr: int, ctx: Context):
                     imm32 = ZeroExtend(concat_bits(imm8, 0x0, 2), 32)
                     if (W == 1) or (P == 0):
                         sideffect_flags |= SIDEFFECT_UNPREDICTABLE
-                    return _apply_sideeffect(
-                        sideffect_flags,
-                        LDC_LDC2_literal(
-                            encoding=Encoding.T2,
-                            index=index,
-                            add=add,
-                            cp=cp,
-                            imm32=imm32,
-                            D=D,
-                            W=W,
-                            CRd=CRd,
-                        ),
+                    return LDC_LDC2_literal(
+                        encoding=Encoding.T2,
+                        sideeffects=sideffect_flags,
+                        index=index,
+                        add=add,
+                        cp=cp,
+                        imm32=imm32,
+                        D=D,
+                        W=W,
+                        CRd=CRd,
                     )
                 elif (
                     instr & 0x1E00000
@@ -12326,11 +12679,14 @@ def decode_32bit(instr: int, ctx: Context):
                         sideffect_flags |= SIDEFFECT_UNPREDICTABLE
                     if (t == 13) or (t2 == 13):
                         sideffect_flags |= SIDEFFECT_UNPREDICTABLE
-                    return _apply_sideeffect(
-                        sideffect_flags,
-                        MRRC_MRRC2(
-                            encoding=Encoding.T2, t=t, t2=t2, cp=cp, opc1=opc1, CRm=CRm
-                        ),
+                    return MRRC_MRRC2(
+                        encoding=Encoding.T2,
+                        sideeffects=sideffect_flags,
+                        t=t,
+                        t2=t2,
+                        cp=cp,
+                        opc1=opc1,
+                        CRm=CRm,
                     )
                 elif (instr & 0x0) == 0x0:  # xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
                     # ldc_ldc2_immediate_t2
@@ -12357,19 +12713,17 @@ def decode_32bit(instr: int, ctx: Context):
                     index = P == 1
                     add = U == 1
                     wback = W == 1
-                    return _apply_sideeffect(
-                        sideffect_flags,
-                        LDC_LDC2_immediate(
-                            encoding=Encoding.T2,
-                            n=n,
-                            cp=cp,
-                            imm32=imm32,
-                            index=index,
-                            add=add,
-                            wback=wback,
-                            D=D,
-                            CRd=CRd,
-                        ),
+                    return LDC_LDC2_immediate(
+                        encoding=Encoding.T2,
+                        sideeffects=sideffect_flags,
+                        n=n,
+                        cp=cp,
+                        imm32=imm32,
+                        index=index,
+                        add=add,
+                        wback=wback,
+                        D=D,
+                        CRd=CRd,
                     )
                 return NoMatch()  # no match
     return NoMatch()  # no match
@@ -12388,8 +12742,9 @@ def decode(instr: int, ctx: Context, size: InstructionSize):
         size: Which instruction size to decode ``instr`` as.
 
     Returns:
-        The decoded instruction, or a NoMatch / See / Undefined / Unpredictable
-        pseudo-instruction. Sizes this instruction set does not use answer NoMatch.
+        The decoded instruction, or ``NoMatch`` if no encoding matches. Sizes this
+        instruction set does not use answer ``NoMatch`` too. A decoded instruction
+        carries the side effects its decode flagged on its ``sideeffects`` member.
     """
     if size == InstructionSize.SIZE_8BIT:
         return decode_8bit(instr, ctx)

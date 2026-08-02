@@ -5,20 +5,21 @@ state, the :func:`disassemble` function for assembler formatting, the ITSTATE
 helpers that carry an IT block's condition across a stream
 (:func:`next_itstate`, :func:`current_cond`, :func:`in_it_block`), the
 instruction-size helpers that settle how wide a word is before it is decoded
-(:func:`instr_size`, :func:`instr_bytes`), the pseudo-instruction classes
-(:class:`NoMatch`, :class:`Undefined`, :class:`Unpredictable`, :class:`See`),
-and all instruction dataclasses.
+(:func:`instr_size`, :func:`instr_bytes`), :class:`NoMatch` for a word no
+encoding matches, the ``SIDEFFECT_*`` flags an instruction reports on its
+``sideeffects`` member, and all instruction dataclasses.
 """
 
 from armv7m_decoder._decoder import (  # noqa: F401
+    SIDEFFECT_NONE,
+    SIDEFFECT_SEE,
+    SIDEFFECT_UNDEFINED,
+    SIDEFFECT_UNPREDICTABLE,
     Context,
     Encoding,
     InstructionSize,
     NoMatch,
     Opcode,
-    See,
-    Undefined,
-    Unpredictable,
     decode,
     decode_16bit,
     decode_32bit,
@@ -35,14 +36,15 @@ from armv7m_decoder._size import instr_bytes, instr_size  # noqa: F401
 
 __all__ = [
     "COND_AL",
+    "SIDEFFECT_NONE",
+    "SIDEFFECT_SEE",
+    "SIDEFFECT_UNDEFINED",
+    "SIDEFFECT_UNPREDICTABLE",
     "Context",
     "Encoding",
     "InstructionSize",
     "NoMatch",
     "Opcode",
-    "See",
-    "Undefined",
-    "Unpredictable",
     "current_cond",
     "decode",
     "decode_16bit",

@@ -19,7 +19,7 @@ See the Armv7-M ARM (ARM DDI 0403E.e) B1.4.2 for ITSTATE, and A7.7.38 for IT.
 
 from __future__ import annotations
 
-from armv7m_decoder._decoder import IT
+from armv7m_decoder._decoder import IT, SIDEFFECT_NONE
 
 # Condition code "always" -- what CurrentCond() reports outside an IT block.
 COND_AL = 0xE
@@ -48,8 +48,16 @@ def next_itstate(istate: int, result: object) -> int:
 
     ``IT`` loads ITSTATE with its own ``firstcond:mask``; every other
     instruction consumes one slot of the block via ``ITAdvance()``.
+
+    An ``IT`` whose decode flagged a side effect loads nothing. A mask of
+    ``0000`` is not an IT at all but the hint space (``SEE NOP``), and a
+    ``firstcond`` of ``1111`` -- or ``1110`` with more than one condition --
+    is UNPREDICTABLE, so its block has no defined extent. The disassembler
+    spells these ``<see>`` and ``<unpredictable>`` rather than as an IT;
+    opening a block on fields it declines to print would let one bad word
+    condition the several that follow it.
     """
-    if isinstance(result, IT):
+    if isinstance(result, IT) and result.sideeffects == SIDEFFECT_NONE:
         return ((result.firstcond & 0xF) << 4) | (result.mask & 0xF)
     if istate & 0b111 == 0:
         return 0

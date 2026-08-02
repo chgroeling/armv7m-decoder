@@ -8,7 +8,14 @@ from __future__ import annotations
 
 from typing import Any
 
-from armv7m_decoder._decoder import Encoding, InstructionSize, Opcode
+from armv7m_decoder._decoder import (
+    SIDEFFECT_SEE,
+    SIDEFFECT_UNDEFINED,
+    SIDEFFECT_UNPREDICTABLE,
+    Encoding,
+    InstructionSize,
+    Opcode,
+)
 from armv7m_decoder._itstate import COND_AL, current_cond, in_it_block
 
 # Separates the mnemonic from its operands. Formatters emit it directly, so a
@@ -1909,12 +1916,19 @@ def disassemble(
         # A word no encoding matches has no mnemonic to spell, so the whole
         # field is a comment carrying the word itself, as objdump writes it.
         return f"\t\t@ <UNDEFINED> instruction: 0x{instr:0{size // 4}x}"
-    if opc == Opcode.OP_UNDEFINED:
-        return "<undefined>"
-    if opc == Opcode.OP_UNPREDICTABLE:
-        return "<unpredictable>"
-    if opc == Opcode.OP_SEE:
+    # A flagged side effect no longer replaces the instruction -- it is decoded
+    # in full and reports the condition -- so which one to spell, and in what
+    # order, is ours to pick. Keep the decoder's old precedence: SEE redirects
+    # to another encoding, so this decode does not describe the word at all;
+    # UNDEFINED says the word has no meaning; UNPREDICTABLE only that its
+    # meaning is not guaranteed, which is the weakest claim of the three.
+    flags = result.sideeffects
+    if flags & SIDEFFECT_SEE:
         return "<see>"
+    if flags & SIDEFFECT_UNDEFINED:
+        return "<undefined>"
+    if flags & SIDEFFECT_UNPREDICTABLE:
+        return "<unpredictable>"
 
     fmt_func = _DISPATCH.get(opc)
 

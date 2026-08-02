@@ -50,3 +50,24 @@ class TestITState:
         # instruction as unconditional rather than inventing a condition.
         assert not in_it_block(0xD0)
         assert current_cond(0xD0) == COND_AL
+
+    def test_flagged_it_opens_no_block(self, ctx) -> None:
+        """An IT the disassembler will not spell must not condition what follows.
+
+        Before decoder-forge v5 a flagged side effect replaced the instruction,
+        so a bad IT never reached here. It arrives intact now, and acting on
+        the fields of a word spelled `<unpredictable>` would let one bad
+        halfword condition the several after it.
+        """
+        # firstcond 0b1111 is UNPREDICTABLE, and the mask is non-zero, so this
+        # would otherwise open a four-slot block.
+        bad_it = decode_word(ctx, 0xBFF8)
+        assert bad_it.mask != 0
+        assert next_itstate(0, bad_it) == 0
+
+        # mask 0000 is the hint space rather than an IT at all: SEE NOP.
+        see_it = decode_word(ctx, 0xBF50)
+        assert next_itstate(0, see_it) == 0
+
+        # A clean IT still loads ITSTATE.
+        assert next_itstate(0, decode_word(ctx, 0xBF08)) == 0x08

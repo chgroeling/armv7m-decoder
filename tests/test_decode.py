@@ -8,14 +8,17 @@ and holds exactly that many bits: a 16-bit encoding is a bare halfword, a
 import pytest
 
 from armv7m_decoder import (
+    SIDEFFECT_NONE,
+    SIDEFFECT_SEE,
+    SIDEFFECT_UNDEFINED,
+    SIDEFFECT_UNPREDICTABLE,
     Encoding,
     InstructionSize,
     NoMatch,
-    Undefined,
-    Unpredictable,
     decode,
     get_supported_sizes,
 )
+from armv7m_decoder._decoder import IT
 
 from .helpers import decode_word
 
@@ -136,29 +139,48 @@ class TestEncodingMember:
     def test_encoding_is_reported(self, ctx, instr: int, expected: Encoding) -> None:
         assert decode_word(ctx, instr).encoding == expected
 
-    def test_pseudo_instructions_carry_no_encoding(self) -> None:
+    def test_nomatch_carries_no_encoding(self) -> None:
         # No encoding matched, so there is no form to name.
         assert not hasattr(NoMatch(), "encoding")
-        assert not hasattr(Undefined(), "encoding")
-        assert not hasattr(Unpredictable(), "encoding")
 
 
-class TestPseudoInstructions:
-    """Verify pseudo-instruction classes exist and decode may produce them."""
+class TestSideEffects:
+    """A flagged side effect annotates the instruction, it does not replace it.
 
-    def test_pseudo_instruction_classes_exist(self) -> None:
-        assert issubclass(NoMatch, object)
-        assert issubclass(Undefined, object)
-        assert issubclass(Unpredictable, object)
-        from armv7m_decoder._decoder import See
+    The decoder returns the instruction with every field decoded and the
+    condition on `sideeffects`, so a caller can see both what the word decodes
+    to and what the architecture says about it.
+    """
 
-        assert issubclass(See, object)
-
-    def test_decode_can_return_undefined(self, ctx) -> None:
-        """Some operand combinations flag the UNDEFINED side effect."""
-        # 0xF81D:xxx :xxx :xxx with specific fields triggers UNDEFINED.
+    def test_undefined_is_reported_on_the_instruction(self, ctx) -> None:
         result = decode_word(ctx, 0xF81DBAA1)
-        assert isinstance(result, Undefined), f"Got {type(result).__name__}"
+        assert result.sideeffects & SIDEFFECT_UNDEFINED
+        # ...and the instruction itself is still there to inspect.
+        assert result.opcode >= 0
+        assert hasattr(result, "encoding")
+
+    def test_unpredictable_is_reported_on_the_instruction(self, ctx) -> None:
+        # IT with firstcond 0b1111 is UNPREDICTABLE, but is still an IT.
+        result = decode_word(ctx, 0xBFF8)
+        assert result.sideeffects & SIDEFFECT_UNPREDICTABLE
+        assert isinstance(result, IT)
+        assert result.firstcond == 0xF
+
+    def test_see_is_reported_on_the_instruction(self, ctx) -> None:
+        # An IT whose mask is 0000 is the hint space, not an IT: SEE NOP.
+        result = decode_word(ctx, 0xBF50)
+        assert result.sideeffects & SIDEFFECT_SEE
+        assert result.mask == 0
+
+    def test_clean_decode_flags_nothing(self, ctx) -> None:
+        assert decode_word(ctx, 0xBF08).sideeffects == SIDEFFECT_NONE
+
+    def test_nomatch_is_still_not_an_instruction(self, ctx) -> None:
+        # NoMatch is the one result that is not an instruction, so it has
+        # neither an encoding nor side effects to report.
+        result = decode_word(ctx, 0xF2E53EFF)
+        assert isinstance(result, NoMatch)
+        assert not hasattr(result, "sideeffects")
 
 
 class TestIDToName:
