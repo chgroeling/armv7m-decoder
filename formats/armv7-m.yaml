@@ -5,7 +5,7 @@ metadata:
   source_id: ARM DDI 0403E.e
   note: 'Decode-only extract: walk bit_fields MSB→LSB — skip N bits for `skip` entries, extract field
     values for `field` entries. The pattern string shows the full bit layout (''0''/''1'' for fixed, ''x''
-    for variable/don''t-care).'
+    for variable). Should-be-0/1 bits are included as fixed ''0''/''1'', so matching is strict.'
 instructions:
 - id: ADC_immediate
   mnemonic: ADC
@@ -50,7 +50,7 @@ instructions:
       (shift_t, shift_n) = (SRType_LSL, 0);
   - name: T2
     length_bits: 32
-    pattern: 11101011010xxxxxxxxxxxxxxxxxxxxx
+    pattern: 11101011010xxxxx0xxxxxxxxxxxxxxx
     bit_fields:
     - skip: 11
     - field: S
@@ -185,7 +185,7 @@ instructions:
       if d == 15 && m == 15 then UNPREDICTABLE;
   - name: T3
     length_bits: 32
-    pattern: 11101011000xxxxxxxxxxxxxxxxxxxxx
+    pattern: 11101011000xxxxx0xxxxxxxxxxxxxxx
     bit_fields:
     - skip: 11
     - field: S
@@ -475,7 +475,7 @@ instructions:
       (shift_t, shift_n) = (SRType_LSL, 0);
   - name: T2
     length_bits: 32
-    pattern: 11101011101xxxxxxxxxxxxxxxxxxxxx
+    pattern: 11101011101xxxxx0xxxxxxxxxxxxxxx
     bit_fields:
     - skip: 11
     - field: S
@@ -557,7 +557,7 @@ instructions:
   encodings:
   - name: T1
     length_bits: 32
-    pattern: 11101011101x1101xxxxxxxxxxxxxxxx
+    pattern: 11101011101x11010xxxxxxxxxxxxxxx
     bit_fields:
     - skip: 11
     - field: S
@@ -669,7 +669,7 @@ instructions:
       if InITBlock() then UNPREDICTABLE;
   - name: T3
     length_bits: 32
-    pattern: 11101010010x1111x000xxxx0000xxxx
+    pattern: 11101010010x11110000xxxx0000xxxx
     bit_fields:
     - skip: 11
     - field: S
@@ -698,7 +698,7 @@ instructions:
       // No additional decoding required
   - name: T2
     length_bits: 32
-    pattern: 111100111010xxxx10x0x00000000000
+    pattern: '11110011101011111000000000000000'
     bit_fields:
     - skip: 12
     - skip: 1
@@ -870,7 +870,7 @@ instructions:
       (-, shift_n) = DecodeImmShift('00', imm5);
   - name: T2
     length_bits: 32
-    pattern: 11101010010x1111xxxxxxxxxx00xxxx
+    pattern: 11101010010x11110xxxxxxxxx00xxxx
     bit_fields:
     - skip: 11
     - field: S
@@ -942,7 +942,7 @@ instructions:
       (-, shift_n) = DecodeImmShift('01', imm5);
   - name: T2
     length_bits: 32
-    pattern: 11101010010x1111xxxxxxxxxx01xxxx
+    pattern: 11101010010x11110xxxxxxxxx01xxxx
     bit_fields:
     - skip: 11
     - field: S
@@ -1038,7 +1038,7 @@ instructions:
       (shift_t, shift_n) = (SRType_LSL, 0);
   - name: T2
     length_bits: 32
-    pattern: 11101010000xxxxxxxxxxxxxxxxxxxxx
+    pattern: 11101010000xxxxx0xxxxxxxxxxxxxxx
     bit_fields:
     - skip: 11
     - field: S
@@ -1105,7 +1105,7 @@ instructions:
       (shift_t, shift_n) = (SRType_LSL, 0);
   - name: T2
     length_bits: 32
-    pattern: 11101010010xxxxxxxxxxxxxxxxxxxxx
+    pattern: 11101010010xxxxx0xxxxxxxxxxxxxxx
     bit_fields:
     - skip: 11
     - field: S
@@ -1493,7 +1493,7 @@ instructions:
       if registers<15> == '1' && InITBlock() && !LastInITBlock() then UNPREDICTABLE;
   - name: T2
     length_bits: 32
-    pattern: 1110100010111101xxxxxxxxxxxxxxxx
+    pattern: 1110100010111101xx0xxxxxxxxxxxxx
     bit_fields:
     - skip: 16
     - field: P
@@ -1535,7 +1535,7 @@ instructions:
       if BitCount(registers) < 1 then UNPREDICTABLE;
   - name: T2
     length_bits: 32
-    pattern: 1110100100101101xxxxxxxxxxxxxxxx
+    pattern: 11101001001011010x0xxxxxxxxxxxxx
     bit_fields:
     - skip: 16
     - skip: 1
@@ -1735,7 +1735,7 @@ instructions:
       (-, shift_n) = DecodeImmShift('10', imm5);
   - name: T2
     length_bits: 32
-    pattern: 11101010010x1111xxxxxxxxxx10xxxx
+    pattern: 11101010010x11110xxxxxxxxx10xxxx
     bit_fields:
     - skip: 11
     - field: S
@@ -1831,7 +1831,7 @@ instructions:
       (shift_t, shift_n) = (SRType_LSL, 0);
   - name: T2
     length_bits: 32
-    pattern: 11101010100xxxxxxxxxxxxxxxxxxxxx
+    pattern: 11101010100xxxxx0xxxxxxxxxxxxxxx
     bit_fields:
     - skip: 11
     - field: S
@@ -1896,7 +1896,7 @@ instructions:
       (shift_t, shift_n) = (SRType_LSL, 0);
   - name: T2
     length_bits: 32
-    pattern: 11101010011x1111xxxxxxxxxxxxxxxx
+    pattern: 11101010011x11110xxxxxxxxxxxxxxx
     bit_fields:
     - skip: 11
     - field: S
@@ -1958,7 +1958,7 @@ instructions:
       (shift_t, shift_n) = (SRType_LSL, 0);
   - name: T2
     length_bits: 32
-    pattern: 111010100001xxxxxxxx1111xxxxxxxx
+    pattern: 111010100001xxxx0xxx1111xxxxxxxx
     bit_fields:
     - skip: 11
     - skip: 1
@@ -2203,7 +2203,7 @@ instructions:
       if BitCount(registers) < 1 then UNPREDICTABLE;
   - name: T2
     length_bits: 32
-    pattern: 1110100010x1xxxxxxxxxxxxxxxxxxxx
+    pattern: 1110100010x1xxxxxx0xxxxxxxxxxxxx
     bit_fields:
     - skip: 10
     - field: W
@@ -2241,7 +2241,7 @@ instructions:
       if BitCount(registers) < 1 then UNPREDICTABLE;
   - name: T2
     length_bits: 32
-    pattern: 1110100010x0xxxxxxxxxxxxxxxxxxxx
+    pattern: 1110100010x0xxxx0x0xxxxxxxxxxxxx
     bit_fields:
     - skip: 10
     - field: W
@@ -2264,7 +2264,7 @@ instructions:
   encodings:
   - name: T1
     length_bits: 16
-    pattern: 010001111xxxxxxx
+    pattern: 010001111xxxx000
     bit_fields:
     - skip: 9
     - field: Rm
@@ -2281,7 +2281,7 @@ instructions:
   encodings:
   - name: T1
     length_bits: 16
-    pattern: 010001110xxxxxxx
+    pattern: 010001110xxxx000
     bit_fields:
     - skip: 9
     - field: Rm
@@ -2327,7 +2327,7 @@ instructions:
   encodings:
   - name: T1
     length_bits: 32
-    pattern: 11110x110110xxxx0xxxxxxxxxxxxxxx
+    pattern: 111100110110xxxx0xxxxxxxxx0xxxxx
     bit_fields:
     - skip: 5
     - skip: 1
@@ -2429,7 +2429,7 @@ instructions:
       (shift_t, shift_n) = (SRType_LSL, 0);
   - name: T2
     length_bits: 32
-    pattern: 111010110001xxxxxxxx1111xxxxxxxx
+    pattern: 111010110001xxxx0xxx1111xxxxxxxx
     bit_fields:
     - skip: 11
     - skip: 1
@@ -2515,7 +2515,7 @@ instructions:
       if n == 15 || m == 15 then UNPREDICTABLE;
   - name: T3
     length_bits: 32
-    pattern: 111010111011xxxxxxxx1111xxxxxxxx
+    pattern: 111010111011xxxx0xxx1111xxxxxxxx
     bit_fields:
     - skip: 11
     - skip: 1
@@ -2540,7 +2540,7 @@ instructions:
   encodings:
   - name: T1
     length_bits: 32
-    pattern: 111100111011xxxx10x0xxxx0101xxxx
+    pattern: 1111001110111111100011110101xxxx
     bit_fields:
     - skip: 12
     - skip: 1
@@ -2602,7 +2602,7 @@ instructions:
       (shift_t, shift_n) = (SRType_LSL, 0);
   - name: T2
     length_bits: 32
-    pattern: 11101010001xxxxxxxxxxxxxxxxxxxxx
+    pattern: 11101010001xxxxx0xxxxxxxxxxxxxxx
     bit_fields:
     - skip: 11
     - field: S
@@ -2652,7 +2652,7 @@ instructions:
   encodings:
   - name: T1
     length_bits: 32
-    pattern: 111010101001xxxxxxxx1111xxxxxxxx
+    pattern: 111010101001xxxx0xxx1111xxxxxxxx
     bit_fields:
     - skip: 12
     - field: Rn
@@ -2714,7 +2714,7 @@ instructions:
   encodings:
   - name: T1
     length_bits: 32
-    pattern: 11101011110xxxxxxxxxxxxxxxxxxxxx
+    pattern: 11101011110xxxxx0xxxxxxxxxxxxxxx
     bit_fields:
     - skip: 11
     - field: S
@@ -2779,7 +2779,7 @@ instructions:
       (shift_t, shift_n) = (SRType_LSL, 0);
   - name: T2
     length_bits: 32
-    pattern: 11101011011xxxxxxxxxxxxxxxxxxxxx
+    pattern: 11101011011xxxxx0xxxxxxxxxxxxxxx
     bit_fields:
     - skip: 11
     - field: S
@@ -2940,7 +2940,7 @@ instructions:
   encodings:
   - name: T1
     length_bits: 32
-    pattern: 111110111001xxxxxxxxxxxx1111xxxx
+    pattern: 111110111001xxxx1111xxxx1111xxxx
     bit_fields:
     - skip: 12
     - field: Rn
@@ -2962,7 +2962,7 @@ instructions:
   encodings:
   - name: T1
     length_bits: 32
-    pattern: 111110111011xxxxxxxxxxxx1111xxxx
+    pattern: 111110111011xxxx1111xxxx1111xxxx
     bit_fields:
     - skip: 12
     - field: Rn
@@ -2984,7 +2984,7 @@ instructions:
   encodings:
   - name: T1
     length_bits: 32
-    pattern: 111110100100xxxx1111xxxx1xxxxxxx
+    pattern: 111110100100xxxx1111xxxx10xxxxxx
     bit_fields:
     - skip: 12
     - field: Rn
@@ -3007,7 +3007,7 @@ instructions:
   encodings:
   - name: T1
     length_bits: 32
-    pattern: 111110100010xxxx1111xxxx1xxxxxxx
+    pattern: 111110100010xxxx1111xxxx10xxxxxx
     bit_fields:
     - skip: 12
     - field: Rn
@@ -3030,7 +3030,7 @@ instructions:
   encodings:
   - name: T1
     length_bits: 32
-    pattern: 111110100000xxxx1111xxxx1xxxxxxx
+    pattern: 111110100000xxxx1111xxxx10xxxxxx
     bit_fields:
     - skip: 12
     - field: Rn
@@ -3064,7 +3064,7 @@ instructions:
       d = UInt(Rd); m = UInt(Rm); rotation = 0;
   - name: T2
     length_bits: 32
-    pattern: 11111010010011111111xxxx1xxxxxxx
+    pattern: 11111010010011111111xxxx10xxxxxx
     bit_fields:
     - skip: 16
     - skip: 4
@@ -3084,7 +3084,7 @@ instructions:
   encodings:
   - name: T1
     length_bits: 32
-    pattern: 11111010001011111111xxxx1xxxxxxx
+    pattern: 11111010001011111111xxxx10xxxxxx
     bit_fields:
     - skip: 16
     - skip: 4
@@ -3115,7 +3115,7 @@ instructions:
       d = UInt(Rd); m = UInt(Rm); rotation = 0;
   - name: T2
     length_bits: 32
-    pattern: 11111010000011111111xxxx1xxxxxxx
+    pattern: 11111010000011111111xxxx10xxxxxx
     bit_fields:
     - skip: 16
     - skip: 4
@@ -3146,7 +3146,7 @@ instructions:
       d = UInt(Rd); m = UInt(Rm); rotation = 0;
   - name: T2
     length_bits: 32
-    pattern: 11111010010111111111xxxx1xxxxxxx
+    pattern: 11111010010111111111xxxx10xxxxxx
     bit_fields:
     - skip: 16
     - skip: 4
@@ -3177,7 +3177,7 @@ instructions:
       d = UInt(Rd); m = UInt(Rm); rotation = 0;
   - name: T2
     length_bits: 32
-    pattern: 11111010000111111111xxxx1xxxxxxx
+    pattern: 11111010000111111111xxxx10xxxxxx
     bit_fields:
     - skip: 16
     - skip: 4
@@ -3197,7 +3197,7 @@ instructions:
   encodings:
   - name: T1
     length_bits: 32
-    pattern: 11110x111100xxxx0xxxxxxxxxxxxxxx
+    pattern: 111100111100xxxx0xxxxxxxxx0xxxxx
     bit_fields:
     - skip: 5
     - skip: 1
@@ -3223,7 +3223,7 @@ instructions:
   encodings:
   - name: T1
     length_bits: 32
-    pattern: 11101010010x1111x000xxxx0011xxxx
+    pattern: 11101010010x11110000xxxx0011xxxx
     bit_fields:
     - skip: 11
     - field: S
@@ -3434,7 +3434,7 @@ instructions:
   encodings:
   - name: T1
     length_bits: 32
-    pattern: 111010000101xxxxxxxxxxxxxxxxxxxx
+    pattern: 111010000101xxxxxxxx1111xxxxxxxx
     bit_fields:
     - skip: 12
     - field: Rn
@@ -3455,7 +3455,7 @@ instructions:
   encodings:
   - name: T1
     length_bits: 32
-    pattern: 1110100100x0xxxxxxxxxxxxxxxxxxxx
+    pattern: 1110100100x0xxxx0x0xxxxxxxxxxxxx
     bit_fields:
     - skip: 10
     - field: W
@@ -3479,7 +3479,7 @@ instructions:
   encodings:
   - name: T1
     length_bits: 32
-    pattern: 11110011111xxxxx10x0xxxxxxxxxxxx
+    pattern: 11110011111011111000xxxxxxxxxxxx
     bit_fields:
     - skip: 11
     - skip: 1
@@ -3502,7 +3502,7 @@ instructions:
   encodings:
   - name: T1
     length_bits: 32
-    pattern: 11110011100xxxxx10x0xxxxxxxxxxxx
+    pattern: 111100111000xxxx1000xx00xxxxxxxx
     bit_fields:
     - skip: 11
     - skip: 1
@@ -3526,7 +3526,7 @@ instructions:
   encodings:
   - name: T1
     length_bits: 32
-    pattern: 111010001101xxxxxxxxxxxx000xxxxx
+    pattern: 111010001101xxxx11110000000xxxxx
     bit_fields:
     - skip: 12
     - field: Rn
@@ -3553,7 +3553,7 @@ instructions:
   encodings:
   - name: T1
     length_bits: 32
-    pattern: 11110x11011011110xxxxxxxxxxxxxxx
+    pattern: 11110011011011110xxxxxxxxx0xxxxx
     bit_fields:
     - skip: 5
     - skip: 1
@@ -3620,7 +3620,7 @@ instructions:
   encodings:
   - name: T1
     length_bits: 32
-    pattern: 111100111011xxxx10x0xxxx0110xxxx
+    pattern: 1111001110111111100011110110xxxx
     bit_fields:
     - skip: 12
     - skip: 1
@@ -3644,7 +3644,7 @@ instructions:
   encodings:
   - name: T1
     length_bits: 32
-    pattern: 1110100100x1xxxxxxxxxxxxxxxxxxxx
+    pattern: 1110100100x1xxxxxx0xxxxxxxxxxxxx
     bit_fields:
     - skip: 10
     - field: W
@@ -3907,7 +3907,7 @@ instructions:
   encodings:
   - name: T1
     length_bits: 32
-    pattern: 111100111011xxxx10x0xxxx0010xxxx
+    pattern: '11110011101111111000111100101111'
     bit_fields:
     - skip: 12
     - skip: 1
@@ -3933,7 +3933,7 @@ instructions:
   encodings:
   - name: T1
     length_bits: 16
-    pattern: 10110110011xxxxx
+    pattern: 10110110011x00xx
     bit_fields:
     - skip: 11
     - field: im
@@ -3954,7 +3954,7 @@ instructions:
   encodings:
   - name: T1
     length_bits: 32
-    pattern: 111100111010xxxx10x0x00000010100
+    pattern: '11110011101011111000000000010100'
     bit_fields:
     - skip: 12
     - skip: 1
@@ -3974,7 +3974,7 @@ instructions:
   encodings:
   - name: T1
     length_bits: 32
-    pattern: 111100111010xxxx10x0x0001111xxxx
+    pattern: 1111001110101111100000001111xxxx
     bit_fields:
     - skip: 12
     - skip: 1
@@ -3996,7 +3996,7 @@ instructions:
   encodings:
   - name: T1
     length_bits: 32
-    pattern: 111100111011xxxx10x0xxxx0100xxxx
+    pattern: 1111001110111111100011110100xxxx
     bit_fields:
     - skip: 12
     - skip: 1
@@ -4225,7 +4225,7 @@ instructions:
   encodings:
   - name: T1
     length_bits: 32
-    pattern: 11101010011xxxxxxxxxxxxxxxxxxxxx
+    pattern: 11101010011xxxxx0xxxxxxxxxxxxxxx
     bit_fields:
     - skip: 11
     - field: S
@@ -4473,7 +4473,7 @@ instructions:
   encodings:
   - name: T1
     length_bits: 32
-    pattern: 11101010010x1111xxxxxxxxxx11xxxx
+    pattern: 11101010010x11110xxxxxxxxx11xxxx
     bit_fields:
     - skip: 11
     - field: S
@@ -4538,7 +4538,7 @@ instructions:
       // No additional decoding required
   - name: T2
     length_bits: 32
-    pattern: 111100111010xxxx10x0x00000000010
+    pattern: '11110011101011111000000000000010'
     bit_fields:
     - skip: 12
     - skip: 1
@@ -4565,7 +4565,7 @@ instructions:
       // No additional decoding required
   - name: T2
     length_bits: 32
-    pattern: 111100111010xxxx10x0x00000000011
+    pattern: '11110011101011111000000000000011'
     bit_fields:
     - skip: 12
     - skip: 1
@@ -4585,7 +4585,7 @@ instructions:
   encodings:
   - name: T1
     length_bits: 32
-    pattern: 111110100101xxxx1111xxxx1xxxxxxx
+    pattern: 111110100101xxxx1111xxxx10xxxxxx
     bit_fields:
     - skip: 12
     - field: Rn
@@ -4608,7 +4608,7 @@ instructions:
   encodings:
   - name: T1
     length_bits: 32
-    pattern: 111110100011xxxx1111xxxx1xxxxxxx
+    pattern: 111110100011xxxx1111xxxx10xxxxxx
     bit_fields:
     - skip: 12
     - field: Rn
@@ -4669,7 +4669,7 @@ instructions:
   encodings:
   - name: T1
     length_bits: 32
-    pattern: 11101010110xxxxxxxxxxxxxxxxxxxxx
+    pattern: 11101010110xxxxx0xxxxxxxxxxxxxxx
     bit_fields:
     - skip: 11
     - field: S
@@ -4699,7 +4699,7 @@ instructions:
   encodings:
   - name: T1
     length_bits: 32
-    pattern: 111100111011xxxx10x0xxxx01000100
+    pattern: '11110011101111111000111101000100'
     bit_fields:
     - skip: 12
     - skip: 1
@@ -5311,7 +5311,7 @@ instructions:
   encodings:
   - name: T1
     length_bits: 32
-    pattern: 11110x1100x0xxxx0xxxxxxxxxxxxxxx
+    pattern: 1111001100x0xxxx0xxxxxxxxx0xxxxx
     bit_fields:
     - skip: 5
     - skip: 1
@@ -5345,7 +5345,7 @@ instructions:
   encodings:
   - name: T1
     length_bits: 32
-    pattern: 11110x110010xxxx0000xxxx00xxxxxx
+    pattern: 111100110010xxxx0000xxxx0000xxxx
     bit_fields:
     - skip: 5
     - skip: 1
@@ -5387,7 +5387,7 @@ instructions:
   encodings:
   - name: T1
     length_bits: 32
-    pattern: 111100111011xxxx10x0xxxx01000000
+    pattern: '11110011101111111000111101000000'
     bit_fields:
     - skip: 12
     - skip: 1
@@ -5665,7 +5665,7 @@ instructions:
   encodings:
   - name: T1
     length_bits: 32
-    pattern: 11110x1110x0xxxx0xxxxxxxxxxxxxxx
+    pattern: 1111001110x0xxxx0xxxxxxxxx0xxxxx
     bit_fields:
     - skip: 5
     - skip: 1
@@ -5699,7 +5699,7 @@ instructions:
   encodings:
   - name: T1
     length_bits: 32
-    pattern: 11110x111010xxxx0000xxxx00xxxxxx
+    pattern: 111100111010xxxx0000xxxx0000xxxx
     bit_fields:
     - skip: 5
     - skip: 1
@@ -5729,7 +5729,7 @@ instructions:
       // No additional decoding required
   - name: T2
     length_bits: 32
-    pattern: 111100111010xxxx10x0x00000000001
+    pattern: '11110011101011111000000000000001'
     bit_fields:
     - skip: 12
     - skip: 1
@@ -5769,7 +5769,7 @@ instructions:
   encodings:
   - name: T1
     length_bits: 32
-    pattern: 111010001101xxxxxxxxxxxx0100xxxx
+    pattern: 111010001101xxxxxxxx111101001111
     bit_fields:
     - skip: 12
     - field: Rn
@@ -5793,7 +5793,7 @@ instructions:
   encodings:
   - name: T1
     length_bits: 32
-    pattern: 111010001101xxxxxxxxxxxx0101xxxx
+    pattern: 111010001101xxxxxxxx111101011111
     bit_fields:
     - skip: 12
     - field: Rn
@@ -5937,7 +5937,7 @@ instructions:
   encodings:
   - name: T1
     length_bits: 32
-    pattern: 11110x110100xxxx0xxxxxxxxxxxxxxx
+    pattern: 111100110100xxxx0xxxxxxxxx0xxxxx
     bit_fields:
     - skip: 5
     - skip: 1
@@ -5989,7 +5989,7 @@ instructions:
       // No additional decoding required
   - name: T2
     length_bits: 32
-    pattern: 111100111010xxxx10x0x00000000100
+    pattern: '11110011101011111000000000000100'
     bit_fields:
     - skip: 12
     - skip: 1
@@ -6143,7 +6143,7 @@ instructions:
   encodings:
   - name: T1
     length_bits: 32
-    pattern: 111010001100xxxxxxxxxxxx0100xxxx
+    pattern: 111010001100xxxxxxxx11110100xxxx
     bit_fields:
     - skip: 12
     - field: Rn
@@ -6166,7 +6166,7 @@ instructions:
   encodings:
   - name: T1
     length_bits: 32
-    pattern: 111010001100xxxxxxxxxxxx0101xxxx
+    pattern: 111010001100xxxxxxxx11110101xxxx
     bit_fields:
     - skip: 12
     - field: Rn
@@ -6402,7 +6402,7 @@ instructions:
   encodings:
   - name: T1
     length_bits: 32
-    pattern: 111110100001xxxx1111xxxx1xxxxxxx
+    pattern: 111110100001xxxx1111xxxx10xxxxxx
     bit_fields:
     - skip: 12
     - field: Rn
@@ -6425,7 +6425,7 @@ instructions:
   encodings:
   - name: T1
     length_bits: 32
-    pattern: 11111010001111111111xxxx1xxxxxxx
+    pattern: 11111010001111111111xxxx10xxxxxx
     bit_fields:
     - skip: 16
     - skip: 4
@@ -6527,7 +6527,7 @@ instructions:
       m = if dp_operation then UInt(M:Vm) else UInt(Vm:M);
   - name: T2
     length_bits: 32
-    pattern: 111011101x110101xxxx101xx1x0xxxx
+    pattern: 111011101x110101xxxx101xx1000000
     bit_fields:
     - skip: 9
     - field: D
@@ -6997,7 +6997,7 @@ instructions:
   encodings:
   - name: T1
     length_bits: 32
-    pattern: 111011101x11xxxxxxxx101xx0x0xxxx
+    pattern: 111011101x11xxxxxxxx101x0000xxxx
     bit_fields:
     - skip: 9
     - field: D
@@ -7053,7 +7053,7 @@ instructions:
   encodings:
   - name: T1
     length_bits: 32
-    pattern: 1110111000x0xxxxxxxx1011x001xxxx
+    pattern: 1110111000x0xxxxxxxx1011x0010000
     bit_fields:
     - skip: 10
     - field: H
@@ -7079,7 +7079,7 @@ instructions:
   encodings:
   - name: T1
     length_bits: 32
-    pattern: 1110111000x1xxxxxxxx1011x001xxxx
+    pattern: 1110111000x1xxxxxxxx1011x0010000
     bit_fields:
     - skip: 10
     - field: H
@@ -7105,7 +7105,7 @@ instructions:
   encodings:
   - name: T1
     length_bits: 32
-    pattern: 11101110000xxxxxxxxx1010xxx1xxxx
+    pattern: 11101110000xxxxxxxxx1010x0010000
     bit_fields:
     - skip: 11
     - field: op
@@ -7184,7 +7184,7 @@ instructions:
   encodings:
   - name: T1
     length_bits: 32
-    pattern: 111011101111xxxxxxxx1010xxx1xxxx
+    pattern: 1110111011110001xxxx101000010000
     bit_fields:
     - skip: 12
     - skip: 1
@@ -7210,7 +7210,7 @@ instructions:
   encodings:
   - name: T1
     length_bits: 32
-    pattern: 111011101110xxxxxxxx1010xxx1xxxx
+    pattern: 1110111011100001xxxx101000010000
     bit_fields:
     - skip: 12
     - skip: 1
