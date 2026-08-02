@@ -12,7 +12,9 @@ authors = [
 requires-python = ">=3.12"
 license = "GPL-3.0-only"
 readme = "README.md"
-dependencies = []
+dependencies = [
+    "click>=8",
+]
 
 [project.scripts]
 armv7m-decoder = "armv7m_decoder.cli:main"
