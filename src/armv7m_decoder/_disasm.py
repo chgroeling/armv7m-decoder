@@ -27,6 +27,14 @@ _SEP: str = "\t"
 # ---------------------------------------------------------------------------
 
 _SHIFT_NAMES = {1: "lsl", 2: "lsr", 3: "asr", 4: "ror", 5: "rrx"}
+
+# The side effects a decode can flag, in the order they are named -- strongest
+# claim about the word first, so a word carrying several reads as one sentence.
+_SIDEFFECT_NAMES: tuple[tuple[int, str], ...] = (
+    (SIDEFFECT_SEE, "see"),
+    (SIDEFFECT_UNDEFINED, "undefined"),
+    (SIDEFFECT_UNPREDICTABLE, "unpredictable"),
+)
 _COND_CODES = [
     "eq",
     "ne",
@@ -43,6 +51,10 @@ _COND_CODES = [
     "gt",
     "le",
     "al",
+    # 0b1111 is not a condition an assembler can write; a word carrying it is
+    # flagged, and spelled behind its marker. objdump names it "nv" ("never",
+    # what the encoding meant before it was withdrawn), so we do too.
+    "nv",
 ]
 _MNEMONICS_WITH_BOTH_WIDTHS: frozenset[str] = frozenset(
     {
@@ -1606,7 +1618,7 @@ def _fmt_ldc_ldc2_lit(result: Any, offset: int = 0, **_) -> str:
 # Dispatch table — maps an opcode to the formatter that spells it
 # ---------------------------------------------------------------------------
 #
-# Every entry is called as `entry(result, instr=..., size=..., offset=...)`,
+# Every entry is called as `entry(result, size=..., offset=...)`,
 # so a formatter names the ones it uses and lets `**_` swallow the rest. The
 # lambdas are there to bind a mnemonic where one formatter serves several
 # opcodes; they pass the rest of the call straight through.
@@ -1900,7 +1912,6 @@ def _in_cond_block(asm: str, istate: int) -> str:
 
 def disassemble(
     result: object,
-    instr: int,
     size: InstructionSize,
     offset: int = 0,
     istate: int = 0,
@@ -1909,14 +1920,9 @@ def disassemble(
 
     Args:
         result: Decoded instruction dataclass instance (or pseudo-instruction).
-        instr: The instruction word, exactly `size` bits wide -- the same word
-               that was handed to :func:`decode`. Only a word that matched no
-               encoding needs it, to spell the bytes it stands for; everything
-               else is spelled from `result`, whose `encoding` member names the
-               form that matched.
-        size: Width of that word, as determined by the caller before decoding.
-              It decides the `.w`/`.n` qualifiers and the operand forms that
-              only one width spells.
+        size: Width of the word `result` was decoded from, as determined by the
+              caller before decoding. It decides the `.w`/`.n` qualifiers and
+              the operand forms that only one width spells.
         offset: Address of the instruction in memory (for computing absolute
                 branch targets).
         istate: ITSTATE in force for this instruction, as tracked across the
@@ -1924,27 +1930,17 @@ def disassemble(
                 default) means no IT block is open, so no condition suffix.
 
     Returns:
-        UAL assembler syntax string, e.g. ``"adds r0, r1, #42"``.
+        UAL assembler syntax string, e.g. ``"adds r0, r1, #42"``. A word whose
+        decode flagged a side effect is spelled behind a marker saying so, as
+        in ``"<SIDEFFECT: see> it pl"``; a word no encoding matched is
+        ``"<no_match>"``, which the caller stands something of its own in for.
     """
     opc = result.opcode
     if opc == Opcode.OP_NO_MATCH:
-        # A word no encoding matches has no mnemonic to spell, so the whole
-        # field is a comment carrying the word itself, as objdump writes it.
-        return f"\t\t@ <UNDEFINED> instruction: 0x{instr:0{size // 4}x}"
-    # An instruction is decoded in full whatever its decode flags, and can
-    # carry more than one condition at once, so which to spell is a choice of
-    # precedence. SEE comes first: it redirects to another encoding, so this
-    # decode does not describe the word at all. Then UNDEFINED, which says the
-    # word has no meaning. Then UNPREDICTABLE, which says only that its meaning
-    # is not guaranteed -- the weakest claim of the three.
-    flags = result.sideeffects
-    if flags & SIDEFFECT_SEE:
-        return "<see>"
-    if flags & SIDEFFECT_UNDEFINED:
-        return "<undefined>"
-    if flags & SIDEFFECT_UNPREDICTABLE:
-        return "<unpredictable>"
-
+        # A word no encoding matches has no mnemonic to spell. What stands in
+        # for one is a question for whoever writes the line, which is the only
+        # place the word itself is still at hand.
+        return "<no_match>"
     fmt_func = _DISPATCH.get(opc)
 
     if fmt_func is None:
@@ -1959,4 +1955,16 @@ def disassemble(
     # are UNPREDICTABLE in a block, so the decoder rarely lets one through.)
     if getattr(result, "cond", COND_AL) == COND_AL:
         asm = _in_cond_block(asm, istate)
+
+    # An instruction is decoded in full whatever its decode flags, so a flagged
+    # word is still spelled; the marker goes in front of what it spells, as in
+    # ``<SIDEFFECT: see> bl 0x0``. A word can carry more than one flag at once,
+    # and every one it carries is named, strongest claim first: SEE redirects
+    # to another encoding, so this decode does not describe the word at all;
+    # UNDEFINED says the word has no meaning; UNPREDICTABLE says only that its
+    # meaning is not guaranteed -- the weakest of the three.
+    flags = result.sideeffects
+    named = [name for bit, name in _SIDEFFECT_NAMES if flags & bit]
+    if named:
+        return f"<SIDEFFECT: {', '.join(named)}> {asm}"
     return asm

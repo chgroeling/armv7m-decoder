@@ -68,22 +68,38 @@ class TestDisasmRegisterNames:
 
 
 class TestDisasmPseudoInstructions:
-    def test_nomatch_comments_the_word(self, ctx) -> None:
-        # No encoding matches, so there is no mnemonic to spell -- objdump
-        # writes the word itself as a comment, and so do we. A line is
-        # mnemonic, tab, operands, tab, comment; with the first two empty the
-        # comment is left holding both tabs, which is how objdump lands it in
-        # the same column as any other comment:
-        #
-        #     2:\tf20d 154f \taddw\tr5, sp, #335\t@ 0x14f
-        #     6:\tf2e5 3eff \t\t\t@ <UNDEFINED> instruction: 0xf2e53eff
-        assert disasm(ctx, 0xF2E53EFF) == "\t\t@ <UNDEFINED> instruction: 0xf2e53eff"
+    def test_nomatch_names_itself(self, ctx) -> None:
+        # No encoding matches, so there is no mnemonic to spell. The
+        # disassembler says only that, and leaves it to whoever writes the
+        # line -- the CLI -- to stand the word itself in for one.
+        assert disasm(ctx, 0xF2E53EFF) == "<no_match>"
 
-    def test_narrow_nomatch_is_a_halfword_wide(self, ctx) -> None:
-        assert disasm(ctx, 0xB717) == "\t\t@ <UNDEFINED> instruction: 0xb717"
+    def test_narrow_nomatch_names_itself(self, ctx) -> None:
+        assert disasm(ctx, 0xB717) == "<no_match>"
 
-    def test_undefined(self, ctx) -> None:
-        assert disasm(ctx, 0xF81DBAA1).startswith("<undefined")
+    def test_undefined_still_spells_the_instruction(self, ctx) -> None:
+        # A flagged word is decoded in full, so it is spelled in full too --
+        # the marker only says what the architecture makes of it.
+        assert (
+            disasm(ctx, 0xF81DBAA1) == "<SIDEFFECT: undefined> ldrb.w\tfp, [sp], #161"
+        )
+
+    def test_see_still_spells_the_instruction(self, ctx) -> None:
+        # Mask 0000 is the hint space rather than an IT at all: SEE NOP.
+        assert disasm(ctx, 0xBF50) == "<SIDEFFECT: see> it\tpl"
+
+    def test_unpredictable_still_spells_the_instruction(self, ctx) -> None:
+        # firstcond 0b1111 is UNPREDICTABLE, and has no name an assembler
+        # takes; objdump writes it "nv", the condition it once was.
+        assert disasm(ctx, 0xBFF8) == "<SIDEFFECT: unpredictable> it\tnv"
+
+    def test_every_side_effect_is_named(self, ctx) -> None:
+        # A decode can flag several at once, and each is named, strongest
+        # claim about the word first.
+        assert disasm(ctx, 0xBFE0) == "<SIDEFFECT: see, unpredictable> it\tal"
+        assert disasm(ctx, 0xEC7A9BA3).startswith(
+            "<SIDEFFECT: see, undefined, unpredictable> "
+        )
 
 
 class TestDisasmAdr:

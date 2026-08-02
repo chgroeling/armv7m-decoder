@@ -19,7 +19,7 @@ uv run ruff format                         # Format
 ### Layering
 
 - **`src/armv7m_decoder/_decoder.py`** — Generated decoder module (committed artifact). Contains embedded armtranspiller runtime, instruction dataclasses, the `InstructionSize` and `Encoding` enums, the per-size decoders (`decode_16bit`, `decode_32bit`), the `decode(instr, ctx, size)` entry point, the `SIDEFFECT_*` flags, and `NoMatch`.
-- **`src/armv7m_decoder/_disasm.py`** — Disassembler: `disassemble(result, instr, size, offset, istate)` turns a decoded dataclass into a UAL string.
+- **`src/armv7m_decoder/_disasm.py`** — Disassembler: `disassemble(result, size, offset, istate)` turns a decoded dataclass into a UAL string.
 - **`src/armv7m_decoder/_itstate.py`** — ITSTATE tracking (`next_itstate`, `current_cond`, `in_it_block`) for carrying an IT block's condition across a stream.
 - **`src/armv7m_decoder/_size.py`** — The Thumb rule that settles an instruction's size from its first halfword (`instr_size`, `instr_bytes`), applied before anything is decoded.
 - **`src/armv7m_decoder/__init__.py`** — Public API: re-exports `decode`, `Context`, `InstructionSize`, `Encoding`, `disassemble`, the ITSTATE helpers, the size helpers, `NoMatch`, the `SIDEFFECT_*` flags, `get_supported_sizes`, and all instruction dataclasses from `_decoder`.
@@ -34,7 +34,7 @@ The generated `_decoder.py` is fully self-contained: Jinja2 template `python_dec
 
 Settling the size is the caller's job, and Thumb settles it from the first halfword alone (`instr_size` in `_size.py`, Armv7-M ARM A5.1). That rule holds whether or not an encoding matches, which is what keeps a stream in step where nothing does: a word the decoder answers `NoMatch` for is still skipped whole.
 
-All encodings of an instruction share one dataclass, so the fields alone cannot say which form matched — `add.w r5, sp, #1` and `addw r5, sp, #335` differ in no member but one. Every instruction therefore carries an `encoding` member (`Encoding.T1`, `T2`, …), and that is what the disassembler spells the ambiguous forms from: `addw`/`subw`/`movw` against their `.w` siblings, `mcr2` against `mcr`, and the narrow `<Rdn>` forms that write two operands where their wide siblings write three. Never read those back off the instruction word — `disassemble` takes `instr` only to spell the bytes of a word that matched nothing. `NoMatch` has no `encoding` member.
+All encodings of an instruction share one dataclass, so the fields alone cannot say which form matched — `add.w r5, sp, #1` and `addw r5, sp, #335` differ in no member but one. Every instruction therefore carries an `encoding` member (`Encoding.T1`, `T2`, …), and that is what the disassembler spells the ambiguous forms from: `addw`/`subw`/`movw` against their `.w` siblings, `mcr2` against `mcr`, and the narrow `<Rdn>` forms that write two operands where their wide siblings write three. Never read those back off the instruction word — `disassemble` is not given it, and spells everything from `result`. `NoMatch` has no `encoding` member.
 
 ### Side effects
 
@@ -42,8 +42,8 @@ A `decode` block can flag `UNDEFINED`, `UNPREDICTABLE` or `SEE`. These are repor
 
 Which of them matters is the caller's decision, and this package makes it twice, consistently:
 
-- `disassemble` spells `<see>`, `<undefined>` or `<unpredictable>` in that order of precedence — `SEE` redirects to another encoding, so the decode does not describe the word at all; `UNDEFINED` says the word has no meaning; `UNPREDICTABLE` only that its meaning is not guaranteed.
-- `next_itstate` loads ITSTATE only from an `IT` that flagged nothing. Acting on the fields of a word the disassembler declines to spell would let one bad halfword condition the several that follow it.
+- `disassemble` spells the instruction whatever it flagged, and puts a marker in front of it: `<SIDEFFECT: see> it pl`, `<SIDEFFECT: undefined> ldrb.w fp, [sp], #161`, `<SIDEFFECT: unpredictable> it nv`. One word can carry several flags, and each is named, comma-separated in the order `see, undefined, unpredictable` — strongest claim about the word first: `SEE` redirects to another encoding, so the decode does not describe the word at all; `UNDEFINED` says the word has no meaning; `UNPREDICTABLE` only that its meaning is not guaranteed. So `<SIDEFFECT: see, unpredictable> it al`. A word that matched no encoding at all is `<no_match>`, and the CLI is what turns that into objdump's `@ <UNDEFINED> instruction: 0x…` comment, being the only place the word itself is still at hand.
+- `next_itstate` loads ITSTATE only from an `IT` that flagged nothing. Acting on the fields of a word the disassembler will not vouch for would let one bad halfword condition the several that follow it.
 
 `NoMatch` is the one result that is not an instruction, and has no `sideeffects` member.
 
@@ -60,7 +60,7 @@ can spell `moveq`, and advance it after every instruction:
 size = instr_size(hw1)
 istate = ctx.istate
 result = decode(instr, ctx, size)
-asm = disassemble(result, instr, size, offset, istate)
+asm = disassemble(result, size, offset, istate)
 ctx.istate = next_itstate(istate, result)
 ```
 

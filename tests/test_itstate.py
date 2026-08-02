@@ -52,12 +52,12 @@ class TestITState:
         assert current_cond(0xD0) == COND_AL
 
     def test_flagged_it_opens_no_block(self, ctx) -> None:
-        """An IT the disassembler will not spell must not condition what follows.
+        """An IT the disassembler will not vouch for must not condition what follows.
 
         A flagged IT is decoded in full and reaches here with its mask intact,
         so nothing but this stops it opening a block. Acting on the fields of a
-        word spelled `<unpredictable>` would let one bad halfword condition the
-        several after it.
+        word marked `<SIDEFFECT: unpredictable>` would let one bad halfword
+        condition the several after it.
         """
         # firstcond 0b1111 is UNPREDICTABLE, and the mask is non-zero, so this
         # would otherwise open a four-slot block.

@@ -36,7 +36,7 @@ def decode_word(ctx: Context, instr: int) -> object:
 def disasm(ctx: Context, instr: int, offset: int = 0, istate: int = 0) -> str:
     """Decode one instruction word and format it as assembler text."""
     size = word_size(instr)
-    return disassemble(decode(instr, ctx, size), instr, size, offset, istate)
+    return disassemble(decode(instr, ctx, size), size, offset, istate)
 
 
 def disassemble_stream(ctx: Context, halfwords: list[int]) -> list[str]:
@@ -56,7 +56,7 @@ def disassemble_stream(ctx: Context, halfwords: list[int]) -> list[str]:
             instr = hw1
         istate = ctx.istate
         result = decode(instr, ctx, size)
-        asm.append(disassemble(result, instr, size, offset, istate))
+        asm.append(disassemble(result, size, offset, istate))
         ctx.istate = next_itstate(istate, result)
         offset += n_bytes
     return asm

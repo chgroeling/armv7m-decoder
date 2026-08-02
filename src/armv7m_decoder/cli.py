@@ -15,6 +15,7 @@ import click
 from armv7m_decoder import (
     Context,
     InstructionSize,
+    Opcode,
     decode,
     disassemble,
     instr_size,
@@ -95,7 +96,17 @@ def decode_cmd(
         # disassembler to spell ``moveq`` rather than ``mov``.
         istate = ctx.istate
         result = decode(instr, ctx, size)
-        asm = disassemble(result, instr, size, offset, istate)
+        asm = disassemble(result, size, offset, istate)
+        if result.opcode == Opcode.OP_NO_MATCH:
+            # A word no encoding matches has no mnemonic to spell, so the whole
+            # field is a comment carrying the word itself, as objdump writes
+            # it. A line is mnemonic, tab, operands, tab, comment; with the
+            # first two empty the comment is left holding both tabs, which is
+            # how objdump lands it in the same column as any other comment:
+            #
+            #     2:\tf20d 154f \taddw\tr5, sp, #335\t@ 0x14f
+            #     6:\tf2e5 3eff \t\t\t@ <UNDEFINED> instruction: 0xf2e53eff
+            asm = f"\t\t@ <UNDEFINED> instruction: 0x{instr:0{size // 4}x}"
         out.write(f"{offset:8x}:\t{hex_bytes:<10}\t{asm}\n")
         ctx.istate = next_itstate(istate, result)
 

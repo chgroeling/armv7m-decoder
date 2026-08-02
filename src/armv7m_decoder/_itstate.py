@@ -11,7 +11,7 @@ decoder can read it through ``InITBlock`` / ``LastInITBlock``, and needed by
 Callers walking a stream keep that state up to date with::
 
     result = decode(instr, ctx, size)
-    asm = disassemble(result, instr, size, offset, ctx.istate)
+    asm = disassemble(result, size, offset, ctx.istate)
     ctx.istate = next_itstate(ctx.istate, result)
 
 See the Armv7-M ARM (ARM DDI 0403E.e) B1.4.2 for ITSTATE, and A7.7.38 for IT.
@@ -53,9 +53,9 @@ def next_itstate(istate: int, result: object) -> int:
     ``0000`` is not an IT at all but the hint space (``SEE NOP``), and a
     ``firstcond`` of ``1111`` -- or ``1110`` with more than one condition --
     is UNPREDICTABLE, so its block has no defined extent. The disassembler
-    spells these ``<see>`` and ``<unpredictable>`` rather than as an IT;
-    opening a block on fields it declines to print would let one bad word
-    condition the several that follow it.
+    marks these ``<SIDEFFECT: see>`` and ``<SIDEFFECT: unpredictable>``;
+    opening a block on the fields of a word it will not vouch for would let
+    one bad word condition the several that follow it.
     """
     if isinstance(result, IT) and result.sideeffects == SIDEFFECT_NONE:
         return ((result.firstcond & 0xF) << 4) | (result.mask & 0xF)
