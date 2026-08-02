@@ -613,4 +613,72 @@ class TestDisasmIT:
 
 
 class TestDisasmVFP:
-    pass
+    """A VFP register list is a range, and its mnemonic names its direction.
+
+    The encoding gives a first register and a count, so the list is contiguous
+    and is written `{d0-d3}`. A core list is a bitmask that may be sparse, so
+    `push`/`ldmia` name every register instead -- the two spellings differ for
+    that reason rather than by accident, and objdump makes the same split.
+    """
+
+    @pytest.mark.parametrize(
+        ("instr", "expected"),
+        [
+            # Doubles, singles, and a range that crosses the d16 boundary.
+            (0xEC900B08, "vldmia\tr0, {d0-d3}"),
+            (0xEC910A04, "vldmia\tr1, {s0-s3}"),
+            (0xEC924B10, "vldmia\tr2, {d4-d11}"),
+            (0xEC800B08, "vstmia\tr0, {d0-d3}"),
+            (0xEC824B10, "vstmia\tr2, {d4-d11}"),
+            # Two registers are still a range.
+            (0xEC938A02, "vldmia\tr3, {s16-s17}"),
+            (0xEC838A02, "vstmia\tr3, {s16-s17}"),
+            # One has no range to write.
+            (0xEC947B02, "vldmia\tr4, {d7}"),
+            (0xECD52A01, "vldmia\tr5, {s5}"),
+            (0xEC847B02, "vstmia\tr4, {d7}"),
+            # The full banks.
+            (0xECB00B20, "vldmia\tr0!, {d0-d15}"),
+            (0xECB10A20, "vldmia\tr1!, {s0-s31}"),
+            (0xECA00B20, "vstmia\tr0!, {d0-d15}"),
+        ],
+    )
+    def test_increment_after_lists(self, ctx, instr: int, expected: str) -> None:
+        assert disasm(ctx, instr) == expected
+
+    @pytest.mark.parametrize(
+        ("instr", "expected"),
+        [
+            # Decrement-before always writes back, and is spelled db.
+            (0xED300B08, "vldmdb\tr0!, {d0-d3}"),
+            (0xED310A04, "vldmdb\tr1!, {s0-s3}"),
+            (0xED324B10, "vldmdb\tr2!, {d4-d11}"),
+            (0xED338A02, "vldmdb\tr3!, {s16-s17}"),
+            (0xED347B02, "vldmdb\tr4!, {d7}"),
+            (0xED200B08, "vstmdb\tr0!, {d0-d3}"),
+            (0xED224B10, "vstmdb\tr2!, {d4-d11}"),
+            (0xED652A01, "vstmdb\tr5!, {s5}"),
+        ],
+    )
+    def test_decrement_before_lists(self, ctx, instr: int, expected: str) -> None:
+        assert disasm(ctx, instr) == expected
+
+    @pytest.mark.parametrize(
+        ("instr", "expected"),
+        [
+            # VPUSH and VPOP have one addressing mode each, so no suffix.
+            (0xED2D8B06, "vpush\t{d8-d10}"),
+            (0xED2D8A02, "vpush\t{s16-s17}"),
+            (0xED2D4B02, "vpush\t{d4}"),
+            (0xECBD8B06, "vpop\t{d8-d10}"),
+            (0xECBD8A02, "vpop\t{s16-s17}"),
+            (0xECFD1A01, "vpop\t{s3}"),
+        ],
+    )
+    def test_push_pop_take_no_mode_suffix(self, ctx, instr: int, expected: str) -> None:
+        assert disasm(ctx, instr) == expected
+
+    def test_core_lists_still_name_every_register(self, ctx) -> None:
+        # The counterpart: a bitmask list may be sparse, so it is spelled out.
+        assert disasm(ctx, 0xB4D0) == "push\t{r4, r6, r7}"
+        assert disasm(ctx, 0xC82A) == "ldmia\tr0!, {r1, r3, r5}"

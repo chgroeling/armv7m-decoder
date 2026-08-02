@@ -232,11 +232,22 @@ def _reg_list(registers: int) -> str:
 
 
 def _vfp_reg_list(single_regs: bool, d: int, count: int) -> str:
-    if single_regs:
-        names = [_sreg(d + i) for i in range(count)]
-    else:
-        names = [_dreg(d + i) for i in range(count)]
-    return "{" + ", ".join(names) + "}"
+    """A VFP register list, written as the range it always is.
+
+    The encoding gives a first register and a count, so the list cannot have
+    a gap in it -- which is what lets it be written `{d0-d15}`. A core list is
+    a bitmask and may well be sparse (`{r1, r3, r5}`), so `_reg_list` has to
+    name every register it holds; the two spellings differ for that reason,
+    and objdump makes the same distinction.
+
+    Two registers are still a range, `{s16-s17}`; one has none to write.
+    """
+    name = _sreg if single_regs else _dreg
+    if count == 0:
+        return "{}"
+    if count == 1:
+        return "{" + name(d) + "}"
+    return "{" + name(d) + "-" + name(d + count - 1) + "}"
 
 
 def _vfp_reg(dp_operation: bool, r: int) -> str:
@@ -1412,9 +1423,13 @@ def _fmt_vldr_vstr(result: Any, mnemonic: str, offset: int = 0, **_) -> str:
 
 
 def _fmt_vldm_vstm(result: Any, mnemonic: str, **_) -> str:
+    # The addressing mode is spelled out, as it is for the core ldmia/stmdb:
+    # increment-after when the encoding adds, decrement-before when it does
+    # not. VPUSH and VPOP have one mode each, so they carry no suffix.
+    mode = "ia" if result.add else "db"
     wb = "!" if result.wback else ""
     reg_str = _vfp_reg_list(result.single_regs, result.d, result.regs)
-    return f"{mnemonic}{_SEP}{_reg(result.n)}{wb}, {reg_str}"
+    return f"{mnemonic}{mode}{_SEP}{_reg(result.n)}{wb}, {reg_str}"
 
 
 def _fmt_vpush_vpop(result: Any, mnemonic: str, **_) -> str:
