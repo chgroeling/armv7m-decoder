@@ -1,8 +1,9 @@
 """Public API for the ARMv7-M instruction decoder.
 
 Provides the :func:`decode` entry point, the :class:`Context` for threading runtime
-state, the :func:`disassemble` function for assembler formatting, the ITSTATE
-helpers that carry an IT block's condition across a stream
+state, :func:`decode_at` for decoding straight out of a byte buffer (reporting a
+:class:`DecodedWord`), the :func:`disassemble` function for assembler formatting,
+the ITSTATE helpers that carry an IT block's condition across a stream
 (:func:`next_itstate`, :func:`current_cond`, :func:`in_it_block`), the
 instruction-size helpers that settle how wide a word is before it is decoded
 (:func:`instr_size`, :func:`instr_bytes`), :class:`NoMatch` for a word no
@@ -33,6 +34,7 @@ from armv7m_decoder._itstate import (  # noqa: F401
     next_itstate,
 )
 from armv7m_decoder._size import instr_bytes, instr_size  # noqa: F401
+from armv7m_decoder._stream import DecodedWord, decode_at  # noqa: F401
 
 __all__ = [
     "COND_AL",
@@ -41,6 +43,7 @@ __all__ = [
     "SIDEFFECT_UNDEFINED",
     "SIDEFFECT_UNPREDICTABLE",
     "Context",
+    "DecodedWord",
     "Encoding",
     "InstructionSize",
     "NoMatch",
@@ -49,6 +52,7 @@ __all__ = [
     "decode",
     "decode_16bit",
     "decode_32bit",
+    "decode_at",
     "disassemble",
     "get_supported_sizes",
     "in_it_block",

@@ -5,7 +5,6 @@ Usage::
     armv7m-decoder decode firmware.bin --start-address 0xD4
 """
 
-import struct
 import sys
 from pathlib import Path
 from typing import Optional
@@ -14,11 +13,9 @@ import click
 
 from armv7m_decoder import (
     Context,
-    InstructionSize,
     Opcode,
-    decode,
+    decode_at,
     disassemble,
-    instr_size,
     next_itstate,
 )
 
@@ -70,33 +67,23 @@ def decode_cmd(
 
     offset = start_address
     total = 0
-    while offset + 2 <= len(data):
+    while True:
         if max_instructions is not None and total >= max_instructions:
             break
 
-        # The first halfword settles the size, whether or not an encoding
-        # matches -- skipping only half of a 32-bit word would leave the
-        # second halfword to be disassembled as an instruction of its own.
-        hw1 = struct.unpack_from("<H", data, offset)[0]
-        size = instr_size(hw1)
-        n_bytes = size // 8
-        if offset + n_bytes > len(data):
+        # One word out of the buffer, decoded at the size its first halfword
+        # settles -- ``None`` once what is left is not a whole instruction.
+        word = decode_at(data, offset, ctx)
+        if word is None:
             break
 
-        if size == InstructionSize.SIZE_32BIT:
-            hw2 = struct.unpack_from("<H", data, offset + 2)[0]
-            instr = (hw1 << 16) | hw2
-            hex_bytes = f"{hw1:04x} {hw2:04x}"
-        else:
-            instr = hw1
-            hex_bytes = f"{hw1:04x}"
-
-        # ITSTATE reaches the decoder through ``ctx`` -- 16-bit data processing
-        # inside an IT block decodes without the S bit -- and tells the
-        # disassembler to spell ``moveq`` rather than ``mov``.
+        # A decode only reads the context, so this is still the ITSTATE the word
+        # decoded under: it tells the disassembler to spell ``moveq`` rather than
+        # ``mov``, and the next state advances from it.
         istate = ctx.istate
-        result = decode(instr, ctx, size)
-        asm = disassemble(result, size, offset, istate)
+        result = word.instruction
+        hex_bytes = " ".join(f"{hw:04x}" for hw in word.halfwords)
+        asm = disassemble(result, word.size, offset, istate)
         if result.opcode == Opcode.OP_NO_MATCH:
             # A word no encoding matches has no mnemonic to spell, so the whole
             # field is a comment carrying the word itself, as objdump writes
@@ -106,11 +93,11 @@ def decode_cmd(
             #
             #     2:\tf20d 154f \taddw\tr5, sp, #335\t@ 0x14f
             #     6:\tf2e5 3eff \t\t\t@ <UNDEFINED> instruction: 0xf2e53eff
-            asm = f"\t\t@ <UNDEFINED> instruction: 0x{instr:0{size // 4}x}"
+            asm = f"\t\t@ <UNDEFINED> instruction: 0x{word.word:0{word.size // 4}x}"
         out.write(f"{offset:8x}:\t{hex_bytes:<10}\t{asm}\n")
         ctx.istate = next_itstate(istate, result)
 
-        offset += n_bytes
+        offset += word.n_bytes
         total += 1
 
     if out_file:
