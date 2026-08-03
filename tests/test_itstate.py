@@ -3,8 +3,8 @@ that follow it."""
 
 import pytest
 
-from armv7m_decoder import COND_AL, current_cond, decode_word
-from armv7m_decoder._itstate import in_it_block, next_itstate
+from armv7m_decoder import COND_AL, decode_word
+from armv7m_decoder._itstate import current_cond, in_it_block, next_itstate
 
 
 @pytest.fixture

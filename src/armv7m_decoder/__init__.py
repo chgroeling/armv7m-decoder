@@ -4,10 +4,10 @@ Decoding starts at :func:`fetch_and_decode` for a word still in a byte buffer, o
 :func:`decode_word` for one the caller already has in hand; both settle the size
 themselves and report a :class:`DecodedWord`. Also provides the :class:`Context`
 for threading runtime state, the :func:`disassemble` function for assembler
-formatting, :func:`current_cond` and ``COND_AL`` for the condition an ITSTATE
-puts the next instruction under, :class:`NoMatch` for a word no encoding
-matches, the ``SIDEFFECT_*`` flags an instruction reports on its ``sideeffects``
-member, and all instruction dataclasses.
+formatting, ``COND_AL`` for the condition an instruction that names none runs
+under, :class:`NoMatch` for a word no encoding matches, the ``SIDEFFECT_*``
+flags an instruction reports on its ``sideeffects`` member, and all instruction
+dataclasses.
 """
 
 from armv7m_decoder._decoder import (  # noqa: F401
@@ -23,7 +23,7 @@ from armv7m_decoder._decoder import (  # noqa: F401
     get_supported_sizes,
 )
 from armv7m_decoder._disasm import disassemble  # noqa: F401
-from armv7m_decoder._itstate import COND_AL, current_cond  # noqa: F401
+from armv7m_decoder._itstate import COND_AL  # noqa: F401
 from armv7m_decoder._word import (  # noqa: F401
     DecodedWord,
     decode_word,
@@ -42,7 +42,6 @@ __all__ = [
     "InstructionSize",
     "NoMatch",
     "Opcode",
-    "current_cond",
     "decode_word",
     "disassemble",
     "fetch_and_decode",
