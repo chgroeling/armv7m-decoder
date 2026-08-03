@@ -83,52 +83,36 @@ Output is objdump's listing format - address, instruction bytes, assembler:
 
 ## Library
 
-Decoding one word takes two steps, because Thumb settles an instruction's
-width from its first halfword before anything is decoded:
+`decode_word` decodes an instruction word you already have in hand:
 
 ```python
-from armv7m_decoder import Context, decode, disassemble, instr_size
+from armv7m_decoder import Context, decode_word, disassemble
 
 ctx = Context()
-size = instr_size(0x2401)              # SIZE_16BIT
-result = decode(0x2401, ctx, size)
+word = decode_word(0x2401, ctx)
+
+word.instruction
 # MOV_immediate(encoding=<Encoding.T1: 1>, sideeffects=0, d=4,
 #               setflags=True, imm32=1, carry=0)
 
-disassemble(result, size)              # 'movs\tr4, #1'
+disassemble(word.instruction, word.size)   # 'movs\tr4, #1'
 ```
 
-`instr` holds exactly `size` bits: a bare halfword for a 16-bit instruction, a
-full word (first halfword in the high half) for a 32-bit one. `decode` returns
-the instruction alone - a dataclass per instruction, with an `encoding` member
+Write the word the way an architecture manual spells the encoding - a bare
+halfword for a 16-bit instruction, a full word with the first halfword in the
+high half for a 32-bit one - and the size follows from the value, since nothing
+below `0x10000` is a 32-bit encoding.
+
+Back comes a `DecodedWord`: the size it was decoded at, the halfwords it holds,
+and `instruction` - a dataclass per instruction, with an `encoding` member
 saying which form matched, or `NoMatch` if none did.
 
 ### Walking a stream
 
-`IT` makes up to four following instructions conditional, and neither their
-condition nor their `S` bit is in their own encoding - both come from ITSTATE.
-A stream is therefore decoded statefully: keep ITSTATE in `Context.istate`, hand
-the same value to `disassemble` so it can spell `moveq` rather than `mov`, and
-advance it after every instruction:
-
-```python
-from armv7m_decoder import next_itstate
-
-size = instr_size(hw1)
-istate = ctx.istate
-result = decode(instr, ctx, size)
-asm = disassemble(result, size, offset, istate)
-ctx.istate = next_itstate(istate, result)
-```
-
-The size holds whether or not an encoding matched, which is what keeps the
-stream in step where nothing does: a word answered `NoMatch` is still skipped
-whole, rather than leaving its second halfword to be decoded as an instruction
-of its own.
-
-Reading the halfwords out of a buffer and settling the size is the same work for
-every caller, and `fetch_and_decode` does it in one call - bytes and a position
-in, `DecodedWord` out, `None` once what is left is not a whole instruction:
+For a word still in memory, `fetch_and_decode` takes bytes and a position, and
+answers `None` once what is left is not a whole instruction. Its size cannot
+come from the value - four bytes and two bytes are the same value until you know
+which - so it comes from the first halfword, before anything is decoded:
 
 ```python
 from armv7m_decoder import fetch_and_decode, next_itstate
@@ -141,12 +125,23 @@ while (word := fetch_and_decode(data, offset, ctx)) is not None:
     offset += word.n_bytes
 ```
 
-A decode only reads the context, so `ctx.istate` after the call is still the
-state the word decoded under - the result carries nothing of it. `DecodedWord`
-does hold the word itself (`word.word`) and the halfwords it was assembled from
-(`word.halfwords`), which is what a listing needs to print the bytes alongside
-the mnemonic. Advancing ITSTATE stays the caller's: only the caller knows whether
-the instruction is one it means to have executed.
+That rule holds whether or not an encoding matched, which is what keeps the
+stream in step where nothing does: a word answered `NoMatch` is still skipped
+whole, rather than leaving its second halfword to be decoded as an instruction
+of its own.
+
+`IT` makes up to four following instructions conditional, and neither their
+condition nor their `S` bit is in their own encoding - both come from ITSTATE.
+A stream is therefore decoded statefully: keep ITSTATE in `Context.istate`, hand
+the same value to `disassemble` so it can spell `moveq` rather than `mov`, and
+advance it after every instruction, as the loop above does. A decode only reads
+the context, so `ctx.istate` after the call is still the state the word decoded
+under - the result carries nothing of it. Advancing it stays yours: only you
+know whether the instruction is one you mean to have executed.
+
+`DecodedWord` also holds the word itself (`word.word`) and the halfwords it was
+assembled from (`word.halfwords`), which is what a listing needs to print the
+bytes alongside the mnemonic.
 
 ### Side effects
 

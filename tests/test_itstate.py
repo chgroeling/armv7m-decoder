@@ -3,15 +3,19 @@ that follow it."""
 
 import pytest
 
-from armv7m_decoder import COND_AL, current_cond, in_it_block, next_itstate
-
-from .helpers import decode_word
+from armv7m_decoder import (
+    COND_AL,
+    current_cond,
+    decode_word,
+    in_it_block,
+    next_itstate,
+)
 
 
 @pytest.fixture
 def it_ittee_gt(ctx):
     """Decoded ``ittee gt`` -- a block with all four slots in use."""
-    result = decode_word(ctx, 0xBFC7)
+    result = decode_word(0xBFC7, ctx).instruction
     return result
 
 
@@ -28,21 +32,21 @@ class TestITState:
         conds = []
         while in_it_block(istate):
             conds.append(current_cond(istate))
-            nop = decode_word(ctx, 0xBF00)
+            nop = decode_word(0xBF00, ctx).instruction
             istate = next_itstate(istate, nop)
         # gt, gt, le, le -- "then, then, else, else".
         assert conds == [0xC, 0xC, 0xD, 0xD]
         assert istate == 0
 
     def test_single_slot_block_ends_at_once(self, ctx) -> None:
-        it = decode_word(ctx, 0xBF08)  # it eq
+        it = decode_word(0xBF08, ctx).instruction  # it eq
         istate = next_itstate(0, it)
         assert current_cond(istate) == 0x0
-        nop = decode_word(ctx, 0xBF00)
+        nop = decode_word(0xBF00, ctx).instruction
         assert next_itstate(istate, nop) == 0
 
     def test_advance_outside_a_block_is_a_no_op(self, ctx) -> None:
-        nop = decode_word(ctx, 0xBF00)
+        nop = decode_word(0xBF00, ctx).instruction
         assert next_itstate(0, nop) == 0
 
     def test_zero_mask_reads_as_outside_a_block(self) -> None:
@@ -61,13 +65,13 @@ class TestITState:
         """
         # firstcond 0b1111 is UNPREDICTABLE, and the mask is non-zero, so this
         # would otherwise open a four-slot block.
-        bad_it = decode_word(ctx, 0xBFF8)
+        bad_it = decode_word(0xBFF8, ctx).instruction
         assert bad_it.mask != 0
         assert next_itstate(0, bad_it) == 0
 
         # mask 0000 is the hint space rather than an IT at all: SEE NOP.
-        see_it = decode_word(ctx, 0xBF50)
+        see_it = decode_word(0xBF50, ctx).instruction
         assert next_itstate(0, see_it) == 0
 
         # A clean IT still loads ITSTATE.
-        assert next_itstate(0, decode_word(ctx, 0xBF08)) == 0x08
+        assert next_itstate(0, decode_word(0xBF08, ctx).instruction) == 0x08

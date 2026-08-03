@@ -1,9 +1,10 @@
-"""Tests for reading an instruction out of memory.
+"""Tests for the two ways in: a word in hand, or a word still in memory.
 
-``decode`` takes a word and the size to read it at; ``fetch_and_decode`` takes
-bytes and a position, and settles the rest. What it has to get right is the size
--- a word is read whole or not at all -- and what it has to report is enough for
-a caller to spell the line and step the stream without going back to the bytes.
+Both settle the size the caller used to have to settle itself, and they settle
+it from different things -- ``decode_word`` from the value it is handed,
+``fetch_and_decode`` from the first halfword, the only rule that works on bytes.
+What either has to report is enough for a caller to spell the line and step the
+stream without going back to the word.
 """
 
 from __future__ import annotations
@@ -17,6 +18,7 @@ from armv7m_decoder import (
     Context,
     InstructionSize,
     Opcode,
+    decode_word,
     fetch_and_decode,
     instr_bytes,
     instr_size,
@@ -63,6 +65,39 @@ class TestStreamResync:
             "<no_match>",
             "lsls\tr6, r1, #26",
         ]
+
+
+class TestWordInHand:
+    def test_narrow_word_is_a_bare_halfword(self, ctx: Context) -> None:
+        word = decode_word(0xBF00, ctx)
+        assert word.size == InstructionSize.SIZE_16BIT
+        assert word.n_bytes == 2
+        assert word.word == 0xBF00
+        assert word.halfwords == (0xBF00,)
+        assert word.instruction.opcode == Opcode.OP_NOP
+
+    def test_wide_word_splits_into_its_halfwords(self, ctx: Context) -> None:
+        word = decode_word(0xF3AF8000, ctx)
+        assert word.size == InstructionSize.SIZE_32BIT
+        assert word.n_bytes == 4
+        assert word.halfwords == (0xF3AF, 0x8000)
+        assert word.instruction.opcode == Opcode.OP_NOP
+
+    def test_it_came_from_no_buffer(self, ctx: Context) -> None:
+        assert decode_word(0xBF00, ctx).offset == 0
+
+    def test_the_block_reaches_the_decoder_here_too(self, ctx: Context) -> None:
+        assert decode_word(0x4001, ctx).instruction.setflags is True
+        ctx.istate = 0x08
+        assert decode_word(0x4001, ctx).instruction.setflags is False
+
+    def test_a_lone_first_halfword_is_the_word_it_is(self, ctx: Context) -> None:
+        # 0xE800 out of a buffer begins a 32-bit instruction, but as a word in
+        # hand it is all there is, so it decodes at the width it has -- and
+        # matches nothing, 16-bit encodings stopping below 0xE800.
+        word = decode_word(0xE800, ctx)
+        assert word.size == InstructionSize.SIZE_16BIT
+        assert word.instruction.opcode == Opcode.OP_NO_MATCH
 
 
 class TestWordFromBuffer:

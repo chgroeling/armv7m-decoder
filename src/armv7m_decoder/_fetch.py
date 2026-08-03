@@ -38,11 +38,12 @@ def instr_bytes(hw1: int) -> int:
 
 @dataclass(frozen=True)
 class DecodedWord:
-    """One instruction read out of a buffer, and what it decoded to.
+    """One instruction word, and what it decoded to.
 
     Attributes:
-        offset: Where in the buffer the instruction begins.
-        size: The size it was decoded at, settled from its first halfword.
+        offset: Where in the buffer the instruction begins -- 0 for a word that
+            came from nowhere but the caller's hand.
+        size: The size it was decoded at.
         n_bytes: Bytes it occupies -- how far the stream advances past it.
         word: The instruction word, ``size`` bits wide, as the decoder took it.
         halfwords: The halfwords it was assembled from, in memory order.
@@ -55,6 +56,54 @@ class DecodedWord:
     word: int
     halfwords: tuple[int, ...]
     instruction: object
+
+
+def _decoded(
+    word: int, size: InstructionSize, offset: int, ctx: Context
+) -> DecodedWord:
+    """Decode ``word`` at ``size`` and report it with the halfwords it holds."""
+    if size == InstructionSize.SIZE_32BIT:
+        halfwords = (word >> 16, word & 0xFFFF)
+    else:
+        halfwords = (word,)
+
+    return DecodedWord(
+        offset=offset,
+        size=size,
+        n_bytes=size // 8,
+        word=word,
+        halfwords=halfwords,
+        instruction=decode(word, ctx, size),
+    )
+
+
+def decode_word(instr: int, ctx: Context) -> DecodedWord:
+    """Decode an instruction word the caller already has in hand.
+
+    The word is written the way an architecture manual spells the encoding --
+    ``0xBF00`` for a 16-bit instruction, ``0xF3AF8000`` for a 32-bit one -- and
+    that settles the size on its own: nothing below ``0x10000`` is a 32-bit
+    encoding, since Thumb reserves the halfwords from ``0xE800`` up for the
+    first half of one.
+
+    Use :func:`fetch_and_decode` for a word still in memory. Its size has to
+    come from the first halfword, which is the only rule that works on bytes:
+    a bare ``0xE800`` in a buffer is the beginning of a 32-bit instruction, not
+    a 16-bit word.
+
+    Args:
+        instr: The instruction word.
+        ctx: The runtime context the decode blocks thread their state through.
+
+    Returns:
+        What the word decoded to. ``offset`` is 0 -- the word came from no
+        buffer -- and ``instruction`` is ``NoMatch`` if no encoding matched.
+    """
+    if instr > 0xFFFF:
+        size = InstructionSize.SIZE_32BIT
+    else:
+        size = InstructionSize.SIZE_16BIT
+    return _decoded(instr, size, 0, ctx)
 
 
 def fetch_and_decode(data: bytes, offset: int, ctx: Context) -> Optional[DecodedWord]:
@@ -83,18 +132,8 @@ def fetch_and_decode(data: bytes, offset: int, ctx: Context) -> Optional[Decoded
         return None
 
     if size == InstructionSize.SIZE_32BIT:
-        hw2 = struct.unpack_from("<H", data, offset + 2)[0]
-        halfwords = (hw1, hw2)
-        word = (hw1 << 16) | hw2
+        word = (hw1 << 16) | struct.unpack_from("<H", data, offset + 2)[0]
     else:
-        halfwords = (hw1,)
         word = hw1
 
-    return DecodedWord(
-        offset=offset,
-        size=size,
-        n_bytes=n_bytes,
-        word=word,
-        halfwords=halfwords,
-        instruction=decode(word, ctx, size),
-    )
+    return _decoded(word, size, offset, ctx)

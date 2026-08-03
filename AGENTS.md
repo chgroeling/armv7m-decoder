@@ -21,8 +21,8 @@ uv run ruff format                         # Format
 - **`src/armv7m_decoder/_decoder.py`** — Generated decoder module (committed artifact). Contains embedded armtranspiller runtime, instruction dataclasses, the `InstructionSize` and `Encoding` enums, the per-size decoders (`decode_16bit`, `decode_32bit`), the `decode(instr, ctx, size)` entry point, the `SIDEFFECT_*` flags, and `NoMatch`.
 - **`src/armv7m_decoder/_disasm.py`** — Disassembler: `disassemble(result, size, offset, istate)` turns a decoded dataclass into a UAL string.
 - **`src/armv7m_decoder/_itstate.py`** — ITSTATE tracking (`next_itstate`, `current_cond`, `in_it_block`) for carrying an IT block's condition across a stream.
-- **`src/armv7m_decoder/_fetch.py`** — Reading an instruction out of memory. The Thumb rule that settles an instruction's size from its first halfword (`instr_size`, `instr_bytes`), applied before anything is decoded, and `fetch_and_decode(data, offset, ctx)` on top of it: one instruction out of a byte buffer, reported as a `DecodedWord` (`offset`, `size`, `n_bytes`, `word`, `halfwords`, `instruction`). Answers `None` once what is left is not a whole instruction.
-- **`src/armv7m_decoder/__init__.py`** — Public API: re-exports `decode`, `Context`, `InstructionSize`, `Encoding`, `disassemble`, `fetch_and_decode`, `DecodedWord`, the ITSTATE helpers, the size helpers, `NoMatch`, the `SIDEFFECT_*` flags, `get_supported_sizes`, and all instruction dataclasses from `_decoder`.
+- **`src/armv7m_decoder/_fetch.py`** — The two ways into the decoder, both reporting a `DecodedWord` (`offset`, `size`, `n_bytes`, `word`, `halfwords`, `instruction`). `decode_word(instr, ctx)` takes a word in hand and reads its size off the value (nothing below `0x10000` is a 32-bit encoding). `fetch_and_decode(data, offset, ctx)` takes bytes and a position, settles the size from the first halfword with `instr_size` (also exported, with `instr_bytes`), and answers `None` once what is left is not a whole instruction.
+- **`src/armv7m_decoder/__init__.py`** — Public API: re-exports `decode_word`, `fetch_and_decode`, `DecodedWord`, `Context`, `InstructionSize`, `Encoding`, `disassemble`, the ITSTATE helpers, the size helpers, `NoMatch`, the `SIDEFFECT_*` flags, `get_supported_sizes`, and all instruction dataclasses from `_decoder`. **`decode`, `decode_16bit` and `decode_32bit` are deliberately not exported** — they take the size as an input, and every way in from outside settles it first.
 - **`src/armv7m_decoder/_generate.py`** — Regeneration script: reads `formats/armv7-m.yaml` and calls `decoder_forge.generate_code` to produce `_decoder.py`.
 - **`src/armv7m_decoder/cli.py`** — Click CLI with `decode` subcommand for decoding binary files.
 
@@ -32,7 +32,7 @@ The generated `_decoder.py` is fully self-contained: Jinja2 template `python_dec
 
 `decode(instr, ctx, size)` returns the decoded instruction alone, and the size is an input rather than a result: each size has its own decode tree, matching against a word of exactly its own width, and `decode` only routes to the right one. `instr` therefore holds exactly `size` bits — a 16-bit instruction is a bare halfword, not one padded out to 32 bits.
 
-Settling the size is the caller's job, and Thumb settles it from the first halfword alone (`instr_size` in `_fetch.py`, Armv7-M ARM A5.1). That rule holds whether or not an encoding matches, which is what keeps a stream in step where nothing does: a word the decoder answers `NoMatch` for is still skipped whole.
+Settling the size is therefore somebody's job, and `_fetch.py` is where it is done — which is why `decode` is not part of the public API. There are two rules, and which applies depends on what the caller has. A word in hand carries its own width in its value, so `decode_word` reads it off that. Bytes in a buffer do not — the same four bytes are one instruction or two, and only the first halfword says which (`instr_size`, Armv7-M ARM A5.1). That rule holds whether or not an encoding matches, which is what keeps a stream in step where nothing does: a word the decoder answers `NoMatch` for is still skipped whole.
 
 All encodings of an instruction share one dataclass, so the fields alone cannot say which form matched — `add.w r5, sp, #1` and `addw r5, sp, #335` differ in no member but one. Every instruction therefore carries an `encoding` member (`Encoding.T1`, `T2`, …), and that is what the disassembler spells the ambiguous forms from: `addw`/`subw`/`movw` against their `.w` siblings, `mcr2` against `mcr`, and the narrow `<Rdn>` forms that write two operands where their wide siblings write three. Never read those back off the instruction word — `disassemble` is not given it, and spells everything from `result`. `NoMatch` has no `encoding` member.
 
@@ -57,17 +57,16 @@ decoder reads it via `InITBlock` / `LastInITBlock`, which is what turns 16-bit
 can spell `moveq`, and advance it after every instruction:
 
 ```python
-size = instr_size(hw1)
+word = fetch_and_decode(data, offset, ctx)
 istate = ctx.istate
-result = decode(instr, ctx, size)
-asm = disassemble(result, size, offset, istate)
-ctx.istate = next_itstate(istate, result)
+asm = disassemble(word.instruction, word.size, offset, istate)
+ctx.istate = next_itstate(istate, word.instruction)
+offset += word.n_bytes
 ```
 
-`fetch_and_decode` folds the first three lines into one call, so a stream walker
-only has to disassemble, advance ITSTATE, and step by `n_bytes`. That is what the
-CLI does. A decode only reads the context, so `ctx.istate` after the call is still
-the state the word decoded under — the result carries nothing of it.
+That is what the CLI does. A decode only reads the context, so `ctx.istate` after
+the call is still the state the word decoded under — the result carries nothing
+of it, and advancing it is the caller's step.
 
 ### Re-generation
 

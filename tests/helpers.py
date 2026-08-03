@@ -13,30 +13,17 @@ import struct
 
 from armv7m_decoder import (
     Context,
-    InstructionSize,
-    decode,
+    decode_word,
     disassemble,
     fetch_and_decode,
     next_itstate,
 )
 
 
-def word_size(instr: int) -> InstructionSize:
-    """Size of a test word written in that form."""
-    if instr > 0xFFFF:
-        return InstructionSize.SIZE_32BIT
-    return InstructionSize.SIZE_16BIT
-
-
-def decode_word(ctx: Context, instr: int) -> object:
-    """Decode one instruction word at the size the word itself implies."""
-    return decode(instr, ctx, word_size(instr))
-
-
 def disasm(ctx: Context, instr: int, offset: int = 0, istate: int = 0) -> str:
     """Decode one instruction word and format it as assembler text."""
-    size = word_size(instr)
-    return disassemble(decode(instr, ctx, size), size, offset, istate)
+    word = decode_word(instr, ctx)
+    return disassemble(word.instruction, word.size, offset, istate)
 
 
 def disassemble_stream(ctx: Context, halfwords: list[int]) -> list[str]:
