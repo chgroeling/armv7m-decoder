@@ -15,8 +15,8 @@ from armv7m_decoder import (
     Context,
     InstructionSize,
     decode,
-    decode_at,
     disassemble,
+    fetch_and_decode,
     next_itstate,
 )
 
@@ -44,7 +44,7 @@ def disassemble_stream(ctx: Context, halfwords: list[int]) -> list[str]:
     data = b"".join(struct.pack("<H", hw) for hw in halfwords)
     asm: list[str] = []
     offset = 0
-    while (word := decode_at(data, offset, ctx)) is not None:
+    while (word := fetch_and_decode(data, offset, ctx)) is not None:
         istate = ctx.istate
         asm.append(disassemble(word.instruction, word.size, offset, istate))
         ctx.istate = next_itstate(istate, word.instruction)

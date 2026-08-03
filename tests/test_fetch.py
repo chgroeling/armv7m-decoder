@@ -1,9 +1,9 @@
 """Tests for reading an instruction out of memory.
 
-``decode`` takes a word and the size to read it at; ``decode_at`` takes bytes and
-a position, and settles the rest. What it has to get right is the size -- a word
-is read whole or not at all -- and what it has to report is enough for a caller
-to spell the line and step the stream without going back to the bytes.
+``decode`` takes a word and the size to read it at; ``fetch_and_decode`` takes
+bytes and a position, and settles the rest. What it has to get right is the size
+-- a word is read whole or not at all -- and what it has to report is enough for
+a caller to spell the line and step the stream without going back to the bytes.
 """
 
 from __future__ import annotations
@@ -17,7 +17,7 @@ from armv7m_decoder import (
     Context,
     InstructionSize,
     Opcode,
-    decode_at,
+    fetch_and_decode,
     instr_bytes,
     instr_size,
     next_itstate,
@@ -67,7 +67,7 @@ class TestStreamResync:
 
 class TestWordFromBuffer:
     def test_narrow_word_is_one_halfword(self, ctx: Context) -> None:
-        word = decode_at(buffer([0x0001]), 0, ctx)
+        word = fetch_and_decode(buffer([0x0001]), 0, ctx)
         assert word is not None
         assert word.size == InstructionSize.SIZE_16BIT
         assert word.n_bytes == 2
@@ -76,7 +76,7 @@ class TestWordFromBuffer:
         assert word.instruction.opcode == Opcode.OP_MOV_REGISTER
 
     def test_wide_word_joins_both_halfwords(self, ctx: Context) -> None:
-        word = decode_at(buffer([0xF20D, 0x154F]), 0, ctx)
+        word = fetch_and_decode(buffer([0xF20D, 0x154F]), 0, ctx)
         assert word is not None
         assert word.size == InstructionSize.SIZE_32BIT
         assert word.n_bytes == 4
@@ -84,7 +84,7 @@ class TestWordFromBuffer:
         assert word.halfwords == (0xF20D, 0x154F)
 
     def test_offset_is_where_it_reads_and_what_it_reports(self, ctx: Context) -> None:
-        word = decode_at(buffer([0x0001, 0xF20D, 0x154F]), 2, ctx)
+        word = fetch_and_decode(buffer([0x0001, 0xF20D, 0x154F]), 2, ctx)
         assert word is not None
         assert word.offset == 2
         assert word.word == 0xF20D154F
@@ -92,7 +92,7 @@ class TestWordFromBuffer:
     def test_a_word_nothing_matches_is_still_read_whole(self, ctx: Context) -> None:
         # The size holds whether or not an encoding matches: a caller stepping
         # by ``n_bytes`` stays in step where nothing decodes.
-        word = decode_at(buffer([0xF2E5, 0x3EFF]), 0, ctx)
+        word = fetch_and_decode(buffer([0xF2E5, 0x3EFF]), 0, ctx)
         assert word is not None
         assert word.n_bytes == 4
         assert word.instruction.opcode == Opcode.OP_NO_MATCH
@@ -100,15 +100,15 @@ class TestWordFromBuffer:
 
 class TestTruncation:
     def test_nothing_left_reads_as_nothing(self, ctx: Context) -> None:
-        assert decode_at(buffer([0x0001]), 2, ctx) is None
+        assert fetch_and_decode(buffer([0x0001]), 2, ctx) is None
 
     def test_a_lone_byte_is_not_a_halfword(self, ctx: Context) -> None:
-        assert decode_at(b"\x01", 0, ctx) is None
+        assert fetch_and_decode(b"\x01", 0, ctx) is None
 
     def test_a_wide_word_missing_its_tail_is_not_read(self, ctx: Context) -> None:
         # 0xF20D announces four bytes and only two are there. Reading it as the
         # halfword it is not would put every line after it out of step.
-        assert decode_at(buffer([0xF20D]), 0, ctx) is None
+        assert fetch_and_decode(buffer([0xF20D]), 0, ctx) is None
 
 
 class TestContext:
@@ -118,7 +118,7 @@ class TestContext:
         # ``disassemble`` and ``next_itstate`` both want.
         ctx.istate = 0x08
         ctx.apsr.C = 1
-        word = decode_at(buffer([0xBF08]), 0, ctx)  # it eq -- loads nothing here
+        word = fetch_and_decode(buffer([0xBF08]), 0, ctx)  # it eq -- loads nothing
         assert word is not None
         assert ctx.istate == 0x08
         assert ctx.apsr.C == 1
@@ -126,7 +126,7 @@ class TestContext:
     def test_advancing_itstate_stays_the_callers(self, ctx: Context) -> None:
         data = buffer([0xBF08, 0x0001])  # it eq; moveq r1, r0
 
-        it = decode_at(data, 0, ctx)
+        it = fetch_and_decode(data, 0, ctx)
         assert it is not None
         assert isinstance(it.instruction, IT)
 
@@ -138,11 +138,11 @@ class TestContext:
         # 0x4001 is ``ands`` outside a block and ``and`` inside one -- the S bit
         # of a 16-bit data-processing instruction comes from ITSTATE, which
         # reaches the decoder through ``ctx``.
-        outside = decode_at(buffer([0x4001]), 0, ctx)
+        outside = fetch_and_decode(buffer([0x4001]), 0, ctx)
         assert outside is not None
         assert outside.instruction.setflags is True
 
         ctx.istate = 0x08
-        inside = decode_at(buffer([0x4001]), 0, ctx)
+        inside = fetch_and_decode(buffer([0x4001]), 0, ctx)
         assert inside is not None
         assert inside.instruction.setflags is False

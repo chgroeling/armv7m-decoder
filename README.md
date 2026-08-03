@@ -127,14 +127,14 @@ whole, rather than leaving its second halfword to be decoded as an instruction
 of its own.
 
 Reading the halfwords out of a buffer and settling the size is the same work for
-every caller, and `decode_at` does it in one call - bytes and a position in,
-`DecodedWord` out, `None` once what is left is not a whole instruction:
+every caller, and `fetch_and_decode` does it in one call - bytes and a position
+in, `DecodedWord` out, `None` once what is left is not a whole instruction:
 
 ```python
-from armv7m_decoder import decode_at, next_itstate
+from armv7m_decoder import fetch_and_decode, next_itstate
 
 offset = 0
-while (word := decode_at(data, offset, ctx)) is not None:
+while (word := fetch_and_decode(data, offset, ctx)) is not None:
     istate = ctx.istate
     asm = disassemble(word.instruction, word.size, offset, istate)
     ctx.istate = next_itstate(istate, word.instruction)

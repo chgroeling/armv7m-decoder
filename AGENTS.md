@@ -21,8 +21,8 @@ uv run ruff format                         # Format
 - **`src/armv7m_decoder/_decoder.py`** — Generated decoder module (committed artifact). Contains embedded armtranspiller runtime, instruction dataclasses, the `InstructionSize` and `Encoding` enums, the per-size decoders (`decode_16bit`, `decode_32bit`), the `decode(instr, ctx, size)` entry point, the `SIDEFFECT_*` flags, and `NoMatch`.
 - **`src/armv7m_decoder/_disasm.py`** — Disassembler: `disassemble(result, size, offset, istate)` turns a decoded dataclass into a UAL string.
 - **`src/armv7m_decoder/_itstate.py`** — ITSTATE tracking (`next_itstate`, `current_cond`, `in_it_block`) for carrying an IT block's condition across a stream.
-- **`src/armv7m_decoder/_fetch.py`** — Reading an instruction out of memory. The Thumb rule that settles an instruction's size from its first halfword (`instr_size`, `instr_bytes`), applied before anything is decoded, and `decode_at(data, offset, ctx)` on top of it: one instruction out of a byte buffer, reported as a `DecodedWord` (`offset`, `size`, `n_bytes`, `word`, `halfwords`, `instruction`). Answers `None` once what is left is not a whole instruction.
-- **`src/armv7m_decoder/__init__.py`** — Public API: re-exports `decode`, `Context`, `InstructionSize`, `Encoding`, `disassemble`, `decode_at`, `DecodedWord`, the ITSTATE helpers, the size helpers, `NoMatch`, the `SIDEFFECT_*` flags, `get_supported_sizes`, and all instruction dataclasses from `_decoder`.
+- **`src/armv7m_decoder/_fetch.py`** — Reading an instruction out of memory. The Thumb rule that settles an instruction's size from its first halfword (`instr_size`, `instr_bytes`), applied before anything is decoded, and `fetch_and_decode(data, offset, ctx)` on top of it: one instruction out of a byte buffer, reported as a `DecodedWord` (`offset`, `size`, `n_bytes`, `word`, `halfwords`, `instruction`). Answers `None` once what is left is not a whole instruction.
+- **`src/armv7m_decoder/__init__.py`** — Public API: re-exports `decode`, `Context`, `InstructionSize`, `Encoding`, `disassemble`, `fetch_and_decode`, `DecodedWord`, the ITSTATE helpers, the size helpers, `NoMatch`, the `SIDEFFECT_*` flags, `get_supported_sizes`, and all instruction dataclasses from `_decoder`.
 - **`src/armv7m_decoder/_generate.py`** — Regeneration script: reads `formats/armv7-m.yaml` and calls `decoder_forge.generate_code` to produce `_decoder.py`.
 - **`src/armv7m_decoder/cli.py`** — Click CLI with `decode` subcommand for decoding binary files.
 
@@ -64,9 +64,9 @@ asm = disassemble(result, size, offset, istate)
 ctx.istate = next_itstate(istate, result)
 ```
 
-`decode_at` folds the first three lines into one call, so a stream walker only
-has to disassemble, advance ITSTATE, and step by `n_bytes`. That is what the CLI
-does. A decode only reads the context, so `ctx.istate` after the call is still
+`fetch_and_decode` folds the first three lines into one call, so a stream walker
+only has to disassemble, advance ITSTATE, and step by `n_bytes`. That is what the
+CLI does. A decode only reads the context, so `ctx.istate` after the call is still
 the state the word decoded under — the result carries nothing of it.
 
 ### Re-generation

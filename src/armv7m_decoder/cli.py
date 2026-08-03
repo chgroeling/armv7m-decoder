@@ -14,8 +14,8 @@ import click
 from armv7m_decoder import (
     Context,
     Opcode,
-    decode_at,
     disassemble,
+    fetch_and_decode,
     next_itstate,
 )
 
@@ -73,7 +73,7 @@ def decode_cmd(
 
         # One word out of the buffer, decoded at the size its first halfword
         # settles -- ``None`` once what is left is not a whole instruction.
-        word = decode_at(data, offset, ctx)
+        word = fetch_and_decode(data, offset, ctx)
         if word is None:
             break
 

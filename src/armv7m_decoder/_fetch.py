@@ -3,7 +3,8 @@
 :func:`decode` takes a word and the size to read it at; a caller walking a stream
 has neither, only bytes and a position. Settling the size is what bridges the
 two, and Thumb settles it from the first halfword alone (:func:`instr_size`), so
-:func:`decode_at` can read a whole instruction out of a buffer and decode it.
+:func:`fetch_and_decode` can take a whole instruction out of a buffer and hand it
+to the decoder.
 """
 
 from __future__ import annotations
@@ -56,8 +57,8 @@ class DecodedWord:
     instruction: object
 
 
-def decode_at(data: bytes, offset: int, ctx: Context) -> Optional[DecodedWord]:
-    """Decode the instruction that begins at ``offset`` in ``data``.
+def fetch_and_decode(data: bytes, offset: int, ctx: Context) -> Optional[DecodedWord]:
+    """Fetch and decode the instruction that begins at ``offset`` in ``data``.
 
     ITSTATE reaches the decoder through ``ctx``, which the decode only reads: it
     still holds what the word decoded under when this returns, so the caller can
