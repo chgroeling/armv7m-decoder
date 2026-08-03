@@ -15,8 +15,8 @@ from armv7m_decoder import (
     Context,
     InstructionSize,
     decode,
+    decode_at,
     disassemble,
-    instr_size,
     next_itstate,
 )
 
@@ -44,19 +44,9 @@ def disassemble_stream(ctx: Context, halfwords: list[int]) -> list[str]:
     data = b"".join(struct.pack("<H", hw) for hw in halfwords)
     asm: list[str] = []
     offset = 0
-    while offset + 2 <= len(data):
-        hw1 = struct.unpack_from("<H", data, offset)[0]
-        size = instr_size(hw1)
-        n_bytes = size // 8
-        if offset + n_bytes > len(data):
-            break
-        if size == InstructionSize.SIZE_32BIT:
-            instr = (hw1 << 16) | struct.unpack_from("<H", data, offset + 2)[0]
-        else:
-            instr = hw1
+    while (word := decode_at(data, offset, ctx)) is not None:
         istate = ctx.istate
-        result = decode(instr, ctx, size)
-        asm.append(disassemble(result, size, offset, istate))
-        ctx.istate = next_itstate(istate, result)
-        offset += n_bytes
+        asm.append(disassemble(word.instruction, word.size, offset, istate))
+        ctx.istate = next_itstate(istate, word.instruction)
+        offset += word.n_bytes
     return asm
