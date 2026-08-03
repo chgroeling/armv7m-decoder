@@ -1,8 +1,9 @@
-"""Decoding one instruction out of a byte buffer.
+"""Reading one instruction out of memory.
 
 :func:`decode` takes a word and the size to read it at; a caller walking a stream
-has neither, only bytes and a position. :func:`decode_at` bridges the two, and
-reports what it read alongside what it decoded.
+has neither, only bytes and a position. Settling the size is what bridges the
+two, and Thumb settles it from the first halfword alone (:func:`instr_size`), so
+:func:`decode_at` can read a whole instruction out of a buffer and decode it.
 """
 
 from __future__ import annotations
@@ -12,7 +13,26 @@ from dataclasses import dataclass
 from typing import Optional
 
 from armv7m_decoder._decoder import Context, InstructionSize, decode
-from armv7m_decoder._size import instr_size
+
+
+def instr_size(hw1: int) -> InstructionSize:
+    """Size of the instruction that begins with halfword ``hw1``.
+
+    A first halfword whose bits 15:11 read ``0b11101``, ``0b11110`` or
+    ``0b11111`` begins a 32-bit instruction, and every other halfword is a
+    16-bit instruction in its own right (Armv7-M ARM A5.1). The rule holds
+    whether or not an encoding matches, which is what keeps a stream in step: a
+    word nothing decodes is still skipped whole, instead of leaving its second
+    halfword to be read as an instruction of its own.
+    """
+    if hw1 & 0xF800 >= 0xE800:
+        return InstructionSize.SIZE_32BIT
+    return InstructionSize.SIZE_16BIT
+
+
+def instr_bytes(hw1: int) -> int:
+    """Bytes that instruction occupies -- how far a stream advances past it."""
+    return instr_size(hw1) // 8
 
 
 @dataclass(frozen=True)
@@ -55,9 +75,6 @@ def decode_at(data: bytes, offset: int, ctx: Context) -> Optional[DecodedWord]:
     if offset < 0 or offset + 2 > len(data):
         return None
 
-    # The first halfword settles the size, whether or not an encoding matches --
-    # skipping only half of a 32-bit word would leave the second halfword to be
-    # decoded as an instruction of its own.
     hw1 = struct.unpack_from("<H", data, offset)[0]
     size = instr_size(hw1)
     n_bytes = size // 8

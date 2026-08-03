@@ -1,4 +1,4 @@
-"""Tests for decoding straight out of a byte buffer.
+"""Tests for reading an instruction out of memory.
 
 ``decode`` takes a word and the size to read it at; ``decode_at`` takes bytes and
 a position, and settles the rest. What it has to get right is the size -- a word
@@ -10,18 +10,59 @@ from __future__ import annotations
 
 import struct
 
+import pytest
+
 from armv7m_decoder import (
     IT,
     Context,
     InstructionSize,
     Opcode,
     decode_at,
+    instr_bytes,
+    instr_size,
     next_itstate,
 )
+
+from .helpers import disassemble_stream
 
 
 def buffer(halfwords: list[int]) -> bytes:
     return b"".join(struct.pack("<H", hw) for hw in halfwords)
+
+
+class TestInstrSize:
+    @pytest.mark.parametrize(
+        ("halfword", "expected"),
+        [
+            (0xB717, InstructionSize.SIZE_16BIT),  # undefined, but plainly 16-bit
+            (0x38D1, InstructionSize.SIZE_16BIT),
+            (0xE7FF, InstructionSize.SIZE_16BIT),  # last halfword that stands alone
+            (0xE800, InstructionSize.SIZE_32BIT),  # first of the three prefixes
+            (0xF2E5, InstructionSize.SIZE_32BIT),
+            (0xFFFF, InstructionSize.SIZE_32BIT),
+        ],
+    )
+    def test_size_from_the_halfword(self, halfword: int, expected: int) -> None:
+        assert instr_size(halfword) == expected
+
+    @pytest.mark.parametrize(
+        ("halfword", "expected"),
+        [(0x38D1, 2), (0xE7FF, 2), (0xE800, 4), (0xFFFF, 4)],
+    )
+    def test_bytes_follow_the_size(self, halfword: int, expected: int) -> None:
+        assert instr_bytes(halfword) == expected
+
+
+class TestStreamResync:
+    def test_stream_skips_both_halfwords(self, ctx) -> None:
+        # The size holds whether or not an encoding matches: without it the
+        # second halfword disassembles as an instruction of its own and every
+        # line after it is suspect.
+        assert disassemble_stream(ctx, [0x0001, 0xF2E5, 0x3EFF, 0x068E]) == [
+            "movs\tr1, r0",
+            "<no_match>",
+            "lsls\tr6, r1, #26",
+        ]
 
 
 class TestWordFromBuffer:
