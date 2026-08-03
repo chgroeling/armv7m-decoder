@@ -25,18 +25,18 @@ from armv7m_decoder._decoder import (  # noqa: F401
     get_supported_sizes,
 )
 from armv7m_decoder._disasm import disassemble  # noqa: F401
-from armv7m_decoder._fetch import (  # noqa: F401
-    DecodedWord,
-    decode_word,
-    fetch_and_decode,
-    instr_bytes,
-    instr_size,
-)
 from armv7m_decoder._itstate import (  # noqa: F401
     COND_AL,
     current_cond,
     in_it_block,
     next_itstate,
+)
+from armv7m_decoder._word import (  # noqa: F401
+    DecodedWord,
+    decode_word,
+    fetch_and_decode,
+    instr_bytes,
+    instr_size,
 )
 
 __all__ = [

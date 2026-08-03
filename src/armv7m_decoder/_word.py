@@ -1,10 +1,10 @@
-"""Reading one instruction out of memory.
+"""The instruction word: how wide it is, where it comes from, what it decodes to.
 
-:func:`decode` takes a word and the size to read it at; a caller walking a stream
-has neither, only bytes and a position. Settling the size is what bridges the
-two, and Thumb settles it from the first halfword alone (:func:`instr_size`), so
-:func:`fetch_and_decode` can take a whole instruction out of a buffer and hand it
-to the decoder.
+:func:`decode` takes a word and the size to read it at, which leaves the caller
+to settle the size -- so this is where that is settled, and why :func:`decode` is
+not part of the public API. A word in hand carries its width in its value
+(:func:`decode_word`); bytes in a buffer do not, and only the first halfword says
+how far the instruction reaches (:func:`instr_size`, :func:`fetch_and_decode`).
 """
 
 from __future__ import annotations
