@@ -20,9 +20,9 @@ uv run ruff format                         # Format
 
 - **`src/armv7m_decoder/_decoder.py`** — Generated decoder module (committed artifact). Contains embedded armtranspiller runtime, instruction dataclasses, the `InstructionSize` and `Encoding` enums, the per-size decoders (`decode_16bit`, `decode_32bit`), the `decode(instr, ctx, size)` entry point, the `SIDEFFECT_*` flags, and `NoMatch`.
 - **`src/armv7m_decoder/_disasm.py`** — Disassembler: `disassemble(result, size, offset, istate)` turns a decoded dataclass into a UAL string.
-- **`src/armv7m_decoder/_itstate.py`** — ITSTATE tracking (`next_itstate`, `current_cond`, `in_it_block`) for carrying an IT block's condition across a stream.
-- **`src/armv7m_decoder/_word.py`** — The two ways into the decoder, both reporting a `DecodedWord` (`offset`, `size`, `n_bytes`, `word`, `halfwords`, `instruction`). `decode_word(instr, ctx)` takes a word in hand and reads its size off the value (nothing below `0x10000` is a 32-bit encoding). `fetch_and_decode(data, offset, ctx)` takes bytes and a position, settles the size from the first halfword with `instr_size` (also exported, with `instr_bytes`), and answers `None` once what is left is not a whole instruction.
-- **`src/armv7m_decoder/__init__.py`** — Public API: re-exports `decode_word`, `fetch_and_decode`, `DecodedWord`, `Context`, `InstructionSize`, `Encoding`, `disassemble`, the ITSTATE helpers, the size helpers, `NoMatch`, the `SIDEFFECT_*` flags, `get_supported_sizes`, and all instruction dataclasses from `_decoder`. **`decode`, `decode_16bit` and `decode_32bit` are deliberately not exported** — they take the size as an input, and every way in from outside settles it first.
+- **`src/armv7m_decoder/_itstate.py`** — ITSTATE tracking (`next_itstate`, `current_cond`, `in_it_block`) for carrying an IT block's condition across a stream. Only `current_cond` and `COND_AL` are public; carrying ITSTATE is internal, done by the CLI and `_disasm`.
+- **`src/armv7m_decoder/_word.py`** — The two ways into the decoder, both reporting a `DecodedWord` (`offset`, `size`, `n_bytes`, `word`, `halfwords`, `instruction`). `decode_word(instr, ctx)` takes a word in hand and reads its size off the value (nothing below `0x10000` is a 32-bit encoding). `fetch_and_decode(data, offset, ctx)` takes bytes and a position, settles the size from the first halfword with `instr_size` (internal, along with `instr_bytes`), and answers `None` once what is left is not a whole instruction.
+- **`src/armv7m_decoder/__init__.py`** — Public API, kept deliberately small: `decode_word`, `fetch_and_decode`, `DecodedWord`, `Context`, `InstructionSize`, `Encoding`, `disassemble`, `current_cond`, `COND_AL`, `NoMatch`, the `SIDEFFECT_*` flags, `get_supported_sizes`, and all instruction dataclasses from `_decoder`. **Not exported, on purpose:** `decode`, `decode_16bit`, `decode_32bit` (they take the size as an input, and both ways in settle it first); `instr_size`, `instr_bytes` (the size rule is applied for the caller, not by it); `next_itstate`, `in_it_block` (carrying ITSTATE is internal — see below). Nothing here is exported because it happens to be useful internally; adding to this list is a decision.
 - **`src/armv7m_decoder/_generate.py`** — Regeneration script: reads `formats/armv7-m.yaml` and calls `decoder_forge.generate_code` to produce `_decoder.py`.
 - **`src/armv7m_decoder/cli.py`** — Click CLI with `decode` subcommand for decoding binary files.
 
@@ -64,9 +64,16 @@ ctx.istate = next_itstate(istate, word.instruction)
 offset += word.n_bytes
 ```
 
-That is what the CLI does. A decode only reads the context, so `ctx.istate` after
-the call is still the state the word decoded under — the result carries nothing
-of it, and advancing it is the caller's step.
+That is what the CLI does, and it is the one place in the package that does it.
+`next_itstate` and `in_it_block` are not public: the CLI walks a stream, and
+anything else outside the package gets `fetch_and_decode` without the running
+state, which spells `mov` where a listing should read `moveq`. Should a library
+caller ever need correct IT blocks, the fix is for `fetch_and_decode` to advance
+`ctx.istate` itself and report the state the word decoded under on the result —
+not to re-export `next_itstate` and hand the bookkeeping back.
+
+A decode only reads the context, so `ctx.istate` after the call is still the
+state the word decoded under — the result carries nothing of it.
 
 ### Re-generation
 

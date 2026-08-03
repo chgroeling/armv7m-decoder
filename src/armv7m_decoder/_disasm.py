@@ -1926,8 +1926,10 @@ def disassemble(
         offset: Address of the instruction in memory (for computing absolute
                 branch targets).
         istate: ITSTATE in force for this instruction, as tracked across the
-                stream by :func:`armv7m_decoder.next_itstate`. Zero (the
-                default) means no IT block is open, so no condition suffix.
+                stream by :func:`armv7m_decoder._itstate.next_itstate`. Zero
+                (the default) means no IT block is open, so no condition
+                suffix -- which is all an outside caller can say, ITSTATE
+                tracking not being part of the public API.
 
     Returns:
         UAL assembler syntax string, e.g. ``"adds r0, r1, #42"``. A word whose

@@ -20,10 +20,9 @@ from armv7m_decoder import (
     Opcode,
     decode_word,
     fetch_and_decode,
-    instr_bytes,
-    instr_size,
-    next_itstate,
 )
+from armv7m_decoder._itstate import next_itstate
+from armv7m_decoder._word import instr_bytes, instr_size
 
 from .helpers import disassemble_stream
 

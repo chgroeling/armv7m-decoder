@@ -11,13 +11,8 @@ from typing import Optional
 
 import click
 
-from armv7m_decoder import (
-    Context,
-    Opcode,
-    disassemble,
-    fetch_and_decode,
-    next_itstate,
-)
+from armv7m_decoder import Context, Opcode, disassemble, fetch_and_decode
+from armv7m_decoder._itstate import next_itstate
 
 
 def parse_address(_ctx, _param, value: str) -> int:

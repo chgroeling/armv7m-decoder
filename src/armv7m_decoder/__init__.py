@@ -4,12 +4,10 @@ Decoding starts at :func:`fetch_and_decode` for a word still in a byte buffer, o
 :func:`decode_word` for one the caller already has in hand; both settle the size
 themselves and report a :class:`DecodedWord`. Also provides the :class:`Context`
 for threading runtime state, the :func:`disassemble` function for assembler
-formatting, the ITSTATE helpers that carry an IT block's condition across a
-stream (:func:`next_itstate`, :func:`current_cond`, :func:`in_it_block`), the
-instruction-size helpers that settle how wide a word is before it is decoded
-(:func:`instr_size`, :func:`instr_bytes`), :class:`NoMatch` for a word no
-encoding matches, the ``SIDEFFECT_*`` flags an instruction reports on its
-``sideeffects`` member, and all instruction dataclasses.
+formatting, :func:`current_cond` and ``COND_AL`` for the condition an ITSTATE
+puts the next instruction under, :class:`NoMatch` for a word no encoding
+matches, the ``SIDEFFECT_*`` flags an instruction reports on its ``sideeffects``
+member, and all instruction dataclasses.
 """
 
 from armv7m_decoder._decoder import (  # noqa: F401
@@ -25,18 +23,11 @@ from armv7m_decoder._decoder import (  # noqa: F401
     get_supported_sizes,
 )
 from armv7m_decoder._disasm import disassemble  # noqa: F401
-from armv7m_decoder._itstate import (  # noqa: F401
-    COND_AL,
-    current_cond,
-    in_it_block,
-    next_itstate,
-)
+from armv7m_decoder._itstate import COND_AL, current_cond  # noqa: F401
 from armv7m_decoder._word import (  # noqa: F401
     DecodedWord,
     decode_word,
     fetch_and_decode,
-    instr_bytes,
-    instr_size,
 )
 
 __all__ = [
@@ -56,10 +47,6 @@ __all__ = [
     "disassemble",
     "fetch_and_decode",
     "get_supported_sizes",
-    "in_it_block",
-    "instr_bytes",
-    "instr_size",
-    "next_itstate",
 ]
 
 # Re-export all instruction dataclasses from the generated decoder.  An instruction

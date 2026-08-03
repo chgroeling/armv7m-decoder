@@ -11,13 +11,8 @@ from __future__ import annotations
 
 import struct
 
-from armv7m_decoder import (
-    Context,
-    decode_word,
-    disassemble,
-    fetch_and_decode,
-    next_itstate,
-)
+from armv7m_decoder import Context, decode_word, disassemble, fetch_and_decode
+from armv7m_decoder._itstate import next_itstate
 
 
 def disasm(ctx: Context, instr: int, offset: int = 0, istate: int = 0) -> str:

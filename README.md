@@ -115,13 +115,11 @@ come from the value - four bytes and two bytes are the same value until you know
 which - so it comes from the first halfword, before anything is decoded:
 
 ```python
-from armv7m_decoder import fetch_and_decode, next_itstate
+from armv7m_decoder import fetch_and_decode
 
 offset = 0
 while (word := fetch_and_decode(data, offset, ctx)) is not None:
-    istate = ctx.istate
-    asm = disassemble(word.instruction, word.size, offset, istate)
-    ctx.istate = next_itstate(istate, word.instruction)
+    asm = disassemble(word.instruction, word.size, offset)
     offset += word.n_bytes
 ```
 
@@ -130,18 +128,21 @@ stream in step where nothing does: a word answered `NoMatch` is still skipped
 whole, rather than leaving its second halfword to be decoded as an instruction
 of its own.
 
-`IT` makes up to four following instructions conditional, and neither their
-condition nor their `S` bit is in their own encoding - both come from ITSTATE.
-A stream is therefore decoded statefully: keep ITSTATE in `Context.istate`, hand
-the same value to `disassemble` so it can spell `moveq` rather than `mov`, and
-advance it after every instruction, as the loop above does. A decode only reads
-the context, so `ctx.istate` after the call is still the state the word decoded
-under - the result carries nothing of it. Advancing it stays yours: only you
-know whether the instruction is one you mean to have executed.
-
 `DecodedWord` also holds the word itself (`word.word`) and the halfwords it was
 assembled from (`word.halfwords`), which is what a listing needs to print the
 bytes alongside the mnemonic.
+
+### One thing this loop does not do
+
+`IT` makes up to four following instructions conditional, and neither their
+condition nor their `S` bit is in their own encoding - both come from ITSTATE,
+a running state the loop above does not keep. Inside an IT block it therefore
+spells `mov` where the listing should read `moveq`, and `adds` where the
+architecture means `add`.
+
+Carrying ITSTATE across a stream is not part of the public API. The command
+line does it, so its listings are right; a library caller writing its own loop
+gets everything except that.
 
 ### Side effects
 
