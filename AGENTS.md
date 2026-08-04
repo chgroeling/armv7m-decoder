@@ -24,7 +24,7 @@ uv run ruff format                         # Format
 - **`src/armv7m_decoder/_word.py`** — The two ways into the decoder, both reporting a `DecodedWord` (`offset`, `size`, `n_bytes`, `word`, `halfwords`, `instruction`). `decode_word(instr, ctx)` takes a word in hand and reads its size off the value (nothing below `0x10000` is a 32-bit encoding). `fetch_and_decode(data, offset, ctx)` takes bytes and a position, settles the size from the first halfword with `instr_size` (internal, along with `instr_bytes`), and answers `None` once what is left is not a whole instruction.
 - **`src/armv7m_decoder/__init__.py`** — Public API, kept deliberately small: `decode_word`, `fetch_and_decode`, `DecodedWord`, `Context`, `InstructionSize`, `Encoding`, `disassemble`, `COND_AL`, `NoMatch`, the `SIDEFFECT_*` flags, `get_supported_sizes`, and all instruction dataclasses from `_decoder`. **Not exported, on purpose:** `decode`, `decode_16bit`, `decode_32bit` (they take the size as an input, and both ways in settle it first); `instr_size`, `instr_bytes` (the size rule is applied for the caller, not by it); `next_itstate`, `in_it_block`, `current_cond` (ITSTATE is internal — see below). Nothing here is exported because it happens to be useful internally; adding to this list is a decision.
 - **`src/armv7m_decoder/_generate.py`** — Regeneration script: reads `formats/armv7-m.yaml` and calls `decoder_forge.generate_code` to produce `_decoder.py`.
-- **`src/armv7m_decoder/cli.py`** — Click CLI with `decode` subcommand for decoding binary files.
+- **`src/armv7m_decoder/cli.py`** — Click CLI, one command taking a binary file - there is only one thing to do, so there is no subcommand to name it.
 
 ### Generated decoder
 

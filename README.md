@@ -44,7 +44,7 @@ emulator is the next step, not this one.
 Nothing to install, if you have `uv` - run it straight from the repository:
 
 ```bash
-uvx git+https://github.com/chgroeling/armv7m-decoder decode firmware.bin
+uvx git+https://github.com/chgroeling/armv7m-decoder firmware.bin
 ```
 
 Not published on PyPI yet, so a project that wants it as a dependency takes it
@@ -65,7 +65,7 @@ uv sync
 ## Command line
 
 ```bash
-armv7m-decoder decode firmware.bin --start-address 0x0
+armv7m-decoder firmware.bin --start-address 0x0
 ```
 
 Output is objdump's listing format - address, instruction bytes, assembler:

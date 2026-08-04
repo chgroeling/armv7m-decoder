@@ -2,7 +2,7 @@
 
 Usage::
 
-    armv7m-decoder decode firmware.bin --start-address 0xD4
+    armv7m-decoder firmware.bin --start-address 0xD4
 """
 
 import sys
@@ -22,12 +22,7 @@ def parse_address(_ctx, _param, value: str) -> int:
         raise click.BadParameter(f"{value!r} is not a valid address")
 
 
-@click.group()
-def main() -> None:
-    pass
-
-
-@main.command()
+@click.command()
 @click.argument("BIN_PATH", type=str)
 @click.option(
     "--start-address",
@@ -47,7 +42,7 @@ def main() -> None:
     type=int,
     help="Maximum number of instructions to decode",
 )
-def decode_cmd(
+def main(
     bin_path: str,
     start_address: int,
     out_file: Optional[str],

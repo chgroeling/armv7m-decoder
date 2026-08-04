@@ -18,7 +18,7 @@ def run(tmp_path, halfwords: list[int]) -> list[str]:
     """Disassemble a Thumb stream through the CLI and return its lines."""
     bin_path = tmp_path / "firmware.bin"
     bin_path.write_bytes(b"".join(struct.pack("<H", hw) for hw in halfwords))
-    result = CliRunner().invoke(main, ["decode", str(bin_path)])
+    result = CliRunner().invoke(main, [str(bin_path)])
     assert result.exit_code == 0, result.output
     return result.output.splitlines()
 
