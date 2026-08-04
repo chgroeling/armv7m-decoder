@@ -95,7 +95,7 @@ word.instruction
 # MOV_immediate(encoding=<Encoding.T1: 1>, sideeffects=0, d=4,
 #               setflags=True, imm32=1, carry=0)
 
-disassemble(word.instruction, word.size)   # 'movs\tr4, #1'
+disassemble(word.instruction, word.size)  # 'movs\tr4, #1'
 ```
 
 Write the word the way an architecture manual spells the encoding - a bare
@@ -105,7 +105,9 @@ below `0x10000` is a 32-bit encoding.
 
 Back comes a `DecodedWord`: the size it was decoded at, the halfwords it holds,
 and `instruction` - a dataclass per instruction, with an `encoding` member
-saying which form matched, or `NoMatch` if none did.
+saying which form matched, or `NoMatch` if none did. It also carries the offset
+the word was read from, which for a word handed over directly is 0 - it came
+from no buffer.
 
 ### Walking a stream
 
@@ -130,7 +132,8 @@ of its own.
 
 `DecodedWord` also holds the word itself (`word.word`) and the halfwords it was
 assembled from (`word.halfwords`), which is what a listing needs to print the
-bytes alongside the mnemonic.
+bytes alongside the mnemonic, and `word.offset` - where in the buffer this one
+began, so a listing has its address without the loop passing it back in.
 
 ### One thing this loop does not do
 
