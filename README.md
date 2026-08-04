@@ -41,7 +41,14 @@ emulator is the next step, not this one.
 
 ## Install
 
-Not published on PyPI yet, so install it from the repository:
+Nothing to install, if you have `uv` - run it straight from the repository:
+
+```bash
+uvx git+https://github.com/chgroeling/armv7m-decoder decode firmware.bin
+```
+
+Not published on PyPI yet, so a project that wants it as a dependency takes it
+from the repository too:
 
 ```bash
 uv add git+https://github.com/chgroeling/armv7m-decoder
